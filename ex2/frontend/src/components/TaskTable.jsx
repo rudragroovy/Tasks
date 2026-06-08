@@ -158,19 +158,19 @@ export default function TaskTable({ tasks, stats, categories = [], fetchTasks, s
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden transition-colors">
       {/* Tabs */}
       {!hideTabs && (
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex gap-2">
-            <button onClick={() => setTab('All')} className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-2", currentTab === 'All' ? "bg-indigo-50 dark:bg-indigo-900/30 text-[#5B4EFF]" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700")}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
+            <button onClick={() => setTab('All')} className={cn("shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-2", currentTab === 'All' ? "bg-indigo-50 dark:bg-indigo-900/30 text-[#5B4EFF]" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700")}>
               All {stats && <span className="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-xs">{stats.total}</span>}
             </button>
-            <button onClick={() => setTab('Pending')} className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-2", currentTab === 'Pending' ? "bg-indigo-50 dark:bg-indigo-900/30 text-[#5B4EFF]" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700")}>
+            <button onClick={() => setTab('Pending')} className={cn("shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-2", currentTab === 'Pending' ? "bg-indigo-50 dark:bg-indigo-900/30 text-[#5B4EFF]" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700")}>
               Pending {stats && <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">{stats.pending}</span>}
             </button>
-            <button onClick={() => setTab('Completed')} className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-2", currentTab === 'Completed' ? "bg-indigo-50 dark:bg-indigo-900/30 text-[#5B4EFF]" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700")}>
+            <button onClick={() => setTab('Completed')} className={cn("shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-2", currentTab === 'Completed' ? "bg-indigo-50 dark:bg-indigo-900/30 text-[#5B4EFF]" : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700")}>
               Completed {stats && <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">{stats.completed}</span>}
             </button>
           </div>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto flex justify-end">
             <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300 px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <SlidersHorizontal size={14} /> Filters <ChevronDown size={14} />
             </button>
@@ -209,8 +209,8 @@ export default function TaskTable({ tasks, stats, categories = [], fetchTasks, s
         </div>
       )}
       
-      {/* Table Header */}
-      <div className="grid grid-cols-[auto_1fr_120px_150px_100px] gap-4 px-6 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 text-xs font-medium text-gray-500 dark:text-gray-400">
+      {/* Table Header - Hidden on mobile */}
+      <div className="hidden md:grid grid-cols-[auto_1fr_120px_150px_100px] gap-4 px-6 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 text-xs font-medium text-gray-500 dark:text-gray-400">
         <div className="w-5 flex justify-center"><input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 w-4 h-4 bg-transparent" /></div>
         <div>Task</div>
         <div>Priority</div>
@@ -229,22 +229,22 @@ export default function TaskTable({ tasks, stats, categories = [], fetchTasks, s
           return (
             <div key={task._id} className="flex flex-col">
               {editingTaskId === task._id ? (
-                <form onSubmit={(e) => saveEdit(e, task._id)} className="grid grid-cols-[auto_1fr_120px_150px_100px] gap-4 px-6 py-4 items-center bg-indigo-50/50 dark:bg-indigo-900/10">
-                  <div className="w-5 flex justify-center">
+                <form onSubmit={(e) => saveEdit(e, task._id)} className="flex flex-col md:grid md:grid-cols-[auto_1fr_120px_150px_100px] gap-3 md:gap-4 px-6 py-4 items-start md:items-center bg-indigo-50/50 dark:bg-indigo-900/10">
+                  <div className="hidden md:flex w-5 justify-center">
                   </div>
-                  <div>
+                  <div className="w-full">
                     <input 
                       type="text" 
                       value={editFormData.title}
                       onChange={(e) => setEditFormData({...editFormData, title: e.target.value})}
-                      className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-sm mb-2"
+                      className="w-full px-2 py-1.5 md:py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-sm mb-2"
                       required
                       placeholder="Task title"
                     />
                     <select 
                       value={editFormData.category}
                       onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
-                      className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-xs text-gray-700 dark:text-gray-300"
+                      className="w-full px-2 py-1.5 md:py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-xs text-gray-700 dark:text-gray-300"
                     >
                       <option value="">No Category</option>
                       {categories.map(cat => (
@@ -252,61 +252,77 @@ export default function TaskTable({ tasks, stats, categories = [], fetchTasks, s
                       ))}
                     </select>
                   </div>
-                  <div>
+                  <div className="w-full md:w-auto flex gap-2 md:contents">
                     <select 
                       value={editFormData.priority}
                       onChange={(e) => setEditFormData({...editFormData, priority: e.target.value})}
-                      className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-sm"
+                      className="flex-1 md:w-full px-2 py-1.5 md:py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-sm"
                     >
                       <option value="Medium">Medium</option>
                       <option value="High">High</option>
                       <option value="Low">Low</option>
                     </select>
-                  </div>
-                  <div>
                     <input 
                       type="date" 
                       value={editFormData.dueDate}
                       onChange={(e) => setEditFormData({...editFormData, dueDate: e.target.value})}
-                      className="w-full px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-sm text-gray-700 dark:text-gray-300"
+                      className="flex-1 md:w-full px-2 py-1.5 md:py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 text-sm text-gray-700 dark:text-gray-300"
                     />
                   </div>
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="hidden md:flex items-center justify-end gap-2">
                     <button type="submit" className="text-green-600 hover:text-green-700 dark:text-green-500"><CheckCircle size={16} /></button>
                     <button type="button" onClick={cancelEdit} className="text-gray-400 hover:text-gray-500"><Trash2 size={16} className="rotate-45" /></button>
                   </div>
+                  {/* Mobile edit actions */}
+                  <div className="flex md:hidden items-center justify-end gap-3 w-full mt-2">
+                    <button type="button" onClick={cancelEdit} className="text-gray-500 text-sm font-medium px-3 py-1">Cancel</button>
+                    <button type="submit" className="bg-[#5B4EFF] text-white text-sm font-medium px-4 py-1.5 rounded flex items-center gap-1"><CheckCircle size={14} /> Save</button>
+                  </div>
                 </form>
               ) : (
-              <div className="grid grid-cols-[auto_1fr_120px_150px_100px] gap-4 px-6 py-4 items-center hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors group">
-                <div className="w-5 flex justify-center">
-                  <button 
-                    onClick={() => toggleTaskStatus(task)}
-                    className={cn("w-4.5 h-4.5 rounded-[4px] border flex items-center justify-center transition-colors", task.status === 'Completed' ? 'bg-[#5B4EFF] border-[#5B4EFF] text-white' : 'border-gray-300 dark:border-gray-600')}
-                  >
-                    {task.status === 'Completed' && <CheckCircle size={12} strokeWidth={3} />}
-                  </button>
-                </div>
-                <div className="flex items-center gap-3">
-                  {hasSubtasks && (
-                    <button onClick={() => toggleTaskExpand(task._id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none">
-                      {isExpanded ? <ChevronDown size={16} /> : <ChevronDown size={16} className="-rotate-90" />}
+              <div className="flex flex-col md:grid md:grid-cols-[auto_1fr_120px_150px_100px] gap-3 md:gap-4 px-6 py-4 items-start md:items-center hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors group">
+                <div className="flex items-start gap-3 w-full md:w-auto md:contents">
+                  <div className="w-5 pt-0.5 md:pt-0 flex justify-center shrink-0">
+                    <button 
+                      onClick={() => toggleTaskStatus(task)}
+                      className={cn("w-4.5 h-4.5 rounded-[4px] border flex items-center justify-center transition-colors", task.status === 'Completed' ? 'bg-[#5B4EFF] border-[#5B4EFF] text-white' : 'border-gray-300 dark:border-gray-600')}
+                    >
+                      {task.status === 'Completed' && <CheckCircle size={12} strokeWidth={3} />}
                     </button>
-                  )}
-                  {!hasSubtasks && <div className="w-4"></div>}
-                  <div>
-                    <p className={cn("text-sm font-medium", task.status === 'Completed' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-gray-100')}>{task.title}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{task.description || (task.category ? task.category.name : "No description")}</p>
+                  </div>
+                  <div className="flex items-start gap-2 flex-1 md:flex-none">
+                    {hasSubtasks && (
+                      <button onClick={() => toggleTaskExpand(task._id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none mt-0.5">
+                        {isExpanded ? <ChevronDown size={16} /> : <ChevronDown size={16} className="-rotate-90" />}
+                      </button>
+                    )}
+                    {!hasSubtasks && <div className="w-4 hidden md:block"></div>}
+                    <div className="flex-1">
+                      <p className={cn("text-sm font-medium", task.status === 'Completed' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-gray-100')}>{task.title}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{task.description || (task.category ? task.category.name : "No description")}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Mobile Actions - Top Right */}
+                  <div className="md:hidden flex items-center gap-3 text-gray-400 shrink-0">
+                    <button onClick={() => startEdit(task)} className="hover:text-[#5B4EFF]"><Edit2 size={16} /></button>
+                    <button onClick={() => confirmDeleteTask(task._id)} className="hover:text-red-500"><Trash2 size={16} /></button>
                   </div>
                 </div>
-                <div>
-                  {task.priority === 'High' && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">High <ArrowUp size={12} /></span>}
-                  {task.priority === 'Medium' && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400">Medium <Minus size={12} /></span>}
-                  {task.priority === 'Low' && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400">Low <ArrowDown size={12} /></span>}
+
+                <div className="flex items-center gap-4 pl-8 md:pl-0 w-full md:w-auto md:contents">
+                  <div className="shrink-0">
+                    {task.priority === 'High' && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] md:text-xs font-medium bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">High <ArrowUp size={10} className="md:w-3 md:h-3" /></span>}
+                    {task.priority === 'Medium' && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] md:text-xs font-medium bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400">Medium <Minus size={10} className="md:w-3 md:h-3" /></span>}
+                    {task.priority === 'Low' && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] md:text-xs font-medium bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400">Low <ArrowDown size={10} className="md:w-3 md:h-3" /></span>}
+                  </div>
+                  <div className="text-xs md:text-sm text-gray-500 md:text-gray-600 dark:text-gray-400 md:dark:text-gray-300">
+                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date'}
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">
-                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
-                </div>
-                <div className="flex items-center justify-end gap-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                
+                {/* Desktop Actions */}
+                <div className="hidden md:flex items-center justify-end gap-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => startEdit(task)} className="hover:text-[#5B4EFF] dark:hover:text-[#6e63ff]"><Edit2 size={16} /></button>
                   <button onClick={() => confirmDeleteTask(task._id)} className="hover:text-red-500 dark:hover:text-red-400"><Trash2 size={16} /></button>
                 </div>

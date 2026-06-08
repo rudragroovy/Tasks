@@ -84,9 +84,9 @@ export default function Categories() {
         </div>
 
         {/* Categories Grid */}
-        <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
           {categoriesWithCounts.length === 0 ? (
-            <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
+            <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
               No categories found. Create one to get started.
             </div>
           ) : (

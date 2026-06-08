@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { cn } from '../utils';
 import {
   CheckCircle, ListTodo, Folder, BarChart2, Settings, HelpCircle,
-  Sun, Moon, Bell, ChevronDown, Search, Calendar, MoreVertical, Clock, ArrowDown, LayoutDashboard, ListChecks
+  Sun, Moon, Bell, ChevronDown, Search, Calendar, MoreVertical, Clock, ArrowDown, LayoutDashboard, ListChecks, Menu
 } from 'lucide-react';
 
 export default function Layout({
@@ -14,6 +14,13 @@ export default function Layout({
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [showHelpMenu, setShowHelpMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+
+  // Close mobile menu when navigating
+  React.useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const chartData = [
     { name: 'Completed', value: stats.completed, color: '#10B981' },
@@ -34,10 +41,22 @@ export default function Layout({
 
   return (
     <div className={cn("min-h-screen flex text-gray-900 font-sans antialiased", isDarkMode ? "dark bg-gray-900 text-gray-100" : "bg-gray-50")}>
+      
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity" 
+          onClick={() => setIsMobileMenuOpen(false)} 
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-[240px] bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 flex flex-col hidden md:flex shrink-0 h-screen sticky top-0 transition-colors">
+      <aside className={cn(
+        "w-[240px] bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 flex flex-col shrink-0 h-screen fixed md:sticky top-0 z-50 transition-transform duration-300",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
         <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#5B4EFF] to-[#8b5cf6] shadow-md flex items-center justify-center text-white">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#5B4EFF] to-[#8b5cf6] dark:from-indigo-500 dark:to-indigo-400 shadow-md flex items-center justify-center text-white">
             <ListChecks size={20} strokeWidth={2.5} />
           </div>
           <span className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 tracking-tight">DailyTasks</span>
@@ -91,29 +110,54 @@ export default function Layout({
       {/* Main Column */}
       <main className="flex-1 flex flex-col min-w-0 h-screen">
         {/* Header */}
-        <header className="h-20 shrink-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between px-8 z-10 transition-colors">
-          <div className="flex items-center bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 w-[480px] max-w-full relative">
-            <Search className="text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search tasks, categories, or tags..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none focus:outline-none ml-2 w-full text-sm text-gray-700 dark:text-gray-200" 
-            />
-            <div className="absolute right-2 px-1.5 py-0.5 border border-gray-200 dark:border-gray-600 rounded text-xs text-gray-400 font-medium bg-white dark:bg-gray-800 shadow-sm">⌘K</div>
+        <header className="h-16 md:h-20 shrink-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between px-4 md:px-8 z-10 transition-colors gap-4">
+          <div className="flex items-center gap-2 md:gap-0 flex-1 max-w-[480px]">
+            <button className="md:hidden p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu size={22} />
+            </button>
+            <div className="hidden sm:flex items-center bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 w-full relative">
+              <Search className="text-gray-400 shrink-0" size={18} />
+              <input 
+                type="text" 
+                placeholder="Search tasks..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none focus:outline-none ml-2 w-full text-sm text-gray-700 dark:text-gray-200 min-w-0" 
+              />
+              <div className="hidden sm:block absolute right-2 px-1.5 py-0.5 border border-gray-200 dark:border-gray-600 rounded text-xs text-gray-400 font-medium bg-white dark:bg-gray-800 shadow-sm shrink-0">⌘K</div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-5">
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <div className="flex items-center gap-1 sm:gap-3">
+            <button className="sm:hidden p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" onClick={() => setShowMobileSearch(!showMobileSearch)}>
+              <Search size={20} />
+            </button>
+            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors">
               {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
           </div>
         </header>
 
+        {/* Mobile Search Bar Row */}
+        {showMobileSearch && (
+          <div className="sm:hidden px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shadow-sm shrink-0">
+            <div className="flex items-center bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 w-full">
+              <Search className="text-gray-400 shrink-0" size={18} />
+              <input 
+                type="text" 
+                placeholder="Search tasks..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none focus:outline-none ml-2 w-full text-sm text-gray-700 dark:text-gray-200 min-w-0" 
+                autoFocus
+              />
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Route Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-8 max-w-6xl mx-auto w-full">
+          <div className="p-4 md:p-8 max-w-6xl mx-auto w-full">
             <Outlet context={{
               tasks, categories, stats,
               fetchTasks, fetchCategories,
@@ -134,7 +178,7 @@ export default function Layout({
             </div>
 
             <div className="h-48 relative">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <PieChart>
                   <Pie
                     data={chartData}

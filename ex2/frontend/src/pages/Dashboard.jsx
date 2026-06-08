@@ -76,12 +76,12 @@ export default function Dashboard() {
           <h2 className="text-[15px] font-bold text-gray-900 dark:text-white">Add New Task</h2>
           <button className="text-gray-400"><ChevronUp size={20} /></button>
         </div>
-        <form onSubmit={addTask} className="flex gap-4 items-end">
-          <div className="flex-1">
+        <form onSubmit={addTask} className="flex flex-col lg:flex-row gap-4 lg:items-end">
+          <div className="flex-1 w-full">
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Task Title</label>
             <input name="title" required type="text" placeholder="e.g., Finish project proposal" className="w-full px-3 py-2 bg-transparent border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 focus:border-[#5B4EFF] text-sm text-gray-900 dark:text-white" />
           </div>
-          <div className="w-40">
+          <div className="w-full lg:w-40">
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Priority</label>
             <div className="relative">
               <select name="priority" className="w-full px-3 py-2 bg-transparent border border-gray-200 dark:border-gray-600 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 focus:border-[#5B4EFF] text-sm pl-8 text-gray-900 dark:text-white">
@@ -93,13 +93,13 @@ export default function Dashboard() {
               <ChevronDown className="absolute right-3 top-2.5 text-gray-400" size={16} />
             </div>
           </div>
-          <div className="w-44">
+          <div className="w-full lg:w-44">
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Due Date</label>
             <div className="relative">
               <input name="dueDate" type="date" className="w-full px-3 py-2 bg-transparent border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 focus:border-[#5B4EFF] text-sm" />
             </div>
           </div>
-          <div className="w-48">
+          <div className="w-full lg:w-48">
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Category</label>
             <div className="relative">
               <select name="category" className="w-full px-3 py-2 bg-transparent border border-gray-200 dark:border-gray-600 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-[#5B4EFF]/20 focus:border-[#5B4EFF] text-sm text-gray-700 dark:text-gray-300">
@@ -111,7 +111,7 @@ export default function Dashboard() {
               <ChevronDown className="absolute right-3 top-2.5 text-gray-400" size={16} />
             </div>
           </div>
-          <button type="submit" className="bg-[#5B4EFF] hover:bg-[#4a3fe0] text-white font-medium px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm whitespace-nowrap">
+          <button type="submit" className="w-full lg:w-auto bg-[#5B4EFF] hover:bg-[#4a3fe0] text-white font-medium px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm whitespace-nowrap">
             Add Task <Plus size={16} />
           </button>
         </form>
