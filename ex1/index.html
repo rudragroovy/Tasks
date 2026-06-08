@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Portfolio of Rudra Bhavsar, AI Developer." />
+  <title>Rudra Bhavsar | AI Developer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWix+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkR4j8Jv5M4xA8bP7Y5P7fR6M2Qq6Qx5f8Bw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#home">Rudra Bhavsar</a>
+    <button id="menu-toggle" class="menu-toggle" aria-label="Toggle navigation">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+    <nav id="nav" class="nav" aria-label="Main navigation">
+      <a href="#about">About</a>
+      <a href="#skills">Skills</a>
+      <a href="#projects">Projects</a>
+      <a href="#experience">Experience</a>
+      <a href="#contact">Contact</a>
+      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" class="hero section reveal">
+      <p class="eyebrow">AI Developer</p>
+      <h1>Building intelligent products with clean engineering.</h1>
+      <p class="lead">
+        I am Rudra Bhavsar. I design reliable full-stack systems and AI-driven experiences.
+        <span id="typed-role" class="typed" aria-live="polite"></span>
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#projects">View Projects</a>
+        <a class="btn btn-outline" href="#contact">Contact Me</a>
+      </div>
+    </section>
+
+    <section id="about" class="section reveal">
+      <h2>About</h2>
+      <p>
+        I am focused on practical AI and product engineering, with experience across data pipelines,
+        vector search, and full-stack web systems. I enjoy turning complex ideas into intuitive products.
+      </p>
+    </section>
+
+    <section id="skills" class="section reveal">
+      <h2>Skills</h2>
+      <div class="chips" role="list" aria-label="Technical skills">
+        <span role="listitem">Python</span>
+        <span role="listitem">Pandas</span>
+        <span role="listitem">NetCDF</span>
+        <span role="listitem">Sentence Transformers</span>
+        <span role="listitem">Qdrant</span>
+        <span role="listitem">MongoDB</span>
+        <span role="listitem">Express.js</span>
+        <span role="listitem">React.js</span>
+        <span role="listitem">Node.js</span>
+        <span role="listitem">Tailwind CSS</span>
+        <span role="listitem">ONNX</span>
+        <span role="listitem">Cloudinary</span>
+      </div>
+    </section>
+
+    <section id="projects" class="section reveal">
+      <h2>Projects</h2>
+      <div class="project-filters" role="toolbar" aria-label="Project filters">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="ai">AI</button>
+        <button class="filter-btn" data-filter="fullstack">Full Stack</button>
+        <button class="filter-btn" data-filter="web">Web App</button>
+      </div>
+      <div class="project-grid">
+        <article class="project-card" data-category="ai">
+          <h3>FloatChat - AI Ocean Data Query System</h3>
+          <p class="stack">Python, Pandas, NetCDF, Sentence Transformers, Qdrant</p>
+          <ul>
+            <li>Processed multi-dimensional ocean datasets into structured formats.</li>
+            <li>Built semantic embeddings and vector search pipeline using Qdrant.</li>
+            <li>Designed ingestion to cleaning to embedding to retrieval data pipeline.</li>
+            <li>Enabled natural language querying over scientific datasets.</li>
+          </ul>
+          <a href="https://github.com/JenilCaptain/FloatChat" target="_blank" rel="noopener">View Project</a>
+        </article>
+
+        <article class="project-card" data-category="fullstack">
+          <h3>ZeroWasteBite - Food Waste Reduction Platform</h3>
+          <p class="stack">MongoDB, Express.js, React.js, Node.js, Tailwind CSS, ML Model Integration</p>
+          <ul>
+            <li>Designed database schemas for food listing and request workflows.</li>
+            <li>Built REST APIs for real-time data exchange and lifecycle management.</li>
+            <li>Developed food safety prediction model to estimate safe consumption time.</li>
+            <li>Integrated ONNX-based prediction pipeline into backend services.</li>
+          </ul>
+          <a href="https://github.com/rudrabhavsar7/ZeroWasteBite" target="_blank" rel="noopener">View Project</a>
+        </article>
+
+        <article class="project-card" data-category="web">
+          <h3>DesiEtsy - Handmade Products E-commerce Site</h3>
+          <p class="stack">MERN, React, Node.js, MongoDB, Cloudinary, Tailwind CSS, Motion, Vercel, Render</p>
+          <ul>
+            <li>Developed a niche e-commerce app for artisan product sales.</li>
+            <li>Implemented cart, checkout, and admin approval workflows.</li>
+            <li>Enabled media uploads and product management with a custom admin panel.</li>
+          </ul>
+          <a href="https://desietsy.vercel.app" target="_blank" rel="noopener">View Project</a>
+        </article>
+      </div>
+    </section>
+
+    <section id="experience" class="section reveal">
+      <h2>Experience</h2>
+      <div class="timeline">
+        <article>
+          <h3>AI and Full Stack Developer</h3>
+          <p class="meta">Project-based Experience</p>
+          <p>
+            Built end-to-end systems spanning data engineering, API services, and polished web frontends,
+            with strong focus on reliability and usability.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="contact" class="section reveal">
+      <h2>Contact</h2>
+      <p>Have an opportunity or idea? Let us connect.</p>
+      <div class="contact-links">
+          <a href="mailto:rbhavsar1061974@gmail.com"><i class="fa-solid fa-envelope" aria-hidden="true"></i> Email</a>
+          <a href="https://www.linkedin.com/in/rudra-bhavsar7/" target="_blank" rel="noreferrer noopener"><i class="fa-brands fa-linkedin" aria-hidden="true"></i> LinkedIn</a>
+        <a href="https://github.com/rudrabhavsar7" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i> GitHub</a>
+        <a href="https://www.instagram.com" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i> Instagram</a>
+      </div>
+
+      <form id="contact-form" class="contact-form" novalidate>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" required />
+
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required />
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="5" required></textarea>
+
+        <button type="submit" class="btn btn-primary">Send Message</button>
+        <p id="form-feedback" class="form-feedback" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <button id="back-to-top" class="back-to-top" aria-label="Back to top">
+    <i class="fa-solid fa-arrow-up"></i>
+  </button>
+
+  <script src="script.js"></script>
+</body>
+</html>
