@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { cn } from '../utils';
 import {
   CheckCircle, ListTodo, Folder, BarChart2, Settings, HelpCircle,
-  Sun, Moon, Bell, ChevronDown, Search, Calendar, MoreVertical, Clock, ArrowDown, LayoutDashboard
+  Sun, Moon, Bell, ChevronDown, Search, Calendar, MoreVertical, Clock, ArrowDown, LayoutDashboard, ListChecks
 } from 'lucide-react';
 
 export default function Layout({
@@ -37,10 +37,10 @@ export default function Layout({
       {/* Sidebar */}
       <aside className="w-[240px] bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 flex flex-col hidden md:flex shrink-0 h-screen sticky top-0 transition-colors">
         <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#5B4EFF] flex items-center justify-center text-white">
-            <CheckCircle size={20} strokeWidth={2.5} />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#5B4EFF] to-[#8b5cf6] shadow-md flex items-center justify-center text-white">
+            <ListChecks size={20} strokeWidth={2.5} />
           </div>
-          <h1 className="font-bold text-xl tracking-tight text-gray-900 dark:text-white">TaskFlow <span className="font-medium text-gray-500">TODO</span></h1>
+          <span className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 tracking-tight">DailyTasks</span>
         </div>
 
         <nav className="flex-1 px-4 py-2 space-y-1">
