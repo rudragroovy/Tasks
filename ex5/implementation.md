@@ -10,7 +10,7 @@ This document outlines the architecture, setup, and key implementations of the c
 - **Frontend**: React (Vite)
 - **Backend**: Node.js + Express.js
 - **Database**: PostgreSQL with `pg` driver
-- **Styling**: Custom CSS (Glassmorphism, Neumorphism, CSS variables, Media Queries)
+- **Styling**: Tailwind CSS v4 (Utility classes + custom `@theme` configuration)
 - **Icons**: `lucide-react`
 - **CSV Handling**: `papaparse` for importing, custom Blob construction for exporting.
 
@@ -88,11 +88,12 @@ Located in `client/`, the Vite React application implements a responsive, premiu
 
 ## 5. UI/UX Design System
 
-The application relies on `index.css` for its global design tokens:
-- **Glassmorphism**: Modals and cards use `backdrop-filter: blur()`, semi-transparent `rgba()` backgrounds, and white borders to look like frosted glass.
-- **Neumorphism**: Elements utilize soft inner and outer box-shadows to simulate physical depth.
-- **Color Palette**: A stark, premium monochrome base (Black `#000`, Anthracite `#111`, Silver `#888`, White `#FFF`) offset by subtle accent colors for success/error/warning states.
-- **Responsiveness**: Elements use `flex-wrap` and `grid-template-columns: repeat(auto-fit)` to dynamically flow onto mobile screens.
+The application was fully migrated to **Tailwind CSS v4** for its global design system:
+- **Tailwind v4 Theme**: Custom colors (`bg-base`, `text-text-primary`), gradients, and shadows (`shadow-neu-in`, `shadow-neu-out`) are natively mapped into utility classes using the new `@theme` directive in `index.css`.
+- **Glassmorphism**: Modals and cards use `backdrop-blur-md`, `bg-white/5` semi-transparent backgrounds, and `border-white/10` to look like frosted glass.
+- **Neumorphism**: Elements utilize soft inner and outer box-shadow utilities to simulate physical depth.
+- **Color Palette**: A stark, premium monochrome base offset by subtle accent colors for success/error/warning states.
+- **Responsiveness**: Mobile layouts are handled natively via `md:` and `sm:` prefixes. The main data table collapses from a standard `table` display into stacked vertical flex cards (`flex-col`) on small screens, preventing any horizontal scrolling.
 
 ---
 

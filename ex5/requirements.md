@@ -17,7 +17,7 @@ Build a **fully functional Student Management CRUD Application** with a modern f
 | Backend    | Node.js + Express.js     | REST API server                  |
 | Database   | PostgreSQL               | Persistent data storage          |
 | ORM        | pg / node-postgres       | Raw SQL queries with pg library  |
-| Styling    | Vanilla CSS              | Custom Glassmorphism + Bento-Box UI |
+| Styling    | Tailwind CSS v4            | Utility-first CSS, custom @theme block |
 | CSV Parser | PapaParse                | Client-side CSV file parsing     |
 | Icons      | lucide-react             | Modern vector iconography        |
 
@@ -66,7 +66,7 @@ Build a **fully functional Student Management CRUD Application** with a modern f
 - **Advanced Filtering & Sorting**: Filter by Course, GPA Min/Max, and Enrollment Year. Sort columns dynamically.
 - **Bulk CSV Import**: Import hundreds of students at once via CSV drag-and-drop using PapaParse.
 - **Export to CSV**: Export the currently filtered list of students to a downloadable CSV.
-- **Responsive Layout**: Desktop Left Sidebar navigating down to a Mobile Bottom Tab Bar.
+- **Responsive Layout**: Desktop Left Sidebar navigating down to a Mobile Bottom Tab Bar. Tables dynamically convert into vertical flex cards on smaller screens to prevent horizontal scrolling.
 
 ---
 
