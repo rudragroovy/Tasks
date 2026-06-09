@@ -2,7 +2,6 @@
 // Accepts `initialData` to pre-fill the form when editing
 import { useState, useEffect } from 'react';
 import { fetchCourses } from '../services/courseService';
-import './StudentForm.css';
 
 function StudentForm({ onSubmit, initialData = {}, buttonLabel = 'Save Student', loading = false }) {
   // Initialize form state — use initialData values or empty strings
@@ -71,8 +70,8 @@ function StudentForm({ onSubmit, initialData = {}, buttonLabel = 'Save Student',
 
   const Field = ({ name, label, type = 'text', placeholder, required }) => (
     <div className="form-group">
-      <label htmlFor={name}>
-        {label} {required && <span className="required">*</span>}
+      <label htmlFor={name} className="text-[0.72rem] font-bold text-text-muted uppercase tracking-[0.08em]">
+        {label} {required && <span className="text-accent-2 ml-[2px]">*</span>}
       </label>
       <input
         id={name}
@@ -82,17 +81,17 @@ function StudentForm({ onSubmit, initialData = {}, buttonLabel = 'Save Student',
         onChange={handleChange}
         onBlur={handleBlur}
         placeholder={placeholder}
-        className={touched[name] && errors[name] ? 'input-error' : ''}
+        className={touched[name] && errors[name] ? '!border-[#b4b4b4]/35 shadow-[inset_4px_4px_10px_rgba(0,0,0,0.75),inset_-3px_-3px_8px_rgba(255,255,255,0.04),0_0_0_3px_rgba(180,180,180,0.07)]' : 'shadow-neu-in'}
       />
       {touched[name] && errors[name] && (
-        <span className="field-error">{errors[name]}</span>
+        <span className="text-[0.76rem] text-accent-2 mt-[2px]">{errors[name]}</span>
       )}
     </div>
   );
 
   return (
-    <form onSubmit={handleSubmit} className="student-form" noValidate>
-      <div className="form-grid">
+    <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 lg:px-12 relative overflow-hidden max-w-[820px] mx-auto shadow-neu-lg before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[1.5px] before:bg-gradient-to-r before:from-transparent before:via-white/35 before:to-transparent" noValidate>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <Field name="first_name" label="First Name" placeholder="e.g. Alice" required />
         <Field name="last_name"  label="Last Name"  placeholder="e.g. Johnson" required />
         <Field name="email"      label="Email"      type="email" placeholder="alice@example.com" required />
@@ -100,8 +99,8 @@ function StudentForm({ onSubmit, initialData = {}, buttonLabel = 'Save Student',
 
         {/* Course dropdown */}
         <div className="form-group">
-          <label htmlFor="course">
-            Course <span className="required">*</span>
+          <label htmlFor="course" className="text-[0.72rem] font-bold text-text-muted uppercase tracking-[0.08em]">
+            Course <span className="text-accent-2 ml-[2px]">*</span>
           </label>
           <select
             id="course"
@@ -109,15 +108,15 @@ function StudentForm({ onSubmit, initialData = {}, buttonLabel = 'Save Student',
             value={formData.course}
             onChange={handleChange}
             onBlur={handleBlur}
-            className={touched.course && errors.course ? 'input-error' : ''}
+            className={`shadow-neu-in ${touched.course && errors.course ? '!border-[#b4b4b4]/35 shadow-[inset_4px_4px_10px_rgba(0,0,0,0.75),inset_-3px_-3px_8px_rgba(255,255,255,0.04),0_0_0_3px_rgba(180,180,180,0.07)]' : ''}`}
           >
-            <option value="">-- Select a course --</option>
+            <option value="" className="bg-[#141414] text-text-primary">-- Select a course --</option>
             {courses.map(c => (
-              <option key={c.id} value={c.name}>{c.name}</option>
+              <option key={c.id} value={c.name} className="bg-[#141414] text-text-primary">{c.name}</option>
             ))}
           </select>
           {touched.course && errors.course && (
-            <span className="field-error">{errors.course}</span>
+            <span className="text-[0.76rem] text-accent-2 mt-[2px]">{errors.course}</span>
           )}
         </div>
 
@@ -130,8 +129,8 @@ function StudentForm({ onSubmit, initialData = {}, buttonLabel = 'Save Student',
         />
       </div>
 
-      <div className="form-actions">
-        <button type="submit" className="btn-submit" disabled={loading}>
+      <div className="mt-8 flex justify-end flex-wrap gap-3">
+        <button type="submit" className="btn-primary w-full sm:w-auto px-10 py-3" disabled={loading}>
           {loading ? 'Saving...' : buttonLabel}
         </button>
       </div>

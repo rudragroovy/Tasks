@@ -3,7 +3,6 @@ import { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import { Upload, X, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { bulkImportStudents } from '../services/studentService';
-import './BulkImportModal.css';
 
 // Required CSV columns (must match exactly, case-insensitive)
 const REQUIRED = ['first_name', 'last_name', 'email', 'date_of_birth', 'course'];
@@ -70,22 +69,26 @@ function BulkImportModal({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="import-card" onClick={e => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 md:p-8 max-w-[600px] w-[95%] shadow-neu-lg flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="import-header">
-          <div className="import-title-row">
-            <FileSpreadsheet size={20} strokeWidth={1.8} />
-            <h2>Bulk CSV Import</h2>
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/5">
+          <div className="flex items-center gap-2.5 text-text-primary">
+            <div className="w-8 h-8 rounded bg-white/5 flex items-center justify-center shadow-neu-in">
+              <FileSpreadsheet size={16} strokeWidth={2} />
+            </div>
+            <h2 className="text-[1.15rem] font-bold tracking-wide">Bulk CSV Import</h2>
           </div>
-          <button className="import-close" onClick={onClose}><X size={18} strokeWidth={2} /></button>
+          <button className="text-text-secondary hover:text-white hover:bg-white/10 p-1.5 rounded-md transition-colors" onClick={onClose}>
+            <X size={18} strokeWidth={2} />
+          </button>
         </div>
 
         {!result ? (
           <>
             {/* Drop zone */}
             <div
-              className={`drop-zone ${dragging ? 'dragging' : ''} ${rows.length ? 'has-file' : ''}`}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[160px] ${dragging ? 'border-white/40 bg-white/5 shadow-neu-in' : 'border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/5'} ${rows.length ? '!border-semantic-success/30 !bg-semantic-success/5 shadow-neu-in' : ''}`}
               onDragOver={e => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={handleDrop}
@@ -97,28 +100,28 @@ function BulkImportModal({ onClose, onSuccess }) {
               />
               {rows.length > 0 ? (
                 <>
-                  <CheckCircle2 size={32} strokeWidth={1.5} className="dz-icon-ok" />
-                  <p className="dz-filename">{fileName}</p>
-                  <p className="dz-count">{rows.length} rows ready to import</p>
+                  <CheckCircle2 size={32} strokeWidth={1.5} className="text-semantic-success mb-3 drop-shadow-[0_0_8px_rgba(212,212,212,0.4)]" />
+                  <p className="text-[0.95rem] font-bold text-text-primary mb-1">{fileName}</p>
+                  <p className="text-[0.8rem] text-semantic-success font-semibold tracking-wide">{rows.length} rows ready to import</p>
                 </>
               ) : (
                 <>
-                  <Upload size={32} strokeWidth={1.5} className="dz-icon" />
-                  <p className="dz-text">Drag & drop a CSV file here</p>
-                  <p className="dz-sub">or click to browse</p>
+                  <Upload size={32} strokeWidth={1.5} className="text-text-muted mb-3" />
+                  <p className="text-[0.95rem] font-bold text-text-secondary mb-1">Drag & drop a CSV file here</p>
+                  <p className="text-[0.8rem] text-text-muted">or click to browse</p>
                 </>
               )}
             </div>
 
             {/* Required columns hint */}
-            <div className="import-hint">
-              <p>Required columns: <code>first_name, last_name, email, date_of_birth, course</code></p>
-              <p>Optional: <code>enrollment_date, gpa</code></p>
+            <div className="mt-4 p-4 rounded-lg bg-black/40 border border-white/5 text-[0.8rem] text-text-secondary shadow-neu-in">
+              <p className="mb-1">Required columns: <code className="bg-white/10 text-[#d4d4d4] px-1.5 py-0.5 rounded text-[0.75rem] font-mono tracking-tight">first_name, last_name, email, date_of_birth, course</code></p>
+              <p>Optional: <code className="bg-white/10 text-[#d4d4d4] px-1.5 py-0.5 rounded text-[0.75rem] font-mono tracking-tight">enrollment_date, gpa</code></p>
             </div>
 
             {/* Parse error */}
             {parseErr && (
-              <div className="import-error">
+              <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-[#3a1c1c] border border-semantic-danger/30 text-semantic-danger text-[0.85rem] font-medium shadow-neu-in">
                 <AlertCircle size={14} strokeWidth={2} />
                 {parseErr}
               </div>
@@ -126,16 +129,16 @@ function BulkImportModal({ onClose, onSuccess }) {
 
             {/* Preview table */}
             {rows.length > 0 && (
-              <div className="preview-wrap">
-                <p className="preview-label">Preview (first 5 rows):</p>
-                <div className="preview-scroll">
-                  <table className="preview-table">
+              <div className="mt-6 flex flex-col min-h-[150px]">
+                <p className="text-[0.8rem] font-bold text-text-muted uppercase tracking-wider mb-2">Preview (first 5 rows):</p>
+                <div className="flex-1 overflow-auto rounded-lg border border-white/5 shadow-neu-in">
+                  <table className="w-full border-collapse min-w-[500px]">
                     <thead>
-                      <tr>{Object.keys(rows[0]).map(k => <th key={k}>{k}</th>)}</tr>
+                      <tr>{Object.keys(rows[0]).map(k => <th key={k} className="bg-black/60 text-left p-2.5 text-[0.7rem] font-bold text-text-secondary uppercase tracking-wider sticky top-0 border-b border-white/10 whitespace-nowrap">{k}</th>)}</tr>
                     </thead>
                     <tbody>
                       {rows.slice(0, 5).map((r, i) => (
-                        <tr key={i}>{Object.values(r).map((v, j) => <td key={j}>{v}</td>)}</tr>
+                        <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5">{Object.values(r).map((v, j) => <td key={j} className="p-2.5 text-[0.8rem] text-[#c0c0c0] whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{v}</td>)}</tr>
                       ))}
                     </tbody>
                   </table>
@@ -144,15 +147,15 @@ function BulkImportModal({ onClose, onSuccess }) {
             )}
 
             {/* Import button */}
-            <div className="import-footer">
-              <button className="btn-cancel-import" onClick={onClose}>Cancel</button>
+            <div className="mt-6 pt-5 border-t border-white/5 flex justify-end gap-3">
+              <button className="btn-secondary" onClick={onClose}>Cancel</button>
               <button
-                className="btn-import"
+                className="btn-primary flex items-center gap-2"
                 disabled={!rows.length || loading}
                 onClick={handleImport}
               >
                 {loading
-                  ? <><Loader2 size={14} className="spin-icon" /> Importing…</>
+                  ? <><Loader2 size={14} className="animate-spin" /> Importing…</>
                   : <><Upload size={14} /> Import {rows.length} Students</>
                 }
               </button>
@@ -160,25 +163,27 @@ function BulkImportModal({ onClose, onSuccess }) {
           </>
         ) : (
           /* Result summary */
-          <div className="import-result">
-            <CheckCircle2 size={40} strokeWidth={1.5} className="result-ok-icon" />
-            <p className="result-title">Import Complete</p>
-            <p className="result-inserted">
-              <strong>{result.inserted}</strong> student{result.inserted !== 1 ? 's' : ''} imported successfully
+          <div className="flex flex-col items-center py-6">
+            <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center bg-semantic-success/10 text-semantic-success shadow-neu-in mb-5">
+              <CheckCircle2 size={40} strokeWidth={1.5} />
+            </div>
+            <p className="text-[1.4rem] font-bold text-text-primary mb-2">Import Complete</p>
+            <p className="text-[0.95rem] text-[#c0c0c0] mb-6 text-center">
+              <strong className="text-white text-[1.1rem]">{result.inserted}</strong> student{result.inserted !== 1 ? 's' : ''} imported successfully
             </p>
             {result.errors.length > 0 && (
-              <div className="result-errors">
-                <p className="result-err-title">
-                  <AlertCircle size={13} strokeWidth={2} /> {result.errors.length} row(s) failed:
+              <div className="w-full bg-[#1a0f0f] border border-semantic-danger/20 rounded-lg p-4 mb-6 shadow-neu-in text-left max-h-[150px] overflow-auto">
+                <p className="flex items-center gap-2 text-[0.85rem] font-bold text-semantic-danger mb-3 border-b border-semantic-danger/20 pb-2">
+                  <AlertCircle size={14} strokeWidth={2} /> {result.errors.length} row(s) failed:
                 </p>
                 {result.errors.map((e, i) => (
-                  <div key={i} className="result-err-row">
-                    Row {e.row} ({e.email}): {e.reason}
+                  <div key={i} className="text-[0.8rem] text-semantic-danger-bright mb-1.5 last:mb-0 leading-relaxed">
+                    <span className="font-bold opacity-70">Row {e.row} ({e.email}):</span> {e.reason}
                   </div>
                 ))}
               </div>
             )}
-            <button className="btn-import" onClick={onClose}>Done</button>
+            <button className="btn-primary w-full max-w-[200px]" onClick={onClose}>Done</button>
           </div>
         )}
       </div>

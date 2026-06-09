@@ -1,136 +1,112 @@
-/* ============================================================
-   index.css — Global Design System
-   Theme: Monochrome (Black · White · Grey)
-   Style: Glassmorphism + Dark Neumorphism
-   Responsive: Mobile-first (320px → 1440px+)
-   ============================================================ */
-
-/* ── Google Fonts ─────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-/* ── Design Tokens — Monochrome Palette ───────────────────── */
-:root {
-  /* Base surfaces — pure blacks & deep greys */
-  --base:           #0d0d0d;
-  --base-light:     #141414;
-  --base-lighter:   #1c1c1c;
-  --base-dark:      #080808;
-  --base-darker:    #050505;
+@import "tailwindcss";
 
-  /* Neumorphism shadows — monochrome */
-  --neu-shadow-out: 6px 6px 14px rgba(0,0,0,0.8),  -4px -4px 10px rgba(255,255,255,0.04);
-  --neu-shadow-in:  inset 4px 4px 10px rgba(0,0,0,0.75), inset -3px -3px 8px rgba(255,255,255,0.04);
-  --neu-shadow-sm:  3px 3px 8px rgba(0,0,0,0.7),   -2px -2px 6px rgba(255,255,255,0.03);
-  --neu-shadow-lg:  10px 10px 28px rgba(0,0,0,0.85), -6px -6px 18px rgba(255,255,255,0.04);
+@theme {
+  --font-sans: 'Inter', sans-serif;
 
-  /* Glassmorphism */
-  --glass-bg:       rgba(255, 255, 255, 0.04);
-  --glass-bg-hover: rgba(255, 255, 255, 0.07);
-  --glass-border:   rgba(255, 255, 255, 0.09);
-  --glass-blur:     blur(18px);
+  --color-base: #0d0d0d;
+  --color-base-light: #141414;
+  --color-base-lighter: #1c1c1c;
+  --color-base-dark: #080808;
+  --color-base-darker: #050505;
 
-  /* Accent — white / light grey only */
-  --accent:         #e5e5e5;
-  --accent-2:       #a3a3a3;
-  --accent-3:       #6b6b6b;
-  --accent-grad:    linear-gradient(135deg, #ffffff 0%, #c2c2c2 50%, #8a8a8a 100%);
-  --accent-glow:    0 0 18px rgba(255, 255, 255, 0.12);
+  --color-glass-bg: rgba(255, 255, 255, 0.04);
+  --color-glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --color-glass-border: rgba(255, 255, 255, 0.09);
 
-  /* Semantic colors — greyscale variants */
-  --success:        #d4d4d4;   /* light grey for success states */
-  --danger:         #9a9a9a;   /* mid grey for danger/delete */
-  --danger-bright:  #c0c0c0;   /* brighter grey for danger text */
-  --warning:        #b0b0b0;
+  --color-accent: #e5e5e5;
+  --color-accent-2: #a3a3a3;
+  --color-accent-3: #6b6b6b;
 
-  /* Text hierarchy */
-  --text-primary:   #f5f5f5;
-  --text-secondary: #a3a3a3;
-  --text-muted:     #4a4a4a;
+  --color-semantic-success: #d4d4d4;
+  --color-semantic-danger: #9a9a9a;
+  --color-semantic-danger-bright: #c0c0c0;
+  --color-semantic-warning: #b0b0b0;
 
-  /* Border */
-  --border-subtle:  rgba(255,255,255,0.04);
-  --border-hover:   rgba(255,255,255,0.08);
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
 
-  /* Radii */
-  --radius-sm:      8px;
-  --radius-md:      12px;
-  --radius-lg:      16px;
-  --radius-xl:      24px;
-  --radius-full:    999px;
+  --color-border-subtle: rgba(255,255,255,0.04);
+  --color-border-hover: rgba(255,255,255,0.08);
 
-  /* Layout */
-  --sidebar-width:  240px;
+  --shadow-neu-out: 6px 6px 14px rgba(0,0,0,0.8), -4px -4px 10px rgba(255,255,255,0.04);
+  --shadow-neu-in: inset 4px 4px 10px rgba(0,0,0,0.75), inset -3px -3px 8px rgba(255,255,255,0.04);
+  --shadow-neu-sm: 3px 3px 8px rgba(0,0,0,0.7), -2px -2px 6px rgba(255,255,255,0.03);
+  --shadow-neu-lg: 10px 10px 28px rgba(0,0,0,0.85), -6px -6px 18px rgba(255,255,255,0.04);
+
+  --background-image-accent-grad: linear-gradient(135deg, #ffffff 0%, #c2c2c2 50%, #8a8a8a 100%);
+  --background-image-body-glow: radial-gradient(ellipse 110% 55% at 65% -15%, rgba(255,255,255,0.04) 0%, transparent 60%), radial-gradient(ellipse 70%  45% at 10% 105%, rgba(255,255,255,0.02) 0%, transparent 55%);
+
+  --spacing-sidebar: 240px;
+}
+@layer base {
+  body {
+    @apply font-sans bg-base text-text-primary min-h-screen leading-relaxed antialiased bg-body-glow bg-fixed;
+  }
+  
+  h1, h2, h3, h4, h5 {
+    @apply font-bold leading-tight text-text-primary;
+  }
+  
+  p {
+    @apply text-text-secondary;
+  }
+
+  /* Reset number inputs */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-base-dark; }
+  ::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-sm hover:bg-white/20; }
+  ::selection { @apply bg-white/10 text-white; }
 }
 
-/* ── Reset ────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+@layer components {
+  /* Common Buttons */
+  .btn-primary {
+    @apply bg-accent-grad text-black font-bold py-2 px-5 rounded-full shadow-neu-sm hover:shadow-neu-in transition-all duration-300 transform hover:scale-[0.98] active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-secondary {
+    @apply bg-glass-bg border border-glass-border text-text-primary font-semibold py-2 px-5 rounded-full hover:bg-glass-bg-hover transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-danger {
+    @apply bg-semantic-danger text-white font-bold py-2 px-5 rounded-full shadow-neu-sm hover:shadow-neu-in hover:bg-[#ff4757] transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
 
-/* Hide number input native spin buttons for clean UI */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type="number"] {
-  -moz-appearance: textfield; /* Firefox */
-}
+  /* Layout Containers */
+  .app-container {
+    @apply flex flex-col min-h-screen md:flex-row;
+  }
+  .main-content {
+    @apply flex-1 w-full max-w-full overflow-x-hidden pb-20 md:pb-0 md:ml-[260px];
+  }
 
-html { scroll-behavior: smooth; font-size: 16px; }
-
-/* ── Base Body ────────────────────────────────────────────── */
-body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: var(--base);
-  color: var(--text-primary);
-  min-height: 100vh;
-  line-height: 1.65;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  /* Subtle white radial glow — depth without color */
-  background-image:
-    radial-gradient(ellipse 110% 55% at 65% -15%, rgba(255,255,255,0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 70%  45% at 10% 105%, rgba(255,255,255,0.02) 0%, transparent 55%);
-  background-attachment: fixed;
-}
-
-/* ── Typography ───────────────────────────────────────────── */
-h1, h2, h3, h4, h5 { line-height: 1.2; font-weight: 700; color: var(--text-primary); }
-p { color: var(--text-secondary); }
-
-/* ── Scrollbar ────────────────────────────────────────────── */
-::-webkit-scrollbar       { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--base-dark); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
-
-/* ── Selection ────────────────────────────────────────────── */
-::selection { background: rgba(255,255,255,0.12); color: #fff; }
-
-/* ── App Layout ───────────────────────────────────────────── */
-.app-container {
-  display: flex;
-  min-height: 100vh;
-  flex-direction: column;
-}
-@media (min-width: 768px) {
-  .app-container { flex-direction: row; }
-}
-
-.main-content {
-  flex: 1;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  padding-bottom: 80px; /* Space for mobile nav */
-}
-@media (min-width: 768px) {
-  .main-content { 
-    padding-bottom: 0; 
-    margin-left: var(--sidebar-width); 
+  /* Shared Modals */
+  .modal-backdrop {
+    @apply fixed inset-0 w-full h-full bg-black/60 backdrop-blur-md flex items-center justify-center z-50;
+  }
+  .modal-content {
+    @apply bg-base-light border border-border-hover rounded-xl w-[90%] max-w-md p-6 shadow-2xl;
+  }
+  
+  /* Shared Forms */
+  .form-group {
+    @apply flex flex-col gap-2 mb-4;
+  }
+  .form-group label {
+    @apply text-sm font-semibold text-text-secondary;
+  }
+  .form-group input, .form-group select {
+    @apply p-3 rounded-lg border border-white/10 bg-white/5 text-white transition-all outline-none focus:border-white/20 focus:bg-white/10 focus:shadow-neu-in;
   }
 }
