@@ -1,45 +1,15 @@
-# Candidate Screener Agent
+# Exercise 15: Candidate Screener
+## Tech Stack
+- Python
+- SQLite (Local Database)
 
-This is a custom AI agent that automates the initial screening of candidate resumes against a job description. It solves a real operations pain point for hiring managers by filtering through resumes and providing a scorecard for each candidate.
+## What the Agent Does
+This agent acts as an automated technical recruiter to screen applicants. It utilizes the OpenAI SDK (configured for OpenRouter) and is equipped with the following tool capabilities:
+1. **File Reading (`read_file`)**: Reads and extracts text from the provided resume (supports both `.txt` and `.pdf`) and the job description file.
+2. **Evaluation & Scoring**: Analyzes the resume against the job requirements, gives a score out of 10, and provides a detailed summary of the candidate's strengths and weaknesses.
+3. **Database Storage (`save_to_db`)**: Autonomously saves the candidate's name, their final score, and the feedback directly into a local SQLite database (`candidates.db`) for record-keeping.
 
-## Architecture
-- **LLM**: OpenRouter (free models).
-- **Tools**:
-  - `read_file`: Reads candidate resumes (supports both `.txt` and `.pdf` formats) and job descriptions.
-  - `save_to_db`: Saves the candidate scorecard and LLM feedback to a local SQLite database (`candidates.db`).
-
-## Setup
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Create a `.env` file and add your OpenRouter API key:
-   ```
-   OPENROUTER_API_KEY=your_key_here
-   ```
-
-## Usage
-Run the agent:
-```bash
-python candidate_screener.py
-```
-
-Upon running, the script will interactively prompt you for:
-1. **Resume Path**: The file path to the candidate's resume (e.g., `sample_resume.txt` or `resume.pdf`).
-2. **Job Description Path**: The file path to the job description (e.g., `job_description.txt`).
-
-### Example Interaction
-
-```text
-$ python candidate_screener.py
-Starting Candidate Screener Agent...
-Enter the path to the candidate's resume: sample_resume.txt
-Enter the path to the job description: job_description.txt
-
-[LLM Processing & Tool Execution...]
-
-Agent Finished.
-[Candidate Evaluation Summary is displayed]
-```
-
-The agent will evaluate the candidate, display a detailed Markdown summary in the console, and log the scorecard directly to the database.
+## How to use
+1. Install requirements: `pip install -r requirements.txt`. (Ensure `PyPDF2` is installed to read PDFs).
+2. Configure `.env` with your `OPENROUTER_API_KEY`.
+3. Run `python candidate_screener.py` and provide the paths to the resume (e.g., `sample_resume.txt`) and `job_description.txt` when prompted.

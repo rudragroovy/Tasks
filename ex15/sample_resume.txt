@@ -1,0 +1,34 @@
+About the job
+🚀 Hiring: MERN Stack Developer Intern (MongoDB, Express, React, Node.js)
+
+We are looking for enthusiastic and self-motivated MERN Stack Developer Interns who are eager to build full-stack web applications and gain hands-on industry experience.
+🔍 Roles & Responsibilities
+
+Develop full-stack web applications using MongoDB, Express, React, and Node.js
+Build and integrate RESTful APIs
+Work on frontend and backend features
+Debug, test, and optimize application performance
+Collaborate with the development team on real-world projects
+✅ Eligibility Criteria
+
+Freshers and students are welcome
+Basic knowledge of React, Node.js, Express, and MongoDB
+Understanding of JavaScript and web development concepts
+Willingness to learn and work in a team environment
+🌐 Internship Details
+
+📍 Mode: Virtual / Remote
+⏳ Duration: Flexible
+💰 Stipend: Not stipend based
+🌟 Perks & Benefits
+
+Hands-on experience with real projects
+Internship Certificate
+Full-stack development exposure
+⭐ Top performers will get 100% placement support
+📌 How to Apply
+
+Interested candidates can apply by clicking on the “Apply” option.
+🗓️ Apply before 30th June to be considered for this opportunity.
+
+See curated AI tools for your job search

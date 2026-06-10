@@ -1,0 +1,7 @@
+Position: Backend Developer
+We are looking for a backend developer with Python experience to build scalable microservices.
+Requirements:
+- 2+ years of Python experience.
+- Experience with SQL databases.
+- Familiarity with cloud platforms (AWS preferred).
+- Team player with good communication skills.
