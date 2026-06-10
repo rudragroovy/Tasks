@@ -14,6 +14,9 @@ This exercise is an advanced iteration of Exercise 10, introducing several key i
 ## System Dependencies
 - **Node.js**: Required to install packages (`npm install`) and run the client/server without errors.
 - **ChromaDB**: Required to be running locally on port 8000 (or as configured in `.env`).
+```
+docker run -p 8000:8000 chromadb/chroma
+```
 - **Environment Variables**: An `OPENAI_API_KEY` (or equivalent OpenRouter key) and a `HUGGINGFACE_API_KEY` must be configured in the `.env` file of the server directory to generate embeddings and run AI features without errors.
 
 ## How to use
