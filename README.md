@@ -30,10 +30,13 @@ Exercise 8: Production-grade Async CLI (v2)
 Exercise 9: Prompt Caching & Codebase Explainer (v3)
 
 ## ex10
-Exercise 10: PDF Parser and RAG
+Exercise 10: PDF Parser 
 
 ## ex11
-Exercise 11: PDF Parser and RAG (Duplicate)
+Exercise 11: PDF Parser and RAG with 
+
+## ex11a
+Exercise 11a: PDF Parser and RAG with additional Chunking methods
 
 ## ex12
 Exercise 12: Chunking Types
