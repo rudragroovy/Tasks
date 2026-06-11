@@ -67,7 +67,7 @@ The fastest way to run this pipeline is by pulling the officially deployed image
 docker pull rudra79/species-pipeline-app:latest
 
 # Run the portable SQLite pipeline straight from the container
-docker run -v ${PWD}:/app --env-file .env rudra79/species-pipeline-app:latest --input species.csv --output local_species.db
+docker run -v ${PWD}:/data --env-file .env rudra79/species-pipeline-app:latest --input /data/species.csv --output /data/local_species.db
 ```
 *(Make sure you have an `.env` and `species.csv` file in your current directory before running).*
 
