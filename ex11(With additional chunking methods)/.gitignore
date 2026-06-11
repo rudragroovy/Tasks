@@ -1,0 +1,16 @@
+# Root Level Ignores
+node_modules/
+.DS_Store
+
+# Server Secrets
+server/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+
+sample.pdf
