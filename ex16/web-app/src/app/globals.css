@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --card-bg: #FFFFFF;
+    --card-border: #E5E7EB;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    
+    --input-bg: #FFFFFF;
+    --input-border: #D1D5DB;
+    --input-focus: #1B5E4A;
+  }
+}
+
+body {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+.bento-card {
+  @apply bg-[#FFFFFF] border border-[#E5E7EB] rounded-[20px] shadow-sm transition-all duration-300 text-[#1A1A1A];
+}
+
+.bento-card:hover {
+  @apply shadow-md transform -translate-y-1;
+}
+
+/* For inputs and form elements */
+input[type="text"] {
+  @apply bg-[#FFFFFF] border border-[#D1D5DB] text-[#1A1A1A] placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#1B5E4A] transition-all rounded-full;
+}
+
+/* Glassmorphism text/elements */
+.glass-pill {
+  @apply bg-[#EAF4EF] text-[#0F766E] px-4 py-1.5 rounded-full text-xs font-bold tracking-wide shadow-sm;
+}
