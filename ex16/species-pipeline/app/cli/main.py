@@ -28,7 +28,7 @@ from app.adapters.iucn import IUCNAdapter
 app = typer.Typer(help="Species Data Aggregation Pipeline")
 console = Console()
 
-async def process_species_list(inputs: list[str]) -> None:
+async def process_species_list(inputs: list[str], report_path: str = "coverage_report.md") -> None:
     # Initialize components
     resolver = Resolver()
     adapters = [
@@ -88,8 +88,8 @@ async def process_species_list(inputs: list[str]) -> None:
     
     # 8. Reporter
     reporter = CoverageReporter(records_processed)
-    reporter.generate_report()
-    console.print(f"[blue]Coverage report generated at coverage_report.md[/blue]")
+    reporter.generate_report(output_path=report_path)
+    console.print(f"[blue]Coverage report generated at {report_path}[/blue]")
 
 
 @app.command("run")
@@ -122,7 +122,9 @@ def run_pipeline(
         console.print("[red]No species names found in input.[/red]")
         raise typer.Exit(1)
         
+    report_path = "coverage_report.md"
     if out_file:
+        report_path = str(out_file.parent / "coverage_report.md")
         db_url = f"sqlite+aiosqlite:///{out_file.resolve()}"
         logger.info("using_sqlite", url=db_url)
     else:
@@ -134,7 +136,7 @@ def run_pipeline(
     
     async def run_pipeline_with_db():
         await init_db(db_url)
-        await process_species_list(species_list)
+        await process_species_list(species_list, report_path)
         
     asyncio.run(run_pipeline_with_db())
 

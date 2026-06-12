@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from typing import List, Dict, Any, Tuple
 from app.models.domain import SpeciesRecord
 from app.logging.logger import logger
@@ -21,12 +22,12 @@ CRITICAL RULES:
 
 class LLMFiller:
     def __init__(self):
-        api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("LLM_API_KEY")
+        api_key = os.getenv("GROQ_API_KEY")
         self.is_dummy = not api_key or not AsyncOpenAI
         if not self.is_dummy:
             self.client = AsyncOpenAI(
                 api_key=api_key,
-                base_url="https://openrouter.ai/api/v1" if os.getenv("OPENROUTER_API_KEY") else None
+                base_url="https://api.groq.com/openai/v1"
             )
         else:
             logger.warning("llm_filler_dummy_mode", reason="No API key or openai package missing")
@@ -70,21 +71,38 @@ Respond with a JSON object in the following format:
   }}
 }}"""
 
+        max_retries = 3
+        llm_data = None
+        tokens = 0
+        for attempt in range(max_retries):
+            try:
+                model_name = os.getenv("LLM_MODEL_NAME", "gemini-3.5-flash")
+                response = await self.client.chat.completions.create(
+                    model=model_name, # cheap model to stay under $2
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.1
+                )
+                
+                content = response.choices[0].message.content
+                llm_data = json.loads(content)
+                tokens = response.usage.total_tokens
+                break  # Success, exit retry loop
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning("llm_rate_limit_retry", attempt=attempt+1, error=str(e))
+                    await asyncio.sleep(5 * (attempt + 1))  # Exponential backoff
+                else:
+                    logger.error("llm_request_failed_after_retries", error=str(e))
+                    return record
+        
+        if llm_data is None:
+            return record
+
         try:
-            model_name = os.getenv("OPENROUTER_MODEL_NAME") if os.getenv("OPENROUTER_MODEL_NAME") else ("openai/gpt-4o-mini" if os.getenv("OPENROUTER_API_KEY") else "gpt-4o-mini")
-            response = await self.client.chat.completions.create(
-                model=model_name, # cheap model to stay under $2
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            
-            content = response.choices[0].message.content
-            llm_data = json.loads(content)
-            
             filled_fields = llm_data.get("llm_filled_fields", [])
             scores = llm_data.get("confidence_scores", {})
             
@@ -93,13 +111,23 @@ Respond with a JSON object in the following format:
                     # Do not overwrite!
                     val = llm_data[field]
                     if val is not None:
-                        # Fix LLM returning string for list fields
-                        if field in ["geographic_range", "image_urls", "common_names"] and isinstance(val, str):
-                            val = [val]
-                        
-                        # Fix LLM returning ints for string fields
-                        if field in ["lifespan_years", "weight_kg", "length_cm"] and isinstance(val, (int, float)):
-                            val = str(val)
+                        string_fields = ["description", "habitat", "diet_type", "conservation_status", 
+                                         "population_trend", "lifespan_years", "weight_kg", "length_cm", 
+                                         "behavior", "reproduction", "wikipedia_url"]
+                        list_fields = ["common_names", "geographic_range", "image_urls"]
+
+                        if field in string_fields and not isinstance(val, str):
+                            val = json.dumps(val) if isinstance(val, (dict, list)) else str(val)
+                            
+                        if field in list_fields:
+                            if isinstance(val, str):
+                                val = [val]
+                            elif isinstance(val, dict):
+                                val = [json.dumps(val)]
+                            elif not isinstance(val, list):
+                                val = [str(val)]
+                            else:
+                                val = [json.dumps(i) if isinstance(i, (dict, list)) else str(i) for i in val]
                             
                         current_val = getattr(record, field, None)
                         if not current_val: # Double check
@@ -109,7 +137,6 @@ Respond with a JSON object in the following format:
                             record.field_provenance[field] = "llm"
                         
             # Keep track of cost internally or logger
-            tokens = response.usage.total_tokens
             logger.info("llm_success", species=record.scientific_name, filled=filled_fields, tokens=tokens)
             
         except Exception as e:
