@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  PAID
+  ACCEPTED
+  COMPLETED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(PATIENT)
+  createdAt DateTime @default(now())
+
+  doctorProfile Doctor?
+  patientAppointments Appointment[] @relation("PatientAppointments")
+  doctorAppointments  Appointment[] @relation("DoctorAppointments")
+}
+
+model Specialization {
+  id      String   @id @default(uuid())
+  name    String   @unique
+  doctors Doctor[]
+}
+
+model Doctor {
+  userId           String         @id
+  user             User           @relation(fields: [userId], references: [id])
+  specializationId String
+  specialization   Specialization @relation(fields: [specializationId], references: [id])
+  fee              Decimal
+  isOnline         Boolean        @default(false)
+}
+
+model Appointment {
+  id        String   @id @default(uuid())
+  patientId String
+  doctorId  String
+  status    String   // PENDING, ACCEPTED, REJECTED, COMPLETED
+  
+  // Scheduling & Payment fields
+  type           String    @default("ON_DEMAND") // ON_DEMAND, SCHEDULED
+  scheduledFor   DateTime?
+  paymentStatus  String    @default("PENDING") // PENDING, PAID, FAILED
+  stripeSessionId String?
+
+  aiSummary Json?    // { symptoms, severity, duration }
+  
+  patient   User     @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor    User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  
+  consultation Consultation?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages        Message[]
+}
+
+model Consultation {
+  id              String      @id @default(uuid())
+  appointmentId   String      @unique
+  appointment     Appointment @relation(fields: [appointmentId], references: [id])
+  notes           String?
+  prescription    Json?
+  prescriptionUrl String?
+  updatedAt       DateTime @updatedAt
+}
+
+model Message {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  senderId      String
+  senderRole    Role
+  text          String
+  createdAt     DateTime    @default(now())
+}
