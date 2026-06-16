@@ -17,6 +17,9 @@ export default function Booking() {
   const [scheduledTime, setScheduledTime] = useState('');
   const [processingId, setProcessingId] = useState(null);
   
+  // Price Breakdown Modal State
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  
   const specialization = searchParams.get('specialization') || '';
   const aiSummary = location.state?.aiSummary || {};
 
@@ -44,12 +47,9 @@ export default function Booking() {
     return () => socket.off('doctors:updated', handleUpdate);
   }, [socket, specialization]);
 
-  const handleBook = async (doctorId) => {
-    if (bookingType === 'SCHEDULED' && (!scheduledDate || !scheduledTime)) {
-      return alert('Please select a date and time for your scheduled consultation.');
-    }
-
-    setProcessingId(doctorId);
+  const confirmBooking = async () => {
+    if (!selectedDoctor) return;
+    setProcessingId(selectedDoctor.userId);
     try {
       let scheduledFor = null;
       if (bookingType === 'SCHEDULED') {
@@ -57,7 +57,7 @@ export default function Booking() {
       }
 
       const { data: appointment } = await axios.post('http://localhost:5000/api/appointments', {
-        doctorId,
+        doctorId: selectedDoctor.userId,
         aiSummary,
         type: bookingType,
         scheduledFor
@@ -66,7 +66,7 @@ export default function Booking() {
       });
 
       const { data: session } = await axios.post('http://localhost:5000/api/payments/create-checkout-session', {
-        doctorId,
+        doctorId: selectedDoctor.userId,
         appointmentId: appointment.id,
         type: bookingType
       }, {
@@ -79,7 +79,15 @@ export default function Booking() {
       console.error(err);
       alert('Failed to initiate booking process.');
       setProcessingId(null);
+      setSelectedDoctor(null);
     }
+  };
+
+  const handleBookClick = (doc) => {
+    if (bookingType === 'SCHEDULED' && (!scheduledDate || !scheduledTime)) {
+      return alert('Please select a date and time for your scheduled consultation.');
+    }
+    setSelectedDoctor(doc);
   };
 
   return (
@@ -236,7 +244,7 @@ export default function Booking() {
                   </div>
 
                   <button 
-                    onClick={() => handleBook(doc.userId)}
+                    onClick={() => handleBookClick(doc)}
                     disabled={processingId === doc.userId}
                     className="w-full bg-health-600 hover:bg-health-700 text-white font-bold font-heading py-4 rounded-xl transition-all shadow-md shadow-health-600/20 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer"
                   >
@@ -255,6 +263,66 @@ export default function Booking() {
           </div>
         )}
       </main>
+
+      {/* Price Breakdown Modal */}
+      {selectedDoctor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-100 transition-transform">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h3 className="font-heading font-black text-xl text-slate-800 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-primary-600" /> Payment Summary
+              </h3>
+              <button 
+                onClick={() => !processingId && setSelectedDoctor(null)}
+                className="text-slate-400 hover:text-slate-600 bg-white rounded-full p-1"
+                disabled={processingId !== null}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                  <img src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${selectedDoctor.user.name}`} alt="Doctor" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900">Dr. {selectedDoctor.user.name}</h4>
+                  <p className="text-sm text-slate-500 font-medium">{selectedDoctor.specialization?.name || selectedDoctor.specialization}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm font-medium text-slate-600">
+                  <span>Consultation Fee</span>
+                  <span>${parseFloat(selectedDoctor.fee || 150).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-medium text-slate-600">
+                  <span>Platform Fee</span>
+                  <span>$0.00</span>
+                </div>
+                <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
+                  <span className="font-bold text-slate-800">Total</span>
+                  <span className="font-heading font-black text-2xl text-slate-900">
+                    ${parseFloat(selectedDoctor.fee || 150).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <button 
+                onClick={confirmBooking}
+                disabled={processingId !== null}
+                className="w-full bg-primary-900 hover:bg-primary-800 text-white font-bold font-heading py-4 rounded-xl transition-all shadow-md shadow-primary-900/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+              >
+                {processingId !== null ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>Proceed to Payment <ArrowLeft className="w-4 h-4 rotate-180" /></>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

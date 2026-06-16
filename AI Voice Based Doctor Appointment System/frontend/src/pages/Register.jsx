@@ -166,48 +166,7 @@ export default function Register() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-bold font-heading text-primary-900 mb-2">I am a</label>
-              <select
-                name="role"
-                className="w-full px-5 py-4 bg-gray-50/50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-primary-900 font-medium cursor-pointer hover:bg-gray-50"
-                value={formData.role}
-                onChange={handleChange}
-                disabled={isLoading}
-              >
-                <option value="PATIENT">Patient</option>
-                <option value="DOCTOR">Doctor</option>
-              </select>
-            </div>
 
-            {formData.role === 'DOCTOR' && (
-              <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-5 mt-2 animate-in fade-in slide-in-from-top-2">
-                <div>
-                  <label className="block text-sm font-bold font-heading text-primary-900 mb-2">Specialty</label>
-                  <input
-                    type="text"
-                    name="specializationId"
-                    className="w-full px-5 py-4 bg-gray-50/50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-primary-900 font-medium placeholder-gray-400 hover:bg-gray-50"
-                    placeholder="Cardiologist"
-                    value={formData.specializationId}
-                    onChange={handleChange}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold font-heading text-primary-900 mb-2">Consultation Fee ($)</label>
-                  <input
-                    type="number"
-                    name="fee"
-                    className="w-full px-5 py-4 bg-gray-50/50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-primary-900 font-medium placeholder-gray-400 hover:bg-gray-50"
-                    placeholder="100"
-                    value={formData.fee}
-                    onChange={handleChange}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-            )}
 
             <button
               type="submit"

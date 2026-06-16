@@ -16,6 +16,7 @@ export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAptNotes, setSelectedAptNotes] = useState(null);
+  const [selectedAptTab, setSelectedAptTab] = useState('summary'); // 'summary' | 'chat'
 
   const [activeTab, setActiveTab] = useState('queue'); // 'queue', 'schedule', 'history'
 
@@ -86,14 +87,20 @@ export default function DoctorDashboard() {
     }
   };
 
-  const updateStatus = async (id, status) => {
+  const updateStatus = async (id, status, aptType) => {
     try {
       playSuccessSound();
       await axios.put(`http://localhost:5000/api/appointments/${id}/status`, { status }, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
+      // Re-fetch so UI reflects the new status immediately
+      const res = await axios.get('http://localhost:5000/api/appointments', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      setAppointments(res.data);
+      // For ACCEPTED appointments: move to Queue tab so doctor can join when ready
       if (status === 'ACCEPTED') {
-        navigate(`/room/${id}`);
+        setActiveTab('queue');
       }
     } catch (err) {
       console.error("Failed to update status", err);
@@ -119,9 +126,16 @@ export default function DoctorDashboard() {
     { name: 'Sun', val: appointments.length + 5 },
   ];
 
-  // Derived lists for tabs
-  const queueAppointments = appointments.filter(a => (a.status === 'PENDING' || a.status === 'ACCEPTED') && a.type === 'ON_DEMAND');
-  const scheduledAppointments = appointments.filter(a => a.type === 'SCHEDULED' && a.status !== 'COMPLETED' && a.status !== 'REJECTED');
+  // ─── Tab filters ────────────────────────────────────────────────────────────
+  // Queue: live ON_DEMAND requests (pending) + ALL accepted appointments waiting to start
+  const queueAppointments = appointments.filter(a =>
+    (a.status === 'PENDING' && a.type === 'ON_DEMAND') ||
+    a.status === 'ACCEPTED'
+  );
+  // Schedule: only PENDING scheduled appointments awaiting accept/decline
+  const scheduledAppointments = appointments.filter(a =>
+    a.type === 'SCHEDULED' && a.status === 'PENDING'
+  );
   const historyAppointments = appointments.filter(a => a.status === 'COMPLETED' || a.status === 'REJECTED');
 
   const getDisplayedAppointments = () => {
@@ -321,15 +335,24 @@ export default function DoctorDashboard() {
                          <div>
                            <h3 className="font-heading font-bold text-slate-900 text-lg">{apt.patient.name}</h3>
                            <div className="flex items-center gap-2 mt-1">
-                              {apt.type === 'SCHEDULED' ? (
-                                <span className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
-                                  <CalendarClock className="w-3 h-3" /> {new Date(apt.scheduledFor).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md">
-                                  <Activity className="w-3 h-3" /> LIVE REQUEST
-                                </span>
-                              )}
+                               {apt.status === 'ACCEPTED' && apt.type === 'SCHEDULED' ? (
+                                 <>
+                                   <span className="flex items-center gap-1 text-xs font-bold text-health-700 bg-health-50 px-2 py-1 rounded-md border border-health-200">
+                                     <CheckCircle className="w-3 h-3" /> Confirmed
+                                   </span>
+                                   <span className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                                     <CalendarClock className="w-3 h-3" /> {new Date(apt.scheduledFor).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                   </span>
+                                 </>
+                               ) : apt.type === 'SCHEDULED' ? (
+                                 <span className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                                   <CalendarClock className="w-3 h-3" /> {new Date(apt.scheduledFor).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                 </span>
+                               ) : (
+                                 <span className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md">
+                                   <Activity className="w-3 h-3" /> LIVE REQUEST
+                                 </span>
+                               )}
                            </div>
                          </div>
                        </div>
@@ -434,12 +457,12 @@ export default function DoctorDashboard() {
                    </div>
                    <h3 className="text-lg font-heading font-bold text-slate-700 mb-1">
                      {activeTab === 'queue' && 'Queue is empty'}
-                     {activeTab === 'schedule' && 'No scheduled appointments'}
+                     {activeTab === 'schedule' && 'No pending requests'}
                      {activeTab === 'history' && 'No past consultations'}
                    </h3>
                    <p className="text-slate-500 font-medium">
-                     {activeTab === 'queue' && 'There are no live patients waiting at the moment.'}
-                     {activeTab === 'schedule' && 'Your schedule is clear.'}
+                     {activeTab === 'queue' && 'No live or confirmed appointments are waiting to start.'}
+                     {activeTab === 'schedule' && 'No scheduled appointments are waiting for your response.'}
                      {activeTab === 'history' && 'You haven\'t completed any consultations yet.'}
                    </p>
                 </motion.div>
@@ -465,6 +488,7 @@ export default function DoctorDashboard() {
               exit={{ scale: 0.95, opacity: 0, y: -20 }}
               className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
             >
+              {/* Modal Header */}
               <div className="bg-primary-900 p-6 flex items-center justify-between relative overflow-hidden shrink-0">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-health-500 rounded-full blur-[50px] opacity-30 pointer-events-none"></div>
                 <div className="flex items-center gap-3 relative z-10">
@@ -477,40 +501,100 @@ export default function DoctorDashboard() {
                   </div>
                 </div>
                 <button 
-                  onClick={() => setSelectedAptNotes(null)}
+                  onClick={() => { setSelectedAptNotes(null); setSelectedAptTab('summary'); }}
                   className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors relative z-10 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
-              <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
-                   <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">AI Summary</h3>
-                   <p className="text-slate-700 font-medium leading-relaxed">
-                     {selectedAptNotes.aiSummary?.summary || "No summary provided."}
-                   </p>
-                </div>
-                
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Conversation Transcript</h3>
-                <div className="space-y-4">
-                  {selectedAptNotes.aiSummary?.chatHistory?.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed shadow-sm ${
-                        msg.role === 'user' 
-                          ? 'bg-gradient-to-br from-primary-800 to-primary-900 text-white rounded-tr-sm font-medium' 
-                          : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
-                      }`}>
-                        {msg.text}
+
+              {/* Tabs */}
+              <div className="flex gap-2 px-5 pt-4 bg-white border-b border-slate-100 shrink-0">
+                <button
+                  onClick={() => setSelectedAptTab('summary')}
+                  className={`px-5 py-2.5 rounded-t-xl text-sm font-bold transition-all cursor-pointer border-b-2 -mb-px ${
+                    selectedAptTab === 'summary'
+                      ? 'border-primary-700 text-primary-800 bg-primary-50'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  AI Summary
+                </button>
+                <button
+                  onClick={() => setSelectedAptTab('chat')}
+                  className={`px-5 py-2.5 rounded-t-xl text-sm font-bold transition-all cursor-pointer border-b-2 -mb-px flex items-center gap-2 ${
+                    selectedAptTab === 'chat'
+                      ? 'border-health-600 text-health-700 bg-health-50'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Conversation
+                  {selectedAptNotes.aiSummary?.chatHistory?.length > 0 && (
+                    <span className="bg-health-100 text-health-700 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      {selectedAptNotes.aiSummary.chatHistory.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Tab Body */}
+              <div className="flex-1 overflow-y-auto bg-slate-50">
+
+                {/* Summary Tab */}
+                {selectedAptTab === 'summary' && (
+                  <div className="p-6 space-y-4">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Clinical Summary</h3>
+                      <p className="text-slate-700 font-medium leading-relaxed">
+                        {selectedAptNotes.aiSummary?.summary || 'No summary provided.'}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Specialization</p>
+                        <p className="text-sm font-bold text-primary-700">{selectedAptNotes.aiSummary?.suggested_specialization || '—'}</p>
+                      </div>
+                      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Assigned Doctor</p>
+                        <p className="text-sm font-bold text-slate-700">{selectedAptNotes.aiSummary?.assigned_doctor_name || '—'}</p>
                       </div>
                     </div>
-                  ))}
-                  {!selectedAptNotes.aiSummary?.chatHistory?.length && (
-                    <p className="text-slate-500 text-sm text-center py-4">No conversation history available.</p>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {/* Conversation Tab */}
+                {selectedAptTab === 'chat' && (
+                  <div className="p-6">
+                    {selectedAptNotes.aiSummary?.chatHistory?.length > 0 ? (
+                      <div className="space-y-4">
+                        {selectedAptNotes.aiSummary.chatHistory.map((msg, idx) => (
+                          <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-1">
+                              {msg.role === 'user' ? selectedAptNotes.patient.name : 'Aria (AI)'}
+                            </span>
+                            <div className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed shadow-sm ${
+                              msg.role === 'user'
+                                ? 'bg-gradient-to-br from-primary-800 to-primary-900 text-white rounded-tr-sm font-medium'
+                                : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
+                            }`}>
+                              {msg.text}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-16 text-center">
+                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4 border border-slate-200">
+                          <Activity className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <p className="text-slate-600 font-bold mb-1">No conversation recorded</p>
+                        <p className="text-slate-400 text-sm">The patient used text triage or no history was saved.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
-              
             </motion.div>
           </motion.div>
         )}

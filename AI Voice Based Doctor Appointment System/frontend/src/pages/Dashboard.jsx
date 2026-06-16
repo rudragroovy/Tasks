@@ -56,6 +56,11 @@ export default function Dashboard() {
     return <DoctorDashboard />;
   }
 
+  if (user?.role === 'ADMIN') {
+    navigate('/admin');
+    return null;
+  }
+
   const activeAppointments = appointments.filter(a => a.status === 'PENDING' || a.status === 'ACCEPTED' || a.paymentStatus === 'PENDING_PAYMENT');
   const pastAppointments = appointments.filter(a => a.status === 'COMPLETED');
 
@@ -99,6 +104,16 @@ export default function Dashboard() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-4"
           >
+            {/* Direct Booking Trigger */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/booking')}
+              className="hidden sm:flex items-center gap-2 bg-white text-primary-900 border border-primary-200 px-5 py-2.5 rounded-full font-bold shadow-sm hover:bg-slate-50 transition-all"
+            >
+              <Stethoscope className="w-4 h-4" /> Direct Book
+            </motion.button>
+
             {/* AI Assistant Navbar Trigger */}
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -141,14 +156,24 @@ export default function Dashboard() {
             <p className="text-slate-500 font-medium text-lg">Your personal telehealth hub. Click "Ask AI Triage" to find a specialist.</p>
           </div>
           
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsAIModalOpen(true)}
-            className="sm:hidden flex items-center justify-center gap-2 bg-gradient-to-r from-primary-900 to-primary-800 text-white px-5 py-3 rounded-full font-bold shadow-md shadow-primary-900/20 w-full"
-          >
-            <Mic className="w-5 h-5" /> Ask AI Triage
-          </motion.button>
+          <div className="sm:hidden flex flex-col gap-3 w-full">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+                onClick={() => setIsAIModalOpen(true)}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-primary-900 to-primary-800 text-white px-5 py-3 rounded-full font-bold shadow-md shadow-primary-900/20 w-full"
+            >
+              <Mic className="w-5 h-5" /> Ask AI Triage
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/booking')}
+              className="flex items-center justify-center gap-2 bg-white text-primary-900 border border-primary-200 px-5 py-3 rounded-full font-bold shadow-sm w-full"
+            >
+              <Stethoscope className="w-5 h-5" /> Direct Book
+            </motion.button>
+          </div>
         </motion.div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -218,7 +243,7 @@ export default function Dashboard() {
                                <img src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${apt.doctor.name}`} alt="Doctor" />
                              </div>
                              <div>
-                               <p className="font-heading font-bold text-lg text-slate-900">Dr. {apt.doctor.name}</p>
+                               <p className="font-heading font-bold text-lg text-slate-900">{apt.doctor.name.startsWith('Dr.') ? apt.doctor.name : `Dr. ${apt.doctor.name}`}</p>
                                <div className="flex items-center gap-2 mt-1">
                                   <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                                     apt.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
@@ -310,7 +335,7 @@ export default function Dashboard() {
                         className="flex flex-col md:flex-row justify-between md:items-center p-5 border border-slate-100 rounded-2xl hover:bg-slate-50 transition-colors gap-4"
                       >
                         <div>
-                          <p className="font-heading font-bold text-slate-900 text-lg">Dr. {apt.doctor.name}</p>
+                          <p className="font-heading font-bold text-slate-900 text-lg">{apt.doctor.name.startsWith('Dr.') ? apt.doctor.name : `Dr. ${apt.doctor.name}`}</p>
                           <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 font-medium">
                             <span className="bg-slate-100 px-2 py-0.5 rounded-md text-xs font-bold text-slate-600">
                               {new Date(apt.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}

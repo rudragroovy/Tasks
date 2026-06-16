@@ -1,124 +1,223 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import { Mic, MicOff, Send, Activity } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useConversation, ConversationProvider } from '@elevenlabs/react';
+import { Mic, PhoneOff, Activity, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AIVoiceAssistant({ onComplete }) {
+function AIVoiceAssistantInner({ onComplete }) {
   const [history, setHistory] = useState([]);
+  const historyRef = useRef([]);
   const [inputText, setInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState('idle'); // idle | connecting | connected | ended
   const chatEndRef = useRef(null);
-  
-  const recognitionRef = useRef(null);
+  const triageDataRef = useRef(null);
 
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
+    historyRef.current = history;
+  }, [history]);
 
-      recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
-        setInputText(transcript);
-      };
-
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
+  const addMessage = useCallback((role, text) => {
+    setHistory(prev => {
+      // Deduplicate consecutive identical messages
+      if (prev.length > 0 && prev[prev.length - 1].text === text && prev[prev.length - 1].role === role) return prev;
+      return [...prev, { id: crypto.randomUUID(), role, text }];
+    });
   }, []);
 
+  // ─── Client Tools ────────────────────────────────────────────────────────────
+  const clientTools = useMemo(() => ({
+
+    fetch_doctors: async (parameters) => {
+      const spec = parameters?.specialization || '';
+      console.log('[Tool] fetch_doctors called with specialization:', spec);
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/appointments/doctors?specializationName=${encodeURIComponent(spec)}`,
+          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const doctors = await res.json();
+
+        if (!doctors || doctors.length === 0) {
+          return JSON.stringify({ available: false, message: 'No doctors are currently online for this specialization.' });
+        }
+
+        const list = doctors.map(d => ({
+          id: d.userId,
+          name: d.user?.name || 'Unknown',
+          specialization: d.specialization?.name || spec,
+          fee: d.fee || 150,
+          isOnline: d.isOnline
+        }));
+
+        console.log('[Tool] fetch_doctors returning:', list);
+        return JSON.stringify({ available: true, doctors: list });
+      } catch (err) {
+        console.error('[Tool] fetch_doctors error:', err);
+        return JSON.stringify({ available: false, error: 'Could not reach the database. Please try again.' });
+      }
+    },
+
+    save_symptom_session: async (parameters) => {
+      console.log('[Tool] save_symptom_session called with:', parameters);
+      const { summary, specialization, doctorId, doctorName } = parameters || {};
+
+      if (!doctorId || !doctorName) {
+        return 'Error: Doctor information is missing. Please ask the patient to select a doctor first.';
+      }
+
+      // Store triage data — the onComplete callback will fire after disconnect
+      triageDataRef.current = {
+        status: 'complete',
+        suggested_specialization: specialization || 'General Physician',
+        summary: summary || 'Symptoms recorded via AI voice triage.',
+        assigned_doctor_id: doctorId,
+        assigned_doctor_name: doctorName,
+        chatHistory: historyRef.current
+      };
+
+      console.log('[Tool] Triage data saved:', triageDataRef.current);
+      return 'Success. The patient has been assigned and will be redirected to complete the booking now.';
+    }
+
+  }), []);
+
+  // ─── Conversation Callbacks ──────────────────────────────────────────────────
+  const callbacks = useMemo(() => ({
+    onConnect: () => {
+      console.log('[ElevenLabs] Connected');
+      setStatus('connected');
+    },
+    onDisconnect: () => {
+      console.log('[ElevenLabs] Disconnected');
+      setStatus('ended');
+      if (triageDataRef.current && onComplete) {
+        // Small delay to let the AI finish speaking
+        setTimeout(() => onComplete(triageDataRef.current), 1500);
+      }
+    },
+    onMessage: (message) => {
+      console.log('[ElevenLabs] Message:', message);
+      const text = message?.message;
+      const source = message?.source || message?.role;
+      if (!text) return;
+      const role = (source === 'ai' || source === 'agent') ? 'assistant' : 'user';
+      addMessage(role, text);
+    },
+    onError: (err) => {
+      console.error('[ElevenLabs] Error:', err);
+      setStatus('idle');
+    }
+  }), [onComplete, addMessage]);
+
+  // Memoize the full options object to prevent WebSocket reconnect on every render
+  const conversationOptions = useMemo(() => ({
+    ...callbacks,
+    clientTools
+  }), [callbacks, clientTools]);
+
+  const conversation = useConversation(conversationOptions);
+
+  // Auto-scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, isLoading]);
+  }, [history]);
 
-  const toggleListen = () => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-    } else {
-      setInputText('');
-      recognitionRef.current?.start();
-      setIsListening(true);
-    }
-  };
-
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  const handleSend = async (textToSend = inputText) => {
-    if (!textToSend.trim()) return;
-    if (isListening) recognitionRef.current?.stop();
-
-    const newUserMsg = { id: Date.now(), role: 'user', text: textToSend };
-    setHistory(prev => [...prev, newUserMsg]);
-    setInputText('');
-    setIsLoading(true);
-
-    try {
-      const response = await axios.post('http://localhost:5000/api/ai/symptoms', {
-        text: textToSend,
-        history: history.map(h => ({ role: h.role, text: h.text }))
-      });
-
-      const data = response.data;
-
-      if (data.status === 'complete') {
-        const aiMsg = { id: Date.now() + 1, role: 'assistant', text: `Got it! Based on your symptoms, I suggest seeing a ${data.suggested_specialization}.` };
-        const finalHistory = [...history, newUserMsg, aiMsg];
-        setHistory(prev => [...prev, aiMsg]);
-        speakText(aiMsg.text);
-        if (onComplete) {
-           setTimeout(() => onComplete({ ...data, chatHistory: finalHistory }), 2000);
-        }
-      } else {
-        const aiMsg = { id: Date.now() + 1, role: 'assistant', text: data.next_question };
-        setHistory(prev => [...prev, aiMsg]);
-        speakText(data.next_question);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (conversation.status === 'connected') {
+        conversation.endSession().catch(() => {});
       }
+    };
+  }, []);
+
+  // ─── Start / End session ────────────────────────────────────────────────────
+  const toggleSession = async () => {
+    if (conversation.status === 'connected') {
+      await conversation.endSession();
+      return;
+    }
+
+    setStatus('connecting');
+    try {
+      const res = await fetch('http://localhost:5000/api/ai/signed-url', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('Could not get signed URL');
+      const { signedUrl } = await res.json();
+      await conversation.startSession({ signedUrl });
     } catch (err) {
-      console.error(err);
-      const errorMsg = { id: Date.now() + 1, role: 'assistant', text: "I'm having trouble connecting right now. Please try typing your symptoms." };
-      setHistory(prev => [...prev, errorMsg]);
-      speakText(errorMsg.text);
-    } finally {
-      setIsLoading(false);
+      console.error('[ElevenLabs] Failed to start session:', err);
+      setStatus('idle');
+      alert('Could not connect to the voice agent. Please check your connection and try again.');
     }
   };
 
-  const startTriage = () => handleSend("Hello, I need to check my symptoms.");
+  const handleSend = () => {
+    if (!inputText.trim()) return;
+    if (conversation.status === 'connected') {
+      try {
+        conversation.sendUserMessage(inputText);
+        addMessage('user', inputText);
+      } catch (err) {
+        console.error('Failed to send text:', err);
+      }
+    } else {
+      addMessage('user', inputText);
+      setTimeout(() => addMessage('assistant', "Please start the AI triage call first by clicking the microphone button."), 400);
+    }
+    setInputText('');
+  };
+
+  const isConnected = conversation.status === 'connected';
+  const isConnecting = conversation.status === 'connecting' || status === 'connecting';
+  const hasEnded = status === 'ended';
 
   return (
     <div className="flex flex-col w-full h-[500px] relative">
-      {/* Header Area inside the Chat (if no history) */}
-      {history.length === 0 && (
-        <motion.div 
+
+      {/* Start button — shown only when no history */}
+      {history.length === 0 && !isConnected && !hasEnded && (
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex justify-center mb-6"
         >
-           <button 
-             onClick={startTriage}
-             className="px-6 py-2.5 bg-primary-100 text-primary-800 text-sm font-bold rounded-full hover:bg-primary-200 transition-colors shadow-sm cursor-pointer flex items-center gap-2"
-           >
-             <Activity className="w-4 h-4" /> Start AI Triage Checkup
-           </button>
+          <button
+            onClick={toggleSession}
+            disabled={isConnecting}
+            className="px-6 py-2.5 bg-primary-100 text-primary-800 text-sm font-bold rounded-full hover:bg-primary-200 transition-colors shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
+          >
+            <Activity className="w-4 h-4" />
+            {isConnecting ? 'Connecting...' : 'Start AI Triage Checkup'}
+          </button>
+        </motion.div>
+      )}
+
+      {/* Ended state */}
+      {hasEnded && !triageDataRef.current && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex justify-center mb-4"
+        >
+          <div className="px-4 py-2 bg-slate-100 text-slate-600 text-sm font-medium rounded-full">
+            Conversation ended
+          </div>
+        </motion.div>
+      )}
+
+      {/* Redirecting state */}
+      {hasEnded && triageDataRef.current && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex justify-center mb-4"
+        >
+          <div className="px-5 py-2.5 bg-health-50 border border-health-200 text-health-700 text-sm font-bold rounded-full flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-health-500 border-t-transparent rounded-full animate-spin" />
+            Redirecting to your doctor...
+          </div>
         </motion.div>
       )}
 
@@ -129,21 +228,21 @@ export default function AIVoiceAssistant({ onComplete }) {
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
               <Mic className="w-8 h-8 text-slate-300" />
             </div>
-            <p className="font-heading font-bold text-slate-600 mb-1">I am ready to listen.</p>
-            <p>Click "Start AI Triage" or type your symptoms to begin. I will analyze your symptoms and connect you with the right specialist.</p>
+            <p className="font-heading font-bold text-slate-600 mb-1">I'm ready to listen.</p>
+            <p>Click "Start AI Triage Checkup" above to begin. I'll ask about your symptoms and connect you with the right specialist.</p>
           </div>
         ) : (
           <AnimatePresence initial={false}>
             {history.map((msg) => (
-              <motion.div 
+              <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                initial={{ opacity: 0, y: 10, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed shadow-sm ${
-                  msg.role === 'user' 
-                    ? 'bg-gradient-to-br from-primary-800 to-primary-900 text-white rounded-tr-sm font-medium' 
+                  msg.role === 'user'
+                    ? 'bg-gradient-to-br from-primary-800 to-primary-900 text-white rounded-tr-sm font-medium'
                     : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
                 }`}>
                   {msg.text}
@@ -152,75 +251,75 @@ export default function AIVoiceAssistant({ onComplete }) {
             ))}
           </AnimatePresence>
         )}
-        
-        {/* Typing Indicator */}
-        {isLoading && (
-          <motion.div 
+
+        {/* Speaking Indicator */}
+        {conversation.isSpeaking && (
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex justify-start"
           >
             <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm flex gap-1.5 items-center">
-               <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0 }} />
-               <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }} />
-               <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }} />
+              <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0 }} />
+              <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }} />
+              <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }} />
             </div>
           </motion.div>
         )}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="flex gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm relative z-10">
+      {/* Input Bar */}
+      <div className="flex gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm items-center">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={toggleListen}
-          className={`relative p-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
-            isListening 
-              ? 'bg-red-50 text-red-500' 
+          onClick={toggleSession}
+          disabled={isConnecting || hasEnded}
+          className={`relative p-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 disabled:opacity-40 ${
+            isConnected
+              ? 'bg-red-50 text-red-500'
               : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
           }`}
-          title={isListening ? "Stop listening" : "Start speaking"}
+          title={isConnected ? 'End voice call' : 'Start voice call'}
         >
-          {isListening && (
-            <span className="absolute inset-0 rounded-xl bg-red-400 animate-ping opacity-20"></span>
-          )}
-          {isListening ? <MicOff className="w-5 h-5 relative z-10" /> : <Mic className="w-5 h-5 relative z-10" />}
+          {isConnected && <span className="absolute inset-0 rounded-xl bg-red-400 animate-ping opacity-20" />}
+          {isConnected ? <PhoneOff className="w-5 h-5 relative z-10" /> : <Mic className="w-5 h-5 relative z-10" />}
         </motion.button>
-        
+
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder={isListening ? "Listening..." : "Describe your symptoms..."}
+          placeholder={isConnected ? 'Speak or type here...' : 'Start the call to chat'}
           className="flex-1 bg-transparent border-none px-2 text-[15px] text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none w-full"
         />
-        
+
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => handleSend()}
-          disabled={!inputText.trim() || isLoading}
-          className="p-3.5 bg-primary-900 text-white rounded-xl shadow-md shadow-primary-900/20 disabled:opacity-50 disabled:shadow-none transition-all cursor-pointer shrink-0 flex items-center justify-center"
+          onClick={handleSend}
+          disabled={!inputText.trim()}
+          className="p-3.5 bg-primary-900 text-white rounded-xl shadow-md shadow-primary-900/20 disabled:opacity-40 disabled:shadow-none transition-all cursor-pointer shrink-0 flex items-center justify-center"
         >
-          <Send className="w-5 h-5 ml-1" />
+          <Send className="w-5 h-5" />
         </motion.button>
       </div>
 
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: #cbd5e1;
-          border-radius: 20px;
-        }
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
       `}</style>
     </div>
+  );
+}
+
+export default function AIVoiceAssistant(props) {
+  return (
+    <ConversationProvider>
+      <AIVoiceAssistantInner {...props} />
+    </ConversationProvider>
   );
 }

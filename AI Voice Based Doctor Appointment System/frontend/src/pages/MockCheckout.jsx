@@ -13,6 +13,7 @@ export default function MockCheckout() {
   const sessionId = searchParams.get('session_id');
   const appointmentId = searchParams.get('appointmentId');
   const type = searchParams.get('type');
+  const fee = searchParams.get('fee') || '150.00';
 
   const handlePay = async () => {
     setLoading(true);
@@ -78,7 +79,7 @@ export default function MockCheckout() {
           <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 mb-8 flex justify-between items-center">
             <div>
               <p className="text-slate-500 text-sm font-bold uppercase tracking-wide mb-1">Total Due</p>
-              <p className="text-3xl font-heading font-black text-slate-900">$150.00</p>
+              <p className="text-3xl font-heading font-black text-slate-900">${parseFloat(fee).toFixed(2)}</p>
             </div>
             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center border border-emerald-200">
               <ShieldCheck className="w-6 h-6 text-emerald-600" />
@@ -121,7 +122,7 @@ export default function MockCheckout() {
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             ) : (
               <>
-                Pay $150.00 <ArrowRight className="w-4 h-4" />
+                Pay ${parseFloat(fee).toFixed(2)} <ArrowRight className="w-4 h-4" />
               </>
             )}
           </motion.button>

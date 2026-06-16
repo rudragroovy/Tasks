@@ -5,11 +5,12 @@ const http = require('http');
 const { Server } = require('socket.io');
 
 const authRoutes = require('./routes/auth');
-const aiRoutes = require('./routes/ai');
 const appointmentRoutes = require('./routes/appointments');
 const doctorsRoutes = require('./routes/doctors');
 const paymentsRoutes = require('./routes/payments');
 const agoraRoutes = require('./routes/agora');
+const aiRoutes = require('./routes/ai');
+const adminRoutes = require('./routes/admin');
 
 const path = require('path');
 
@@ -27,11 +28,12 @@ app.set('io', io); // Allow routes to access io via req.app.get('io')
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/ai', aiRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/doctors', doctorsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/agora', agoraRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Socket.io
 require('./socket')(io);

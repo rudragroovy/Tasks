@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Activity, ShieldCheck, Clock, ArrowRight } from 'lucide-react';
+import { Activity, ShieldCheck, Clock, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -16,8 +16,12 @@ export default function Login() {
     setIsLoading(true);
     try {
       setError('');
-      await login(email, password);
-      navigate('/dashboard');
+      const loggedInUser = await login(email, password);
+      if (loggedInUser.role === 'ADMIN') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to login');
       setIsLoading(false);

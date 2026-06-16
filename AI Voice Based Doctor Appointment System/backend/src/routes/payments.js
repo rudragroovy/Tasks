@@ -28,7 +28,7 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
             product_data: {
               name: `Consultation with Dr. ${doctor.user.name}`,
             },
-            unit_amount: 150 * 100, // $150.00
+            unit_amount: Math.round((parseFloat(doctor.fee) || 150) * 100),
           },
           quantity: 1,
         },
@@ -59,7 +59,7 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
       });
 
       return res.json({ 
-        url: `http://localhost:5173/mock-checkout?session_id=${mockSessionId}&appointmentId=${appointmentId}&type=${type}` 
+        url: `http://localhost:5173/mock-checkout?session_id=${mockSessionId}&appointmentId=${appointmentId}&type=${type}&fee=${parseFloat(doctor.fee) || 150}` 
       });
     }
     res.status(500).json({ error: 'Failed to create payment session' });
