@@ -29,6 +29,7 @@ app.set('io', io); // Allow routes to access io via req.app.get('io')
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/family-members', require('./routes/familyMembers'));
 app.use('/api/doctors', doctorsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/agora', agoraRoutes);

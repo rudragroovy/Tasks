@@ -30,8 +30,22 @@ model User {
   createdAt DateTime @default(now())
 
   doctorProfile Doctor?
+  familyMembers FamilyMember[]
   patientAppointments Appointment[] @relation("PatientAppointments")
   doctorAppointments  Appointment[] @relation("DoctorAppointments")
+}
+
+model FamilyMember {
+  id        String   @id @default(uuid())
+  patientId String
+  patient   User     @relation(fields: [patientId], references: [id])
+  name      String
+  relation  String
+  age       Int
+  gender    String?
+  createdAt DateTime @default(now())
+
+  appointments Appointment[]
 }
 
 model Specialization {
@@ -53,6 +67,7 @@ model Appointment {
   id        String   @id @default(uuid())
   patientId String
   doctorId  String
+  familyMemberId String?
   status    String   // PENDING, ACCEPTED, REJECTED, COMPLETED
   
   // Scheduling & Payment fields
@@ -63,8 +78,9 @@ model Appointment {
 
   aiSummary Json?    // { symptoms, severity, duration }
   
-  patient   User     @relation("PatientAppointments", fields: [patientId], references: [id])
-  doctor    User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  patient      User          @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor       User          @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  familyMember FamilyMember? @relation(fields: [familyMemberId], references: [id])
   
   consultation Consultation?
   createdAt DateTime @default(now())

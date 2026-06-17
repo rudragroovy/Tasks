@@ -3,15 +3,24 @@ import { useState, useEffect } from 'react';
 import AIVoiceAssistant from '../components/AIVoiceAssistant';
 import { useNavigate } from 'react-router-dom';
 import DoctorDashboard from './DoctorDashboard';
-import { FileText, Download, Activity, User, LogOut, ChevronRight, Stethoscope, Video, CalendarClock, Mic, X } from 'lucide-react';
+import { useSocket } from '../context/SocketContext';
+import { HistoryModal } from '../components/ui/history-modal';
+import { TopHeader } from '../components/ui/top-header';
+import { Home, Stethoscope, Mic, LogOut, FileText, Download, Activity, User, ChevronRight, Video, CalendarClock, X, MessageSquare, Phone, PhoneOff, Clock, LayoutDashboard, Settings, Bell, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const socket = useSocket();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedHistoryApt, setSelectedHistoryApt] = useState(null);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  
+  // Call state
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(120);
 
   useEffect(() => {
     fetch('http://localhost:5000/api/appointments', {
@@ -24,6 +33,40 @@ export default function Dashboard() {
     .catch(err => console.error(err))
     .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleIncomingCall = (data) => {
+      setIncomingCall(data);
+      setTimeLeft(120);
+    };
+
+    socket.on('call:incoming', handleIncomingCall);
+    return () => socket.off('call:incoming', handleIncomingCall);
+  }, [socket]);
+
+  useEffect(() => {
+    let timer;
+    if (incomingCall && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (incomingCall && timeLeft === 0) {
+      handleDeclineCall();
+    }
+    return () => clearInterval(timer);
+  }, [incomingCall, timeLeft]);
+
+  const handleAcceptCall = () => {
+    socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: true });
+    navigate(`/room/${incomingCall.appointmentId}`);
+  };
+
+  const handleDeclineCall = () => {
+    socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: false });
+    setIncomingCall(null);
+  };
 
   const playSuccessSound = () => {
     try {
@@ -63,313 +106,344 @@ export default function Dashboard() {
 
   const activeAppointments = appointments.filter(a => a.status === 'PENDING' || a.status === 'ACCEPTED' || a.paymentStatus === 'PENDING_PAYMENT');
   const pastAppointments = appointments.filter(a => a.status === 'COMPLETED');
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
-  };
+  const scheduledAppointments = appointments.filter(a => a.type === 'SCHEDULED' && a.status !== 'COMPLETED' && a.status !== 'CANCELLED');
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans relative overflow-hidden">
-      {/* Background Orbs */}
-      <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary-200 blur-[150px] pointer-events-none opacity-40"></div>
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-health-200 blur-[150px] pointer-events-none opacity-40"></div>
+    <div className="min-h-screen xl:h-screen bg-slate-50 font-sans flex flex-col xl:overflow-hidden">
+      {/* Top Application Bar */}
+      <TopHeader activeAppointmentsCount={activeAppointments.length} />
 
-      {/* Navigation */}
-      <nav className="relative z-10 bg-white/70 backdrop-blur-xl border-b border-white/50 shadow-sm px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2"
-          >
-            <div className="w-8 h-8 bg-primary-900 rounded-md flex items-center justify-center relative overflow-hidden shadow-sm">
-               <div className="absolute w-4 h-4 bg-white top-0 left-0 rounded-br-md" />
-               <div className="absolute w-4 h-4 bg-health-500 bottom-0 right-0 rounded-tl-md" />
-            </div>
-            <span className="font-heading font-black text-primary-900 text-xl tracking-tight">MyDrScripts</span>
-          </motion.div>
+      {/* Main Dashboard Layout */}
+      <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 flex flex-col xl:flex-row gap-6">
 
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-4"
-          >
-            {/* Direct Booking Trigger */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/booking')}
-              className="hidden sm:flex items-center gap-2 bg-white text-primary-900 border border-primary-200 px-5 py-2.5 rounded-full font-bold shadow-sm hover:bg-slate-50 transition-all"
-            >
-              <Stethoscope className="w-4 h-4" /> Direct Book
-            </motion.button>
-
-            {/* AI Assistant Navbar Trigger */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsAIModalOpen(true)}
-              className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-primary-900 to-primary-800 text-white px-5 py-2.5 rounded-full font-bold shadow-md shadow-primary-900/20 hover:shadow-lg transition-all"
-            >
-              <Mic className="w-4 h-4" /> Ask AI Triage
-            </motion.button>
-
-            <div className="hidden sm:flex items-center gap-2 bg-slate-100/80 px-4 py-2.5 rounded-full border border-slate-200/50">
-              <User className="w-4 h-4 text-slate-500" />
-              <span className="text-sm font-bold text-slate-700">{user?.name}</span>
-            </div>
-            
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={logout}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-full hover:bg-slate-50 hover:text-red-600 transition-colors shadow-sm cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Sign Out</span>
-            </motion.button>
-          </motion.div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 py-10 lg:py-12">
-        {/* Welcome Banner */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6"
-        >
-          <div>
-            <h1 className="text-3xl md:text-4xl font-heading font-black text-slate-900 tracking-tight mb-2">
-              Welcome back, {user?.name?.split(' ')[0]}
-            </h1>
-            <p className="text-slate-500 font-medium text-lg">Your personal telehealth hub. Click "Ask AI Triage" to find a specialist.</p>
-          </div>
+        {/* Left Column: Stats + Active Sessions */}
+        <div className="flex-1 flex flex-col gap-6 min-w-0 xl:min-h-0">
           
-          <div className="sm:hidden flex flex-col gap-3 w-full">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-                onClick={() => setIsAIModalOpen(true)}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-primary-900 to-primary-800 text-white px-5 py-3 rounded-full font-bold shadow-md shadow-primary-900/20 w-full"
-            >
-              <Mic className="w-5 h-5" /> Ask AI Triage
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/booking')}
-              className="flex items-center justify-center gap-2 bg-white text-primary-900 border border-primary-200 px-5 py-3 rounded-full font-bold shadow-sm w-full"
-            >
-              <Stethoscope className="w-5 h-5" /> Direct Book
-            </motion.button>
+          {/* Dashboard Header Stats */}
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 shrink-0">
+            <div className="bg-white p-3 sm:p-5 lg:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 hover:shadow-md transition-shadow group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-health-50 text-health-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div className="text-center sm:text-left">
+                <p className="text-xl sm:text-2xl font-heading font-black text-slate-900 leading-none mb-0.5 sm:mb-1">{activeAppointments.length}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Active</p>
+              </div>
+            </div>
+            <div className="bg-white p-3 sm:p-5 lg:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 hover:shadow-md transition-shadow group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div className="text-center sm:text-left">
+                <p className="text-xl sm:text-2xl font-heading font-black text-slate-900 leading-none mb-0.5 sm:mb-1">{scheduledAppointments.length}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Scheduled</p>
+              </div>
+            </div>
+            <div className="bg-white p-3 sm:p-5 lg:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 hover:shadow-md transition-shadow group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div className="text-center sm:text-left">
+                <p className="text-xl sm:text-2xl font-heading font-black text-slate-900 leading-none mb-0.5 sm:mb-1">{pastAppointments.length}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">History</p>
+              </div>
+            </div>
           </div>
-        </motion.div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
-            {/* Active Consultations (Expanded) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]"
-            >
-              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
-                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
-                     <Video className="w-5 h-5" />
-                   </div>
-                   <h3 className="font-heading font-bold text-slate-800 text-xl">Active Requests</h3>
-                 </div>
-                 <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-200">
-                   {loading ? '...' : activeAppointments.length} Active
-                 </span>
+          {/* Active Appointments Feed */}
+          <div className="flex flex-col gap-4 flex-1 xl:overflow-hidden">
+              <div className="flex items-center justify-between shrink-0">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                   Active Sessions
+                </h2>
               </div>
               
-              <div className="p-6 overflow-y-auto flex-1">
-                {loading ? (
-                  <div className="space-y-4">
-                    {[1, 2].map(i => (
-                      <div key={i} className="flex gap-4 items-center animate-pulse border border-slate-100 p-5 rounded-2xl">
-                        <div className="w-12 h-12 bg-slate-200 rounded-full shrink-0"></div>
-                        <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-slate-200 rounded w-1/3"></div>
-                          <div className="h-3 bg-slate-100 rounded w-1/4"></div>
-                        </div>
-                        <div className="w-32 h-10 bg-slate-200 rounded-xl"></div>
+              {loading ? (
+                <div className="bg-white border border-slate-200 rounded-3xl p-10 flex justify-center shadow-sm">
+                  <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : activeAppointments.length === 0 ? (
+                <div className="bg-white border border-slate-200 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
+                   <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                     <CalendarClock className="w-8 h-8 text-slate-400" />
+                   </div>
+                   <p className="text-base font-bold text-slate-700">No active sessions</p>
+                   <p className="text-sm text-slate-500 mt-1 max-w-xs">Use the AI triage or book directly to consult with a doctor.</p>
+                </div>
+              ) : (
+                <div className="flex-1 xl:overflow-y-auto pr-2 pb-4 space-y-4 xl:custom-scrollbar">
+                  {activeAppointments.map((apt, idx) => (
+                    <motion.div 
+                      key={apt.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1, type: "spring", stiffness: 300, damping: 25 }}
+                      className="group relative bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col sm:flex-row gap-6 items-start sm:items-center overflow-hidden"
+                    >
+                      {/* Gradient background pulse for active calls */}
+                      {apt.status === 'ACCEPTED' && (
+                        <div className="absolute inset-0 bg-gradient-to-r from-health-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      )}
+
+                      {/* Status Indicator Bar (Left Side) */}
+                      <div className="hidden sm:block w-1.5 h-full min-h-[60px] rounded-full self-stretch bg-slate-100 relative overflow-hidden">
+                        <div className={`absolute bottom-0 w-full rounded-full transition-all duration-1000 ${
+                           apt.status === 'ACCEPTED' ? 'h-full bg-health-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 
+                           apt.paymentStatus === 'PENDING_PAYMENT' ? 'h-1/2 bg-amber-500' : 'h-1/4 bg-primary-500'
+                        }`}></div>
                       </div>
-                    ))}
-                  </div>
-                ) : activeAppointments.length === 0 ? (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center h-full min-h-[200px] text-center"
-                  >
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                       <Stethoscope className="w-8 h-8 text-slate-300" />
-                    </div>
-                    <p className="text-slate-800 font-bold font-heading text-lg mb-1">No active consultations</p>
-                    <p className="text-slate-500 text-sm font-medium">Use the AI Triage above to request a doctor.</p>
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="space-y-4"
-                  >
-                    <AnimatePresence>
-                      {activeAppointments.map(apt => (
-                        <motion.div 
-                          variants={itemVariants}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          key={apt.id} 
-                          className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 border border-slate-100 rounded-2xl hover:border-primary-200 hover:shadow-md transition-colors bg-white gap-4 group"
-                        >
-                          <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
-                               <img src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${apt.doctor.name}`} alt="Doctor" />
-                             </div>
-                             <div>
-                               <p className="font-heading font-bold text-lg text-slate-900">{apt.doctor.name.startsWith('Dr.') ? apt.doctor.name : `Dr. ${apt.doctor.name}`}</p>
-                               <div className="flex items-center gap-2 mt-1">
-                                  <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                                    apt.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                  }`}>
-                                    {apt.status === 'PENDING' && apt.paymentStatus === 'PENDING_PAYMENT' ? 'AWAITING PAYMENT' : apt.status}
-                                  </span>
-                                  {apt.type === 'SCHEDULED' && (
-                                    <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                                      <CalendarClock className="w-3 h-3" /> Scheduled
-                                    </span>
-                                  )}
-                               </div>
-                             </div>
-                          </div>
-                          
-                          {apt.paymentStatus === 'PENDING_PAYMENT' ? (
-                            <motion.button 
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => navigate(`/mock-checkout?session_id=${apt.stripeSessionId}&appointmentId=${apt.id}&type=${apt.type}`)}
-                              className="w-full sm:w-auto px-6 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-bold shadow-sm cursor-pointer flex items-center justify-center gap-2"
-                            >
-                              Complete Payment <ChevronRight className="w-4 h-4" />
-                            </motion.button>
-                          ) : (
-                            <motion.button 
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => { playSuccessSound(); navigate(`/waiting-room?id=${apt.id}`); }}
-                              className="w-full sm:w-auto px-6 py-3 bg-primary-900 text-white rounded-xl hover:bg-primary-800 font-bold shadow-sm shadow-primary-900/20 cursor-pointer flex items-center justify-center gap-2"
-                            >
-                              View Room <ChevronRight className="w-4 h-4" />
-                            </motion.button>
+
+                      <div className="flex items-center gap-5 flex-1 z-10 min-w-0">
+                        <div className="relative shrink-0">
+                          <div className={`absolute inset-0 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity ${
+                            apt.status === 'ACCEPTED' ? 'bg-health-400' : 'bg-primary-200'
+                          }`}></div>
+                          <img 
+                            src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${apt.doctor?.name || 'Doctor'}&backgroundColor=f8fafc`} 
+                            alt="Doctor" 
+                            className="relative w-16 h-16 rounded-full border-4 border-white shadow-sm object-cover bg-slate-50"
+                          />
+                          {apt.status === 'ACCEPTED' && (
+                            <span className="absolute bottom-0 right-0 w-4 h-4 bg-health-500 border-2 border-white rounded-full flex items-center justify-center">
+                               <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
+                            </span>
                           )}
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-              </div>
-            </motion.div>
-
-            {/* Past Consultations (Expanded) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]"
-            >
-              <div className="px-8 py-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-                 <div className="w-10 h-10 bg-health-100 rounded-xl flex items-center justify-center text-health-600">
-                   <FileText className="w-5 h-5" />
-                 </div>
-                 <h3 className="font-heading font-bold text-slate-800 text-xl">Medical History</h3>
-              </div>
-
-              <div className="p-6 overflow-y-auto flex-1">
-                {loading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="flex justify-between items-center animate-pulse border border-slate-100 p-5 rounded-2xl">
-                        <div className="space-y-2">
-                          <div className="h-4 bg-slate-200 rounded w-32"></div>
-                          <div className="h-3 bg-slate-100 rounded w-48"></div>
                         </div>
-                        <div className="w-24 h-8 bg-slate-200 rounded-xl"></div>
+                        
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-black text-slate-900 text-lg tracking-tight truncate">
+                              {apt.doctor?.name?.startsWith('Dr.') ? apt.doctor?.name : `Dr. ${apt.doctor?.name}`}
+                            </h4>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md shrink-0 ${
+                               apt.status === 'ACCEPTED' ? 'bg-health-100 text-health-700 border border-health-200' :
+                               apt.paymentStatus === 'PENDING_PAYMENT' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                               'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}>
+                              {apt.status === 'ACCEPTED' ? 'Ready' : apt.paymentStatus === 'PENDING_PAYMENT' ? 'Payment Due' : 'Matching'}
+                            </span>
+                          </div>
+                          <p className="text-sm font-bold text-slate-500 truncate">
+                            {apt.doctor?.doctorProfile?.specialization?.name || apt.doctor?.specialization?.name || 'Specialist'}
+                            {apt.familyMember && <span className="ml-2 text-primary-600 text-[10px] uppercase tracking-widest bg-primary-50 px-2 py-0.5 rounded-md border border-primary-100 hidden sm:inline-block">For {apt.familyMember.name}</span>}
+                          </p>
+                          <p className="sm:hidden text-xs font-medium text-slate-400 mt-1 flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5" />
+                            Requested {new Date(apt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
                       </div>
-                    ))}
+                      
+                      <div className="hidden sm:flex flex-col items-center justify-center px-4 xl:px-8 z-10 shrink-0 border-l border-slate-100">
+                        <div className="flex items-center gap-1.5 text-slate-600 font-bold">
+                          <Clock className="w-4 h-4 text-slate-400" />
+                          <span>{new Date(apt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Requested</span>
+                      </div>
+                      
+                      <div className="w-full sm:w-auto shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-5 sm:pt-0 sm:pl-6 z-10">
+                        {apt.paymentStatus === 'PENDING_PAYMENT' ? (
+                          <button 
+                            onClick={() => navigate(`/checkout/${apt.id}`)}
+                            className="w-full sm:w-auto px-6 py-3 bg-slate-900 text-white rounded-xl hover:bg-health-600 shadow-md hover:shadow-health-600/20 text-sm font-bold transition-all cursor-pointer transform-gpu active:scale-95"
+                          >
+                            Pay Now
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => { playSuccessSound(); navigate(`/waiting-room?id=${apt.id}`); }}
+                            className={`w-full sm:w-auto px-6 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 transform-gpu active:scale-95 ${
+                              apt.status === 'ACCEPTED' 
+                                ? 'bg-health-500 text-white hover:bg-health-600 shadow-lg shadow-health-500/30' 
+                                : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 shadow-sm'
+                            }`}
+                          >
+                            <Video className={`w-4 h-4 ${apt.status === 'ACCEPTED' ? 'animate-pulse' : ''}`} />
+                            {apt.status === 'ACCEPTED' ? 'Join Call' : 'Waiting Room'}
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+        </div>
+
+        {/* Right Column: Past History Sidebar */}
+        <div className="w-full xl:w-[400px] 2xl:w-[450px] shrink-0 flex flex-col gap-4 xl:overflow-hidden">
+               <div className="flex items-center justify-between shrink-0">
+                <h2 className="text-lg font-bold text-slate-900">Medical History</h2>
+                <button 
+                  onClick={() => navigate('/medical-history')}
+                  className="text-xs font-bold text-primary-600 hover:text-primary-700 transition-colors"
+                >
+                  View All
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3 xl:h-full xl:min-h-0 overflow-x-hidden">
+                {loading ? (
+                  <div className="flex-1 flex justify-center items-center">
+                    <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 ) : pastAppointments.length === 0 ? (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center h-full text-center"
-                  >
-                    <p className="text-slate-500 font-medium text-sm">Your consultation history will appear here.</p>
-                  </motion.div>
+                  <div className="bg-white border border-slate-200 border-dashed rounded-3xl p-10 text-center flex flex-col items-center shadow-sm">
+                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                      <FileText className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-600">No medical history</p>
+                    <p className="text-xs text-slate-500 mt-1">Past consultations will appear here.</p>
+                  </div>
                 ) : (
-                  <motion.div 
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="space-y-4"
-                  >
-                    {pastAppointments.map(apt => (
+                  <div className="flex-1 xl:overflow-y-auto overflow-x-hidden pr-2 pb-4 space-y-3 xl:custom-scrollbar">
+                    {pastAppointments.slice(0, 5).map((apt, idx) => (
                       <motion.div 
-                        variants={itemVariants}
                         key={apt.id} 
-                        className="flex flex-col md:flex-row justify-between md:items-center p-5 border border-slate-100 rounded-2xl hover:bg-slate-50 transition-colors gap-4"
+                        initial={{ opacity: 0, x: 15 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.1, type: "spring", stiffness: 300, damping: 25 }}
+                        onClick={() => setSelectedHistoryApt(apt)}
+                        className="group bg-white border border-slate-200 rounded-3xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden"
                       >
-                        <div>
-                          <p className="font-heading font-bold text-slate-900 text-lg">{apt.doctor.name.startsWith('Dr.') ? apt.doctor.name : `Dr. ${apt.doctor.name}`}</p>
-                          <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 font-medium">
-                            <span className="bg-slate-100 px-2 py-0.5 rounded-md text-xs font-bold text-slate-600">
-                              {new Date(apt.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
-                            <span>•</span>
-                            <span className="truncate max-w-[200px]">{apt.aiSummary?.primary_symptom || 'General Consultation'}</span>
-                          </div>
-                        </div>
-                        {apt.consultation?.prescriptionUrl ? (
-                          <motion.a 
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            href={`http://localhost:5000${apt.consultation.prescriptionUrl}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white border-2 border-health-100 text-health-700 rounded-xl hover:bg-health-50 hover:border-health-200 transition-colors text-sm font-bold shadow-sm cursor-pointer shrink-0"
-                          >
-                            <Download className="w-4 h-4" /> Prescription
-                          </motion.a>
-                        ) : (
-                          <span className="text-sm font-bold text-slate-400 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 shrink-0 text-center">
-                            No files
-                          </span>
-                        )}
+                         <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-100 group-hover:bg-primary-400 transition-colors duration-300"></div>
+                         
+                         <div className="flex justify-between items-start mb-3 pl-2">
+                           <div className="flex items-center gap-3">
+                             <div className="relative">
+                               <img 
+                                  src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${apt.doctor?.name || 'Doctor'}&backgroundColor=f1f5f9`} 
+                                  alt="Doctor" 
+                                  className="w-10 h-10 rounded-full border border-slate-200 object-cover"
+                               />
+                             </div>
+                             <div>
+                               <h4 className="text-sm font-bold text-slate-900 tracking-tight">
+                                 {apt.doctor?.name?.startsWith('Dr.') ? apt.doctor?.name : `Dr. ${apt.doctor?.name}`}
+                               </h4>
+                                <p className="text-xs font-medium text-slate-500">
+                                  {new Date(apt.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  {apt.familyMember && <span className="ml-1.5 text-primary-500 bg-primary-50 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider">For {apt.familyMember.name}</span>}
+                                </p>
+                             </div>
+                           </div>
+                           
+                           {apt.consultation?.prescriptionUrl && (
+                             <div 
+                               className="shrink-0 w-8 h-8 rounded-full bg-health-50 text-health-600 flex items-center justify-center transition-colors shadow-sm"
+                               title="Prescription Attached"
+                             >
+                               <FileText className="w-3.5 h-3.5" />
+                             </div>
+                           )}
+                         </div>
+                         
+                         <div className="ml-2 bg-slate-50 group-hover:bg-primary-50/50 p-2.5 rounded-xl border border-slate-100 transition-colors">
+                            <p className="text-xs text-slate-600 line-clamp-2 font-medium leading-relaxed">
+                              {apt.aiSummary?.primary_symptom || 'General consultation regarding health concerns.'}
+                            </p>
+                         </div>
                       </motion.div>
                     ))}
-                  </motion.div>
+
+                    {pastAppointments.length > 5 && (
+                      <button 
+                        onClick={() => navigate('/medical-history')}
+                        className="w-full py-4 mt-2 border-2 border-slate-100 rounded-2xl text-slate-500 font-bold text-sm hover:bg-slate-50 hover:text-slate-900 transition-colors flex items-center justify-center gap-2"
+                      >
+                        View More Records
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            </motion.div>
-        </div>
+            </div>
       </main>
 
-      {/* AI Assistant Modal Overlay */}
+      {/* Mobile Bottom Nav */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 flex justify-around items-end p-3 pb-5 z-40 shadow-lg">
+         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-primary-600 cursor-pointer">
+           <LayoutDashboard className="w-5 h-5" />
+           <span className="text-[10px] font-bold">Home</span>
+         </button>
+         <button onClick={() => setIsAIModalOpen(true)} className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 relative -top-5 cursor-pointer">
+           <div className="w-14 h-14 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl border-4 border-white">
+             <Mic className="w-6 h-6" />
+           </div>
+           <span className="text-[10px] font-bold text-slate-500 mt-1">AI Triage</span>
+         </button>
+         <button onClick={() => navigate('/booking')} className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+           <Stethoscope className="w-5 h-5" />
+           <span className="text-[10px] font-bold">Book</span>
+         </button>
+      </div>
+
+
+
+      {/* Call Incoming Modal */}
+      {incomingCall && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center p-4">
+           {/* Pulsing avatar */}
+           <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-health-400 animate-ping opacity-75"></div>
+              <div className="absolute inset-2 rounded-full border-4 border-health-500 animate-pulse"></div>
+              
+              <div className="absolute inset-4 rounded-full bg-slate-100 border-4 border-white shadow-lg overflow-hidden z-10">
+                 <img 
+                   src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${incomingCall.doctorName || 'Loading'}`} 
+                   alt="Doctor" 
+                   className="w-full h-full object-cover"
+                 />
+              </div>
+           </div>
+
+           <h2 className="text-white font-heading font-black text-3xl mb-2 text-center animate-pulse">
+             Incoming Video Call...
+           </h2>
+           <p className="text-slate-300 font-medium text-lg text-center mb-10">
+             {incomingCall.doctorName?.startsWith('Dr.') ? incomingCall.doctorName : `Dr. ${incomingCall.doctorName}`} is calling you
+           </p>
+
+           <div className="flex items-center gap-10">
+              <button 
+                onClick={handleDeclineCall}
+                className="flex flex-col items-center gap-3 group cursor-pointer"
+              >
+                 <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/40 group-hover:bg-red-600 transition-colors">
+                    <PhoneOff className="w-7 h-7 text-white" />
+                 </div>
+                 <span className="text-white font-bold tracking-wider uppercase text-xs">Decline</span>
+              </button>
+
+              <button 
+                onClick={handleAcceptCall}
+                className="flex flex-col items-center gap-3 group cursor-pointer"
+              >
+                 <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/40 group-hover:bg-green-600 transition-colors animate-bounce">
+                    <Phone className="w-7 h-7 text-white" />
+                 </div>
+                 <span className="text-white font-bold tracking-wider uppercase text-xs">Accept</span>
+              </button>
+           </div>
+
+           {/* Timer */}
+           <div className="mt-12 flex items-center gap-2 text-white/50 font-medium">
+              <Clock className="w-4 h-4" />
+              <span>Auto-declining in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+           </div>
+        </div>
+      )}
+
+      {selectedHistoryApt && (
+        <HistoryModal 
+          apt={selectedHistoryApt} 
+          onClose={() => setSelectedHistoryApt(null)} 
+        />
+      )}
+
+      {/* AI Voice Modal - for mobile bottom nav */}
       <AnimatePresence>
         {isAIModalOpen && (
           <motion.div 
@@ -385,7 +459,6 @@ export default function Dashboard() {
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden relative flex flex-col max-h-[90vh]"
             >
-              {/* Modal Header */}
               <div className="bg-primary-900 p-6 flex items-center justify-between relative overflow-hidden">
                  <div className="absolute top-0 right-0 w-32 h-32 bg-health-500 rounded-full blur-[50px] opacity-30 pointer-events-none"></div>
                  <div className="flex items-center gap-3 relative z-10">
@@ -404,8 +477,6 @@ export default function Dashboard() {
                    <X className="w-5 h-5" />
                  </button>
               </div>
-
-              {/* Modal Body with AI Voice Assistant */}
               <div className="p-8 flex-1 bg-white relative z-10 flex flex-col items-center justify-center min-h-[300px]">
                 <AIVoiceAssistant onComplete={handleTriageComplete} />
               </div>

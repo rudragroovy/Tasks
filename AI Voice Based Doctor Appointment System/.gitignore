@@ -29,4 +29,32 @@ dist-ssr
 !.env.example
 
 # Custom folders
-.agents/
+check*.js
+patch*.js
+push*.js
+remove*.js
+seed*.js
+verify*.js
+check_*.js
+patch_*.js
+push_*.js
+remove_*.js
+seed_*.js
+verify_*.js
+restore*.js
+revert*.js
+setup*.js
+verify*.js
+create*.js
+fetch*.js
+make*.js
+test*.js
+apply*.js
+agent*.json
+.agents/*
+inspect*.js
+find*.js
+
+/ui
+/uichanges
+/graphify-out

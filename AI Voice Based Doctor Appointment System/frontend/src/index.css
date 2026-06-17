@@ -1,31 +1,60 @@
 @import "tailwindcss";
 
-@import "tailwindcss";
-
 @theme {
   --font-sans: "Noto Sans", sans-serif;
   --font-heading: "Figtree", sans-serif;
 
-  --color-primary-50: #ECFEFF;
+  /* Primary — Cyan/Teal palette */
+  --color-primary-50:  #ECFEFF;
   --color-primary-100: #CFFAFE;
+  --color-primary-200: #A5F3FC;
+  --color-primary-300: #67E8F9;
+  --color-primary-400: #22D3EE;
   --color-primary-500: #06B6D4;
   --color-primary-600: #0891B2;
   --color-primary-700: #0E7490;
+  --color-primary-800: #155E75;
   --color-primary-900: #164E63;
 
-  --color-health-50: #ECFDF5;
+  /* Health — Emerald palette */
+  --color-health-50:  #ECFDF5;
+  --color-health-100: #D1FAE5;
+  --color-health-200: #A7F3D0;
+  --color-health-300: #6EE7B7;
+  --color-health-400: #34D399;
   --color-health-500: #10B981;
   --color-health-600: #059669;
   --color-health-700: #047857;
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #164E63;
+  --background: #020C1B;
+  --foreground: #E2E8F0;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* Smooth scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Date/time input dark mode */
+input[type="date"],
+input[type="time"] {
+  color-scheme: dark;
 }

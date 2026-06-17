@@ -25,13 +25,14 @@ exports.getDoctors = async (req, res) => {
 
 exports.createAppointment = async (req, res) => {
   try {
-    const { doctorId, aiSummary, type, scheduledFor } = req.body;
+    const { doctorId, aiSummary, type, scheduledFor, familyMemberId } = req.body;
     const patientId = req.user.id; // from authMiddleware
 
     const appointment = await prisma.appointment.create({
       data: {
         patientId,
         doctorId,
+        familyMemberId: familyMemberId || null,
         aiSummary: typeof aiSummary === 'object' ? aiSummary : JSON.parse(aiSummary || '{}'),
         status: 'PENDING',
         type: type || 'ON_DEMAND',
@@ -109,7 +110,11 @@ exports.getUserAppointments = async (req, res) => {
       include: {
         doctor: { select: { name: true, email: true, doctorProfile: { include: { specialization: true } } } },
         patient: { select: { name: true, email: true } },
-        consultation: true
+        familyMember: true,
+        consultation: true,
+        messages: {
+          orderBy: { createdAt: 'asc' }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });

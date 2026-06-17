@@ -3,12 +3,15 @@ import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import DoctorsList from './pages/DoctorsList';
 import Booking from './pages/Booking';
 import MeetingRoom from './pages/MeetingRoom';
 import PatientWaitingRoom from './pages/PatientWaitingRoom';
 import PaymentSuccess from './pages/PaymentSuccess';
 import MockCheckout from './pages/MockCheckout';
 import AdminDashboard from './pages/AdminDashboard';
+import MedicalHistory from './pages/MedicalHistory';
+import FamilyMembers from './pages/FamilyMembers';
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -27,11 +30,14 @@ function App() {
           <Route path="/login" element={user ? <Navigate to={user.role === 'ADMIN' ? "/admin" : "/dashboard"} replace /> : <Login />} />
           <Route path="/register" element={user ? <Navigate to={user.role === 'ADMIN' ? "/admin" : "/dashboard"} replace /> : <Register />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/doctors" element={<ProtectedRoute><DoctorsList /></ProtectedRoute>} />
           <Route path="/booking" element={<ProtectedRoute><Booking /></ProtectedRoute>} />
           <Route path="/room/:appointmentId" element={<ProtectedRoute><MeetingRoom /></ProtectedRoute>} />
           <Route path="/waiting-room" element={<ProtectedRoute><PatientWaitingRoom /></ProtectedRoute>} />
           <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
           <Route path="/mock-checkout" element={<ProtectedRoute><MockCheckout /></ProtectedRoute>} />
+          <Route path="/medical-history" element={<ProtectedRoute><MedicalHistory /></ProtectedRoute>} />
+          <Route path="/family-members" element={<ProtectedRoute><FamilyMembers /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         </Routes>
       </div>

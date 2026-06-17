@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useConversation, ConversationProvider } from '@elevenlabs/react';
-import { Mic, PhoneOff, Activity, Send } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Activity, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function AIVoiceAssistantInner({ onComplete }) {
@@ -8,6 +8,7 @@ function AIVoiceAssistantInner({ onComplete }) {
   const historyRef = useRef([]);
   const [inputText, setInputText] = useState('');
   const [status, setStatus] = useState('idle'); // idle | connecting | connected | ended
+  const [micMuted, setMicMuted] = useState(false);
   const chatEndRef = useRef(null);
   const triageDataRef = useRef(null);
 
@@ -169,9 +170,34 @@ function AIVoiceAssistantInner({ onComplete }) {
     setInputText('');
   };
 
+  const toggleMic = async () => {
+    const newMuted = !micMuted;
+    setMicMuted(newMuted);
+    // Mute/unmute all active browser audio tracks
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (devices.some(d => d.kind === 'audioinput')) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream.getAudioTracks().forEach(track => {
+          track.enabled = !newMuted;
+          // Stop the extra stream we just created — we only needed to reach the shared track
+          track.stop();
+        });
+      }
+    } catch {
+      // No mic permission or unavailable — state still toggles for UX
+    }
+  };
+
   const isConnected = conversation.status === 'connected';
   const isConnecting = conversation.status === 'connecting' || status === 'connecting';
   const hasEnded = status === 'ended';
+
+  // Reset mic mute state when session ends
+  useEffect(() => {
+    if (!isConnected) setMicMuted(false);
+  }, [isConnected]);
+
 
   return (
     <div className="flex flex-col w-full h-[500px] relative">
@@ -270,7 +296,8 @@ function AIVoiceAssistantInner({ onComplete }) {
       </div>
 
       {/* Input Bar */}
-      <div className="flex gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm items-center">
+      <div className="flex gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm items-center">
+        {/* Hang-up / Start button */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -287,12 +314,33 @@ function AIVoiceAssistantInner({ onComplete }) {
           {isConnected ? <PhoneOff className="w-5 h-5 relative z-10" /> : <Mic className="w-5 h-5 relative z-10" />}
         </motion.button>
 
+        {/* Mic mute/unmute — only while connected */}
+        {isConnected && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={toggleMic}
+            className={`relative p-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+              micMuted
+                ? 'bg-red-50 text-red-500 ring-1 ring-red-200'
+                : 'bg-green-50 text-green-600 hover:bg-green-100'
+            }`}
+            title={micMuted ? 'Unmute microphone' : 'Mute microphone'}
+          >
+            {micMuted
+              ? <MicOff className="w-5 h-5" />
+              : <Mic className="w-5 h-5" />
+            }
+            {!micMuted && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-green-500 rounded-full" />}
+          </motion.button>
+        )}
+
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder={isConnected ? 'Speak or type here...' : 'Start the call to chat'}
+          placeholder={isConnected ? (micMuted ? 'Mic muted — type instead…' : 'Speak or type here...') : 'Start the call to chat'}
           className="flex-1 bg-transparent border-none px-2 text-[15px] text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none w-full"
         />
 
