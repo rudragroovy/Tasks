@@ -1057,13 +1057,13 @@ export default function MeetingRoom() {
               style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.5)' }}
               title="End call"
             >
-              <PhoneOff className="w-6 h-6 text-slate-900" />
+              <PhoneOff className="w-6 h-6 text-white" />
             </button>
           </div>
 
           {/* ── Tabs row — below video, horizontal scrollable ── */}
           <div
-            className="shrink-0 flex items-stretch overflow-x-auto"
+            className="shrink-0 flex items-stretch justify-center overflow-x-auto"
             style={{ background: 'rgba(13,15,20,0.97)', borderTop: '1px solid rgba(0,0,0,0.05)', scrollbarWidth: 'none' }}
           >
             <TabBtn icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={activeTab === 'chat'} onClick={() => setActiveTab(activeTab === 'chat' ? null : 'chat')} badge={messages.length || null} />
@@ -1489,9 +1489,9 @@ function VideoOverlayBtn({ icon, label, onClick, danger }) {
       title={label}
       className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105"
       style={{
-        background: danger ? 'rgba(234,67,53,0.25)' : 'rgba(255,255,255,0.12)',
-        border: danger ? '1px solid rgba(234,67,53,0.4)' : '1px solid rgba(255,255,255,0.15)',
-        color: danger ? '#f87171' : 'white'
+        background: danger ? 'rgba(234,67,53,0.1)' : '#f1f5f9',
+        border: danger ? '1px solid rgba(234,67,53,0.3)' : '1px solid #e2e8f0',
+        color: danger ? '#ef4444' : '#475569'
       }}
     >
       {icon}
@@ -1506,8 +1506,8 @@ function TabBtn({ icon, label, active, onClick, badge, accent }) {
       onClick={onClick}
       className="relative flex flex-col items-center justify-center gap-1.5 px-5 py-3 shrink-0 cursor-pointer transition-all group"
       style={{
-        borderBottom: active ? '2px solid #67e8f9' : '2px solid transparent',
-        color: active ? '#67e8f9' : accent ? '#34d399' : '#64748b'
+        borderBottom: active ? '2px solid #0e7490' : '2px solid transparent',
+        color: active ? '#0e7490' : accent ? '#059669' : '#64748b'
       }}
     >
       <span className="group-hover:scale-110 transition-transform">{icon}</span>
