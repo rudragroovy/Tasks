@@ -252,11 +252,13 @@ exports.inviteDoctor = async (req, res) => {
       }
     });
 
+    const inviter = await prisma.user.findUnique({ where: { id: userId } });
+
     const io = req.app.get('io');
-    if (io) {
-      io.to(`user:${doctorId}`).emit('doctor:invited', {
+    if (io && inviter) {
+      io.to(`user:${doctorId}`).emit('call:incoming', {
         appointmentId: id,
-        invitedBy: userId
+        doctorName: inviter.name
       });
     }
 
@@ -327,5 +329,33 @@ exports.submitDoctorNote = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to submit doctor note' });
+  }
+};
+
+exports.getAppointmentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        doctor: { select: { name: true, email: true, doctorProfile: { include: { specialization: true } } } },
+        patient: { select: { name: true, email: true } },
+        familyMember: true,
+        consultation: true,
+        invitedDoctors: true,
+        messages: {
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    res.json(appointment);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch appointment' });
   }
 };

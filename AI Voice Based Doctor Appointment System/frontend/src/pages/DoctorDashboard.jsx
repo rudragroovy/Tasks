@@ -6,10 +6,11 @@ import axios from 'axios';
 import {
   Users, Clock, CheckCircle, Video, Activity, LayoutDashboard,
   Calendar, Settings, LogOut, Check, X, CalendarClock, Download,
-  MessageSquare, Bell, FileText, Zap, TrendingUp, Wifi
+  MessageSquare, Bell, FileText, Zap, TrendingUp, Wifi, PhoneOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
+import SharedNavbar from '../components/SharedNavbar';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -25,6 +26,20 @@ export default function DoctorDashboard() {
   const [selectedAptTab, setSelectedAptTab] = useState('summary');
   const [activeTab, setActiveTab] = useState('queue');
   const [incomingInvite, setIncomingInvite] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [deferredInvites, setDeferredInvites] = useState(() => {
+    try {
+      const saved = localStorage.getItem('deferredInvites');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('deferredInvites', JSON.stringify(deferredInvites));
+  }, [deferredInvites]);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -54,17 +69,34 @@ export default function DoctorDashboard() {
       playSuccessSound();
       refetch();
     };
+    
+    const handleIncomingCall = (data) => {
+      setIncomingCall(data);
+      setTimeLeft(30);
+      playSuccessSound();
+    };
 
     socket.on('appointment:new', refetch);
     socket.on('appointment:updated', refetch);
     socket.on('doctor:invited', handleInvite);
+    socket.on('call:incoming', handleIncomingCall);
     
     return () => { 
       socket.off('appointment:new', refetch); 
       socket.off('appointment:updated', refetch); 
       socket.off('doctor:invited', handleInvite);
+      socket.off('call:incoming', handleIncomingCall);
     };
   }, [socket]);
+
+  useEffect(() => {
+    if (incomingCall && timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (incomingCall && timeLeft === 0) {
+      setIncomingCall(null);
+    }
+  }, [incomingCall, timeLeft]);
 
   const toggleOnline = async () => {
     try {
@@ -148,115 +180,53 @@ export default function DoctorDashboard() {
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
 
       {/* ── Top Nav — matches patient TopHeader exactly ── */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
-
-          {/* Logo */}
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => { }}>
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-              +
-            </div>
-            <span className="font-heading font-black text-slate-900 text-lg tracking-tight hidden sm:block">MyDrScripts</span>
-          </div>
-
-          {/* Center nav links */}
-          <div className="hidden md:flex flex-1 items-center justify-center gap-6">
-            {navItems.map(item => (
-              <button
-                key={item.key}
-                onClick={() => setActiveTab(item.key)}
-                className={`font-bold text-sm flex items-center gap-1.5 transition-colors cursor-pointer relative ${activeTab === item.key ? 'text-primary-700' : 'text-slate-500 hover:text-primary-600'
-                  }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-                {item.badge > 0 && (
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${activeTab === item.key ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                    {item.badge}
-                  </span>
-                )}
-                {activeTab === item.key && (
-                  <span className="absolute -bottom-[22px] left-0 right-0 h-0.5 bg-primary-600 rounded-full" />
-                )}
-              </button>
-            ))}
-            <button className="font-bold text-sm flex items-center gap-1.5 text-slate-500 hover:text-primary-600 transition-colors cursor-pointer">
-              <Settings className="w-4 h-4" /> Settings
-            </button>
-          </div>
-
-          {/* Right side */}
-          <div className="flex items-center gap-3">
-            {/* Online toggle */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleOnline}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full font-bold text-xs cursor-pointer transition-all border"
-              style={{
-                background: isOnline ? '#f0fdf4' : '#f8fafc',
-                borderColor: isOnline ? '#bbf7d0' : '#e2e8f0',
-                color: isOnline ? '#059669' : '#64748b'
-              }}
-            >
-              <div className="relative w-2 h-2 shrink-0">
-                {isOnline && <span className="absolute inset-0 rounded-full animate-ping bg-green-500 opacity-50" />}
-                <span className="relative rounded-full w-2 h-2 block" style={{ background: isOnline ? '#059669' : '#94a3b8' }} />
-              </div>
-              <span className="hidden sm:inline uppercase tracking-wider text-[11px]">
-                {isOnline ? 'Accepting' : 'Offline'}
-              </span>
-            </motion.button>
-
-            {/* Bell */}
-            <button className="text-slate-400 hover:text-slate-600 relative cursor-pointer">
-              <Bell className="w-5 h-5" />
-              {pendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-health-500 rounded-full border-2 border-white" />
-              )}
-            </button>
-
-            <div className="w-px h-6 bg-slate-200 hidden sm:block" />
-
-            {/* Doctor avatar */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-sm border border-primary-200">
-                {doctorName.replace('Dr. ', '').charAt(0) || 'D'}
-              </div>
-              <div className="hidden sm:block text-sm">
-                <p className="font-bold text-slate-900 leading-none">{doctorName}</p>
-                <p className="text-slate-500 text-xs">Doctor</p>
-              </div>
-            </div>
-
-            <button onClick={() => { logout(); }} className="ml-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer" title="Sign Out">
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile tab bar */}
-        <div className="md:hidden flex border-t border-slate-100 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-          {navItems.map(item => (
-            <button
-              key={item.key}
-              onClick={() => setActiveTab(item.key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold transition-colors cursor-pointer shrink-0 ${activeTab === item.key ? 'text-primary-700 border-b-2 border-primary-600' : 'text-slate-400 border-b-2 border-transparent'
-                }`}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-              {item.badge > 0 && (
-                <span className="text-[9px] font-black px-1 py-0.5 rounded-full bg-slate-100 text-slate-500">{item.badge}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      </header>
+      <SharedNavbar
+        user={user}
+        onLogoClick={() => {}}
+        navItems={navItems}
+        activeTab={activeTab}
+        onTabClick={setActiveTab}
+        isOnline={isOnline}
+        onToggleOnline={toggleOnline}
+        pendingCount={pendingCount}
+        doctorName={doctorName}
+        onLogout={() => logout()}
+        showMobileTabs={true}
+      />
 
       {/* ── Main content ─────────────────────────────── */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+          {/* Deferred Invites */}
+          {deferredInvites.length > 0 && (
+            <div className="p-4 rounded-2xl border border-orange-200 bg-orange-50 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-orange-900">Deferred Consultations</h3>
+                  <p className="text-orange-700 text-sm">You told {deferredInvites.length} room(s) you would join shortly.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {deferredInvites.map((invite, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      socket.emit('call:response', { appointmentId: invite.appointmentId, accepted: true });
+                      setDeferredInvites(prev => prev.filter((_, idx) => idx !== i));
+                      navigate(`/room/${invite.appointmentId}`);
+                    }}
+                    className="px-4 py-2 bg-white text-orange-700 font-bold text-sm rounded-xl border border-orange-200 hover:bg-orange-100 transition-colors shadow-sm cursor-pointer"
+                  >
+                    Join {invite.doctorName}'s Room
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Page title — queue tab only */}
           {activeTab === 'queue' && (
@@ -484,15 +454,6 @@ export default function DoctorDashboard() {
 
                       {apt.status === 'ACCEPTED' && (
                         <>
-                          <motion.button
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                            onClick={() => navigate(`/room/${apt.id}`)}
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white cursor-pointer transition-all flex-1 md:flex-none"
-                            style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}
-                          >
-                            <Video className="w-4 h-4" /> Join Call
-                          </motion.button>
                           <motion.button
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
@@ -775,26 +736,24 @@ export default function DoctorDashboard() {
                               {msg.role === 'user' ? (selectedAptNotes.familyMember?.name || selectedAptNotes.patient.name) : '🤖 Aria (AI)'}
                             </span>
                             <div
-                              className="max-w-[85%] px-4 py-3 text-sm leading-relaxed break-words"
+                              className="px-4 py-3 rounded-2xl max-w-[90%] sm:max-w-[85%] text-sm"
                               style={{
-                                borderRadius: msg.role === 'user' ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                                background: msg.role === 'user' ? 'linear-gradient(135deg,#0e7490,#059669)' : 'rgba(255,255,255,0.06)',
-                                color: msg.role === 'user' ? 'white' : '#cbd5e1',
-                                border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.08)'
+                                background: msg.role === 'user' ? 'rgba(14,116,144,0.2)' : 'rgba(255,255,255,0.05)',
+                                border: msg.role === 'user' ? '1px solid rgba(14,116,144,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                                color: msg.role === 'user' ? '#e2e8f0' : '#94a3b8',
+                                borderBottomRightRadius: msg.role === 'user' ? '4px' : '16px',
+                                borderBottomLeftRadius: msg.role === 'model' ? '4px' : '16px'
                               }}
                             >
-                              {msg.text}
+                              <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-16 text-center">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                          <Activity className="w-7 h-7 text-slate-600" />
-                        </div>
-                        <p className="text-slate-400 font-bold text-sm mb-1">No conversation recorded</p>
-                        <p className="text-slate-600 text-xs">Patient used text triage or no history was saved.</p>
+                      <div className="py-12 flex flex-col items-center text-center">
+                        <MessageSquare className="w-12 h-12 text-slate-600 mb-4" />
+                        <p className="text-slate-400 font-medium">No triage chat history available for this appointment.</p>
                       </div>
                     )}
                   </div>
@@ -804,17 +763,16 @@ export default function DoctorDashboard() {
                   <div className="p-6">
                     {selectedAptNotes.messages?.length > 0 ? (
                       <div className="space-y-4">
-                        {selectedAptNotes.messages.map((msg, idx) => (
-                          <div key={idx} className={`flex ${msg.senderRole === 'DOCTOR' ? 'justify-end' : 'justify-start'}`}>
-                            <div className="flex flex-col gap-1 max-w-[85%]">
-                              <span className={`text-[10px] font-black uppercase tracking-wider px-1 ${msg.senderRole === 'DOCTOR' ? 'text-primary-300 text-right' : 'text-slate-500'}`}>
-                                {msg.senderRole === 'DOCTOR' ? 'You' : (selectedAptNotes.familyMember?.name || selectedAptNotes.patient.name)}
+                        {selectedAptNotes.messages.map((msg, idx) => {
+                          const isMe = msg.senderId === user?.id;
+                          return (
+                            <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 px-1">
+                                {isMe ? 'You' : msg.senderName}
                               </span>
                               <div
-                                className="px-4 py-3 text-sm leading-relaxed break-words"
+                                className="px-4 py-3 rounded-2xl max-w-[90%] sm:max-w-[85%] text-sm"
                                 style={{
-                                  borderRadius: msg.senderRole === 'DOCTOR' ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                                  background: msg.senderRole === 'DOCTOR' ? 'linear-gradient(135deg,#0e7490,#059669)' : 'rgba(255,255,255,0.06)',
                                   color: msg.senderRole === 'DOCTOR' ? 'white' : '#cbd5e1',
                                   border: msg.senderRole === 'DOCTOR' ? 'none' : '1px solid rgba(255,255,255,0.08)'
                                 }}
@@ -825,8 +783,8 @@ export default function DoctorDashboard() {
                                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -904,6 +862,67 @@ export default function DoctorDashboard() {
                 style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
               >
                 <Check className="w-4 h-4" /> Accept & Join
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Call Incoming Toast ─────────────────────────────── */}
+      <AnimatePresence>
+        {incomingCall && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-[100] bg-white p-6 rounded-3xl shadow-2xl border border-primary-100 max-w-sm w-full"
+            style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-health-600 animate-pulse" style={{ background: 'rgba(5,150,105,0.1)' }}>
+                <Video className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg text-slate-900 leading-tight">Joining Request</h3>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">{incomingCall.doctorName} is waiting</p>
+              </div>
+            </div>
+            <p className="text-slate-600 mb-6 text-sm font-medium">You have been requested to join the consultation.</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: false });
+                    setIncomingCall(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors cursor-pointer"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={() => {
+                    socket.emit('call:tentative_join', { 
+                      appointmentId: incomingCall.appointmentId, 
+                      doctorName: user.name || 'Invited Doctor', 
+                      delayMinutes: 5 
+                    });
+                    setDeferredInvites(prev => [...prev, incomingCall]);
+                    setIncomingCall(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-orange-100 text-orange-600 font-bold text-sm hover:bg-orange-200 transition-colors cursor-pointer"
+                >
+                  +5 Mins
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: true });
+                  navigate(`/room/${incomingCall.appointmentId}`);
+                }}
+                className="w-full py-3 rounded-xl text-white font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-health-500/30 flex items-center justify-center gap-2 cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
+              >
+                <Check className="w-4 h-4" /> Join Now
               </button>
             </div>
           </motion.div>

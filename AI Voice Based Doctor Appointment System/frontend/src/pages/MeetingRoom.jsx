@@ -4,12 +4,14 @@ import AgoraRTC from 'agora-rtc-sdk-ng';
 import {
   Video, VideoOff, Mic, MicOff, PhoneOff, Send, FileText,
   Pill, Plus, Activity, MessageSquare, ChevronRight, CheckCircle2,
-  Wifi, Shield, Clock, UserPlus, Search, X
+  Wifi, Shield, Clock, UserPlus, Search, X, Check, LogOut,
+  LayoutDashboard, Calendar, Settings, Bell
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import SharedNavbar from '../components/SharedNavbar';
 
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '1480fbbff91244f7a77f0a8ed1359c19';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -17,7 +19,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 export default function MeetingRoom() {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const socket = useSocket();
 
   const [appointment, setAppointment] = useState(null);
@@ -30,6 +32,10 @@ export default function MeetingRoom() {
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
   const [showNotesSuccess, setShowNotesSuccess] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  
+  // For notifications while in meeting
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -55,6 +61,9 @@ export default function MeetingRoom() {
   const [notes, setNotes] = useState('');
   const [prescription, setPrescription] = useState([]);
   const [medInput, setMedInput] = useState({ name: '', dosage: '', frequency: '', duration: '' });
+  
+  const [userNames, setUserNames] = useState({});
+  const myUidRef = useRef(null);
 
   // Duration timer
   const [elapsed, setElapsed] = useState(0);
@@ -67,6 +76,33 @@ export default function MeetingRoom() {
   const prescriptionRef = useRef([]);
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { prescriptionRef.current = prescription; }, [prescription]);
+
+  const playSuccessSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1046.50, audioCtx.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    } catch (e) { console.warn(e); }
+  };
+
+  useEffect(() => {
+    if (incomingCall && timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (incomingCall && timeLeft === 0) {
+      setIncomingCall(null);
+    }
+  }, [incomingCall, timeLeft]);
 
   // Invite modal state
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -149,7 +185,8 @@ export default function MeetingRoom() {
       socket.emit('call:initiate', {
         appointmentId,
         patientId: appointment.patientId,
-        doctorName: user.name
+        doctorName: user.name,
+        invitedDoctorIds: appointment.invitedDoctors?.map(inv => inv.doctorId) || []
       });
     }
     const handleAnswered = (data) => {
@@ -196,19 +233,51 @@ export default function MeetingRoom() {
       }
     };
 
+    const handleIncomingCall = (data) => {
+      // Ignore if the incoming call is for the meeting we are currently already inside
+      if (data.appointmentId === appointmentId) return;
+
+      // Even if they are in another meeting, show the incoming call notification
+      setIncomingCall(data);
+      setTimeLeft(30);
+      playSuccessSound();
+    };
+
+    const handleAgoraUserJoined = (data) => {
+      if (data.appointmentId === appointmentId) {
+        setUserNames(prev => ({ ...prev, [data.uid]: data.name }));
+        if (data.requestReply && myUidRef.current) {
+          socket.emit('agora:name_reply', { appointmentId, uid: myUidRef.current, name: user.name, requestReply: false });
+        }
+      }
+    };
+
     socket.on('call:answered', handleAnswered);
     socket.on('appointment:updated', handleStatusUpdate);
     socket.on('call:request_complete', handleRequestComplete);
     socket.on('call:accept_complete', handleAcceptComplete);
     socket.on('call:decline_complete', handleDeclineComplete);
+    socket.on('call:incoming', handleIncomingCall);
+    socket.on('agora:user_joined', handleAgoraUserJoined);
     return () => {
       socket.off('call:answered', handleAnswered);
       socket.off('appointment:updated', handleStatusUpdate);
       socket.off('call:request_complete', handleRequestComplete);
       socket.off('call:accept_complete', handleAcceptComplete);
       socket.off('call:decline_complete', handleDeclineComplete);
+      socket.off('call:incoming', handleIncomingCall);
+      socket.off('agora:user_joined', handleAgoraUserJoined);
     };
   }, [socket, appointmentId, appointment, user, navigate]);
+
+  // Guarantee that we broadcast our name to the room as soon as we are in the call 
+  // and the socket is fully available. This covers the edge case where the socket 
+  // connects slightly after the Agora setup useEffect has already run.
+  useEffect(() => {
+    if (inCall && socket && myUidRef.current && user?.name) {
+      socket.emit('agora:join', { appointmentId, uid: myUidRef.current, name: user.name, requestReply: true });
+    }
+  }, [inCall, socket, appointmentId, user?.name]);
 
   // ── Agora setup + AUTO JOIN ────────────────────────────────
   useEffect(() => {
@@ -270,10 +339,15 @@ export default function MeetingRoom() {
         const res = await axios.get(`${API_URL}/api/agora/token?channelName=${appointmentId}`);
         if (!mounted) return;
 
-        await client.join(APP_ID, appointmentId, res.data.token, null);
+        const uid = await client.join(APP_ID, appointmentId, res.data.token, null);
+        myUidRef.current = uid;
         if (!mounted) {
           client.leave();
           return;
+        }
+
+        if (socket) {
+          socket.emit('agora:join', { appointmentId, uid, name: user.name, requestReply: true });
         }
 
         if (tracks.length > 0) {
@@ -335,13 +409,15 @@ export default function MeetingRoom() {
   // ── Helpers ────────────────────────────────────────────────
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  const leaveCall = async () => {
+  const leaveCall = async (skipNavigate = false) => {
     localTracks.forEach(t => { if (t) { t.stop(); t.close(); } });
     setLocalTracks([]);
     clearInterval(timerRef.current);
     await client.leave();
     setInCall(false);
-    navigate('/dashboard');
+    if (skipNavigate !== true) {
+      navigate('/dashboard');
+    }
   };
 
   const toggleMic = async () => {
@@ -429,10 +505,35 @@ export default function MeetingRoom() {
     ? (appointment?.familyMember?.name || appointment?.patient?.name)
     : (appointment?.doctor?.name?.startsWith('Dr.') ? appointment.doctor.name : `Dr. ${appointment?.doctor?.name}`);
   const sidebarOpen = activeTab !== null;
-
   // ── Render ─────────────────────────────────────────────────
   return (
     <div className="flex flex-col font-sans select-none overflow-hidden" style={{ height: '100dvh', background: '#0d0f14' }}>
+
+      {/* ── Top Nav — matches patient TopHeader exactly ── */}
+      <SharedNavbar
+        className="bg-white border-b border-slate-200 shrink-0 z-40"
+        user={user}
+        onLogoClick={() => leaveCall()}
+        navItems={[
+          { key: 'queue', icon: LayoutDashboard, label: 'Queue' },
+          { key: 'schedule', icon: Calendar, label: 'Schedule' },
+          { key: 'history', icon: Clock, label: 'History' }
+        ]}
+        activeTab={null}
+        onTabClick={() => leaveCall()}
+        statusOverride={{
+          text: 'In Call',
+          color: '#059669',
+          bg: '#f0fdf4',
+          borderColor: '#bbf7d0',
+          ping: true,
+          dotColor: '#059669'
+        }}
+        pendingCount={0}
+        doctorName={user?.name}
+        isDoctor={isDoctor}
+        onLogout={() => { leaveCall(true).then(() => { if(typeof logout === 'function') logout(); else navigate('/login'); }) }}
+      />
 
       {/* ── Joining overlay ─────────────────────────────── */}
       <AnimatePresence>
@@ -450,6 +551,82 @@ export default function MeetingRoom() {
             />
             <p className="text-white font-heading font-black text-xl tracking-tight">Connecting to call…</p>
             <p className="text-slate-400 text-sm font-medium">Setting up your camera & microphone</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Call Incoming Toast ─────────────────────────────── */}
+      <AnimatePresence>
+        {incomingCall && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-[100] bg-white p-6 rounded-3xl shadow-2xl border border-primary-100 max-w-sm w-full"
+            style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-health-600 animate-pulse" style={{ background: 'rgba(5,150,105,0.1)' }}>
+                <Video className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg text-slate-900 leading-tight">Joining Request</h3>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">{incomingCall.doctorName} is waiting</p>
+              </div>
+            </div>
+            <p className="text-slate-600 mb-6 text-sm font-medium">You have been requested to join another consultation.</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: false });
+                    setIncomingCall(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors cursor-pointer"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={() => {
+                    socket.emit('call:tentative_join', { 
+                      appointmentId: incomingCall.appointmentId, 
+                      doctorName: user.name || 'Invited Doctor', 
+                      delayMinutes: 5 
+                    });
+                    try {
+                      const saved = localStorage.getItem('deferredInvites');
+                      const invites = saved ? JSON.parse(saved) : [];
+                      invites.push(incomingCall);
+                      localStorage.setItem('deferredInvites', JSON.stringify(invites));
+                    } catch (e) {}
+                    setIncomingCall(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-orange-100 text-orange-600 font-bold text-sm hover:bg-orange-200 transition-colors cursor-pointer"
+                >
+                  +5 Mins
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: true });
+                  leaveCall(true).then(() => {
+                    // Force a full unmount/remount to cleanly initialize the new WebRTC connection
+                    window.location.href = `/room/${incomingCall.appointmentId}`;
+                  });
+                }}
+                className="w-full py-2.5 rounded-xl text-white font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
+              >
+                <Check className="w-4 h-4" /> End Current & Join
+              </button>
+            </div>
+            <div className="w-full bg-slate-100 h-1 mt-4 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: '100%' }}
+                animate={{ width: `${(timeLeft / 30) * 100}%` }}
+                className="h-full bg-primary-500"
+              />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -765,15 +942,15 @@ export default function MeetingRoom() {
               </div>
             ) : (
               /* Remote video feeds */
-              <div className={`absolute inset-0 p-2 flex flex-wrap gap-2 ${remoteUsers.length > 0 ? 'items-center justify-center' : ''}`}>
+              <div className={`absolute inset-0 p-4 flex flex-wrap gap-4 items-center justify-center ${remoteUsers.length > 2 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
                 {remoteUsers.map(u => (
-                  <div key={u.uid} className={`relative flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden shadow-lg border border-slate-700 transition-all ${
-                    remoteUsers.length === 1 ? 'w-full h-full' : 
-                    remoteUsers.length === 2 ? 'w-[calc(50%-4px)] h-full' : 
-                    'w-[calc(50%-4px)] h-[calc(50%-4px)]'
-                  }`}>
+                  <div key={u.uid} className={`relative flex items-center justify-center bg-[#111318] rounded-3xl overflow-hidden shadow-2xl border border-white/5 transition-all
+                    ${remoteUsers.length === 1 ? 'w-full max-w-5xl max-h-full aspect-[16/9]' : ''}
+                    ${remoteUsers.length === 2 ? 'w-[calc(50%-8px)] max-w-3xl max-h-full aspect-[16/9]' : ''}
+                    ${remoteUsers.length >= 3 ? 'w-[calc(33.33%-11px)] max-w-xl aspect-[16/9] min-w-[300px]' : ''}
+                  `}>
                     {u.hasVideo ? (
-                      <div className="w-full h-full" ref={el => remoteVideoRefs.current[u.uid] = el} />
+                      <div className="w-full h-full [&>div>video]:object-cover" ref={el => remoteVideoRefs.current[u.uid] = el} />
                     ) : (
                       <div className="flex flex-col items-center gap-3">
                         <div className="relative w-28 h-28">
@@ -784,20 +961,20 @@ export default function MeetingRoom() {
                           />
                           <div className="absolute inset-0 rounded-full overflow-hidden border-4" style={{ borderColor: 'rgba(14,116,144,0.4)' }}>
                             <img
-                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${otherName}&backgroundColor=0e7490`}
-                              alt={otherName}
+                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}&backgroundColor=0e7490`}
+                              alt={userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}
                               className="w-full h-full"
                             />
                           </div>
                         </div>
-                        <p className="text-white font-heading font-black text-lg">{otherName}</p>
+                        <p className="text-white font-heading font-black text-lg">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</p>
                       </div>
                     )}
                     
                     {/* Status Overlay */}
                     <div className="absolute bottom-6 left-6 flex items-center gap-2">
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/10">
-                        <span className="text-white text-sm font-bold truncate max-w-[150px]">{otherName}</span>
+                        <span className="text-white text-sm font-bold truncate max-w-[150px]">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</span>
                         <div className="w-px h-3 bg-white/20 mx-1" />
                         {!u.hasAudio ? (
                           <MicOff className="w-4 h-4 text-red-500" />
@@ -832,8 +1009,12 @@ export default function MeetingRoom() {
                 <div className="w-full h-full transform scale-x-[-1]" ref={localVideoRef} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-black text-white" style={{ background: 'rgba(14,116,144,0.5)' }}>
-                    {user?.name?.substring(0, 2)?.toUpperCase() || 'ME'}
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-700 bg-slate-800 flex items-center justify-center">
+                    <img
+                      src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.name || 'Me'}&backgroundColor=334155`}
+                      alt="Me"
+                      className="w-full h-full opacity-50"
+                    />
                   </div>
                 </div>
               )}
@@ -847,36 +1028,35 @@ export default function MeetingRoom() {
                 <span className="text-white font-mono font-bold text-xs">{fmt(elapsed)}</span>
               </div>
             )}
+          </div>
 
-            {/* ── Call controls — floating overlay at bottom center of video ── */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 rounded-full shadow-2xl"
-              style={{ background: 'rgba(13,15,20,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              {/* CC caption placeholder */}
-              <VideoOverlayBtn label="CC" icon={<span className="text-[11px] font-black">CC</span>} onClick={() => { }} />
-              {/* Mic */}
-              <VideoOverlayBtn
-                label={micMuted ? 'Unmute' : 'Mute'}
-                icon={micMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                onClick={toggleMic}
-                danger={micMuted}
-              />
-              {/* Video */}
-              <VideoOverlayBtn
-                label={videoMuted ? 'Show' : 'Hide'}
-                icon={videoMuted ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                onClick={toggleVideo}
-                danger={videoMuted}
-              />
-              {/* End call — larger red */}
-              <button
-                onClick={leaveCall}
-                className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-lg"
-                style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.5)' }}
-                title="End call"
-              >
-                <PhoneOff className="w-5 h-5 text-white" />
-              </button>
-            </div>
+          {/* ── Call controls — Separate row below the video ── */}
+          <div className="shrink-0 flex items-center justify-center gap-4 py-4" style={{ background: '#1a1d23', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            {/* CC caption placeholder */}
+            <VideoOverlayBtn label="CC" icon={<span className="text-[11px] font-black">CC</span>} onClick={() => { }} />
+            {/* Mic */}
+            <VideoOverlayBtn
+              label={micMuted ? 'Unmute' : 'Mute'}
+              icon={micMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              onClick={toggleMic}
+              danger={micMuted}
+            />
+            {/* Video */}
+            <VideoOverlayBtn
+              label={videoMuted ? 'Show' : 'Hide'}
+              icon={videoMuted ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+              onClick={toggleVideo}
+              danger={videoMuted}
+            />
+            {/* End call — larger red */}
+            <button
+              onClick={() => leaveCall()}
+              className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-lg"
+              style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.5)' }}
+              title="End call"
+            >
+              <PhoneOff className="w-6 h-6 text-white" />
+            </button>
           </div>
 
           {/* ── Tabs row — below video, horizontal scrollable ── */}

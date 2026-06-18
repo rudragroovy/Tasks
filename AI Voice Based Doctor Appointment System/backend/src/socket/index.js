@@ -32,9 +32,15 @@ module.exports = function(io) {
     });
 
     socket.on('call:initiate', (data) => {
-      const { appointmentId, patientId, doctorName } = data;
+      const { appointmentId, patientId, doctorName, invitedDoctorIds } = data;
       // Send the call to the patient
       io.to(`user:${patientId}`).emit('call:incoming', { appointmentId, doctorName });
+      // Send to all invited doctors
+      if (invitedDoctorIds && Array.isArray(invitedDoctorIds)) {
+        invitedDoctorIds.forEach(id => {
+          io.to(`user:${id}`).emit('call:incoming', { appointmentId, doctorName });
+        });
+      }
     });
 
     socket.on('call:response', (data) => {
@@ -43,6 +49,36 @@ module.exports = function(io) {
       if (doctorId) {
         io.to(`user:${doctorId}`).emit('call:answered', { appointmentId, accepted });
       }
+    });
+
+    socket.on('call:tentative_join', async (data) => {
+      const { appointmentId, doctorName, delayMinutes } = data;
+      const text = `Dr. ${doctorName} will join the meeting in ${delayMinutes} minutes.`;
+      
+      try {
+        const msg = await prisma.message.create({
+          data: { 
+            appointmentId, 
+            senderId: 'SYSTEM', 
+            senderRole: 'ADMIN', 
+            text 
+          }
+        });
+        const msgWithMeta = { ...msg, senderName: 'System' };
+        io.to(`appt:${appointmentId}`).emit('chat:message', msgWithMeta);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    socket.on('agora:join', (data) => {
+      // Forward the user's Agora UID and name to others in the room
+      socket.to(`appt:${data.appointmentId}`).emit('agora:user_joined', data);
+    });
+
+    socket.on('agora:name_reply', (data) => {
+      // Forward the name reply to others in the room
+      socket.to(`appt:${data.appointmentId}`).emit('agora:user_joined', data);
     });
 
     // ── Call Completion Confirmation Flow ──
