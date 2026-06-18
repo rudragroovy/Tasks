@@ -92,7 +92,10 @@ exports.updateStatus = async (req, res) => {
         return res.json(fullAppt);
       }
 
-      const incompleteInvites = fullAppt.invitedDoctors.filter(invite => invite.status !== 'COMPLETED');
+      // Only block if there are invited doctors who were ACCEPTED but haven't submitted notes yet
+      const incompleteInvites = fullAppt.invitedDoctors.filter(
+        invite => invite.status === 'ACCEPTED' || invite.status === 'JOINED'
+      );
       if (incompleteInvites.length > 0) {
         return res.status(400).json({ error: 'Cannot complete appointment until all invited doctors have submitted their notes.' });
       }
