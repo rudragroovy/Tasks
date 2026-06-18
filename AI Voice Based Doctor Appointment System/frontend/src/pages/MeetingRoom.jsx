@@ -799,22 +799,22 @@ export default function MeetingRoom() {
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-slate-800 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden"
+              className="bg-white rounded-[2rem] p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-slate-100"
             >
-              <div className="absolute inset-0 bg-gradient-to-b from-health-500/10 to-transparent opacity-50 pointer-events-none" />
-              
-              <div className="w-20 h-20 bg-health-500/20 text-health-600 rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
+              <div className="absolute inset-0 bg-gradient-to-b from-health-50 to-transparent pointer-events-none" />
+
+              <div className="w-20 h-20 bg-health-100 text-health-600 rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <h2 className="text-2xl font-heading font-black text-slate-900 mb-2 relative z-10">Consultation Complete</h2>
               <p className="text-slate-500 text-sm mb-8 relative z-10 leading-relaxed">
-                {isDoctor 
-                  ? "The patient has confirmed and ended this consultation. You will now be redirected to your dashboard." 
+                {isDoctor
+                  ? "The patient has confirmed and ended this consultation. You will now be redirected to your dashboard."
                   : "The doctor has ended this consultation. You will now be redirected to your dashboard."}
               </p>
               <button
                 onClick={leaveCall}
-                className="w-full py-4 bg-health-500 hover:bg-health-400 text-slate-900 font-bold rounded-2xl transition-all shadow-lg shadow-health-500/20 relative z-10 active:scale-95"
+                className="w-full py-4 bg-health-500 hover:bg-health-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-health-500/20 relative z-10 active:scale-95"
               >
                 Return to Dashboard
               </button>
@@ -1250,7 +1250,7 @@ export default function MeetingRoom() {
                       </div>
 
                       {/* Symptoms pills if available */}
-                      {appointment.aiSummary?.symptoms?.length > 0 && (
+                      {Array.isArray(appointment?.aiSummary?.symptoms) && appointment.aiSummary.symptoms.length > 0 && (
                         <div>
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">Reported Symptoms</p>
                           <div className="flex flex-wrap gap-2">
@@ -1265,7 +1265,7 @@ export default function MeetingRoom() {
                       )}
 
                       {/* Transcript */}
-                      {appointment.aiSummary?.chatHistory?.length > 0 && (
+                      {Array.isArray(appointment?.aiSummary?.chatHistory) && appointment.aiSummary.chatHistory.length > 0 && (
                         <div>
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 px-1">Patient Conversation</p>
                           <div className="space-y-2.5">
