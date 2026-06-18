@@ -507,7 +507,7 @@ export default function MeetingRoom() {
   const sidebarOpen = activeTab !== null;
   // ── Render ─────────────────────────────────────────────────
   return (
-    <div className="flex flex-col font-sans select-none overflow-hidden" style={{ height: '100dvh', background: '#0d0f14' }}>
+    <div className="flex flex-col font-sans select-none overflow-hidden" style={{ height: '100dvh', background: '#f8fafc' }}>
 
       {/* ── Top Nav — matches patient TopHeader exactly ── */}
       <SharedNavbar
@@ -542,15 +542,15 @@ export default function MeetingRoom() {
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4"
-            style={{ background: '#0d0f14' }}
+            style={{ background: '#f8fafc' }}
           >
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
               className="w-14 h-14 rounded-full border-4 border-primary-500 border-t-transparent"
             />
-            <p className="text-white font-heading font-black text-xl tracking-tight">Connecting to call…</p>
-            <p className="text-slate-400 text-sm font-medium">Setting up your camera & microphone</p>
+            <p className="text-slate-900 font-heading font-black text-xl tracking-tight">Connecting to call…</p>
+            <p className="text-slate-500 text-sm font-medium">Setting up your camera & microphone</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -614,7 +614,7 @@ export default function MeetingRoom() {
                     window.location.href = `/room/${incomingCall.appointmentId}`;
                   });
                 }}
-                className="w-full py-2.5 rounded-xl text-white font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 rounded-xl text-slate-900 font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 cursor-pointer"
                 style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
               >
                 <Check className="w-4 h-4" /> End Current & Join
@@ -665,7 +665,7 @@ export default function MeetingRoom() {
                     socket.emit('call:accept_complete', { appointmentId });
                     setShowPatientEndConfirm(false);
                   }}
-                  className="flex-1 py-3.5 rounded-xl font-bold text-sm text-white transition-transform hover:scale-105 cursor-pointer"
+                  className="flex-1 py-3.5 rounded-xl font-bold text-sm text-slate-900 transition-transform hover:scale-105 cursor-pointer"
                   style={{ background: 'linear-gradient(135deg,#0e7490,#059669)', boxShadow: '0 8px 20px rgba(14,116,144,0.3)' }}
                 >
                   Yes, End Call
@@ -729,14 +729,14 @@ export default function MeetingRoom() {
                 </h2>
                 <button
                   onClick={() => setShowInviteModal(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="relative mb-4">
-                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search by name or specialization..."
@@ -773,7 +773,7 @@ export default function MeetingRoom() {
                         <button
                           onClick={() => handleInviteDoctor(d.userId)}
                           disabled={invitingDoctorId === d.userId}
-                          className="px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:scale-105 disabled:opacity-50"
+                          className="px-4 py-2 rounded-xl text-sm font-bold text-slate-900 transition-all hover:scale-105 disabled:opacity-50"
                           style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
                         >
                           {invitingDoctorId === d.userId ? 'Inviting...' : 'Invite'}
@@ -794,7 +794,7 @@ export default function MeetingRoom() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md"
+            className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-white/80 backdrop-blur-md"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -806,15 +806,15 @@ export default function MeetingRoom() {
               <div className="w-20 h-20 bg-health-500/20 text-health-400 rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
-              <h2 className="text-2xl font-heading font-black text-white mb-2 relative z-10">Consultation Complete</h2>
-              <p className="text-slate-400 text-sm mb-8 relative z-10 leading-relaxed">
+              <h2 className="text-2xl font-heading font-black text-slate-900 mb-2 relative z-10">Consultation Complete</h2>
+              <p className="text-slate-500 text-sm mb-8 relative z-10 leading-relaxed">
                 {isDoctor 
                   ? "The patient has confirmed and ended this consultation. You will now be redirected to your dashboard." 
                   : "The doctor has ended this consultation. You will now be redirected to your dashboard."}
               </p>
               <button
                 onClick={leaveCall}
-                className="w-full py-4 bg-health-500 hover:bg-health-400 text-white font-bold rounded-2xl transition-all shadow-lg shadow-health-500/20 relative z-10 active:scale-95"
+                className="w-full py-4 bg-health-500 hover:bg-health-400 text-slate-900 font-bold rounded-2xl transition-all shadow-lg shadow-health-500/20 relative z-10 active:scale-95"
               >
                 Return to Dashboard
               </button>
@@ -854,7 +854,7 @@ export default function MeetingRoom() {
             initial={{ opacity: 0, y: -50, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -20, x: '-50%' }}
-            className="fixed top-6 left-1/2 z-[200] bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl border border-slate-700 flex items-center gap-3"
+            className="fixed top-6 left-1/2 z-[200] bg-white text-slate-900 px-6 py-3 rounded-full shadow-2xl border border-slate-700 flex items-center gap-3"
           >
             <div className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
             <span className="font-bold text-sm">{toastMessage}</span>
@@ -863,25 +863,25 @@ export default function MeetingRoom() {
       </AnimatePresence>
 
       {/* ── Top bar ─────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 z-10" style={{ background: 'rgba(13,15,20,0.95)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 z-10" style={{ background: 'rgba(255,255,255,0.95)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
         {/* Left: logo + name */}
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}>
-            <Video className="w-4 h-4 text-white" />
+            <Video className="w-4 h-4 text-slate-900" />
           </div>
           <div className="min-w-0">
-            <p className="text-white font-heading font-black text-sm leading-tight truncate">
+            <p className="text-slate-900 font-heading font-black text-sm leading-tight truncate">
               {otherName || 'Consultation'}
             </p>
-            <p className="text-slate-400 text-[10px] font-medium">{appointment?.doctor?.specialization || 'Telemedicine Session'}</p>
+            <p className="text-slate-500 text-[10px] font-medium">{appointment?.doctor?.specialization || 'Telemedicine Session'}</p>
           </div>
         </div>
 
         {/* Center: timer */}
         {inCall && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)' }}>
             <div className="w-2 h-2 rounded-full bg-health-400 animate-pulse" />
-            <span className="text-white font-mono font-bold text-xs">{fmt(elapsed)}</span>
+            <span className="text-slate-900 font-mono font-bold text-xs">{fmt(elapsed)}</span>
           </div>
         )}
 
@@ -911,7 +911,7 @@ export default function MeetingRoom() {
             {remoteUsers.length === 0 ? (
               /* Waiting for other party */
               <div className="absolute inset-0 p-4 flex flex-wrap gap-4 items-center justify-center overflow-hidden">
-                <div className="relative flex flex-col items-center justify-center gap-4 bg-[#111318] rounded-3xl overflow-hidden shadow-2xl border border-white/5 transition-all w-full max-w-5xl max-h-full aspect-[16/9]">
+                <div className="relative flex flex-col items-center justify-center gap-4 bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 shadow-sm transition-all w-full max-w-4xl max-h-full aspect-[16/9]">
                 <div className="relative">
                   <motion.div
                     animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
@@ -931,8 +931,8 @@ export default function MeetingRoom() {
                     />
                   </div>
                 </div>
-                <p className="text-white font-heading font-black text-lg">{otherName}</p>
-                <div className="flex items-center gap-2 text-slate-400 text-sm font-medium">
+                <p className="text-slate-900 font-heading font-black text-lg">{otherName}</p>
+                <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
@@ -946,8 +946,8 @@ export default function MeetingRoom() {
               /* Remote video feeds */
               <div className={`absolute inset-0 p-4 flex flex-wrap gap-4 items-center justify-center ${remoteUsers.length > 2 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
                 {remoteUsers.map(u => (
-                  <div key={u.uid} className={`relative flex items-center justify-center bg-[#111318] rounded-3xl overflow-hidden shadow-2xl border border-white/5 transition-all
-                    ${remoteUsers.length === 1 ? 'w-full max-w-5xl max-h-full aspect-[16/9]' : ''}
+                  <div key={u.uid} className={`relative flex items-center justify-center bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 shadow-sm transition-all
+                    ${remoteUsers.length === 1 ? 'w-full max-w-4xl max-h-full aspect-[16/9]' : ''}
                     ${remoteUsers.length === 2 ? 'w-[calc(50%-8px)] max-w-3xl max-h-full aspect-[16/9]' : ''}
                     ${remoteUsers.length >= 3 ? 'w-[calc(33.33%-11px)] max-w-xl aspect-[16/9] min-w-[300px]' : ''}
                   `}>
@@ -969,14 +969,14 @@ export default function MeetingRoom() {
                             />
                           </div>
                         </div>
-                        <p className="text-white font-heading font-black text-lg">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</p>
+                        <p className="text-slate-900 font-heading font-black text-lg">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</p>
                       </div>
                     )}
                     
                     {/* Status Overlay */}
                     <div className="absolute bottom-6 left-6 flex items-center gap-2">
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/10">
-                        <span className="text-white text-sm font-bold truncate max-w-[150px]">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</span>
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 text-slate-800 backdrop-blur-md border border-slate-200">
+                        <span className="text-slate-900 text-sm font-bold truncate max-w-[150px]">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</span>
                         <div className="w-px h-3 bg-white/20 mx-1" />
                         {!u.hasAudio ? (
                           <MicOff className="w-4 h-4 text-red-500" />
@@ -1003,7 +1003,7 @@ export default function MeetingRoom() {
               style={{
                 width: '140px',
                 aspectRatio: '4/3',
-                border: '2px solid rgba(255,255,255,0.1)',
+                border: '2px solid rgba(0,0,0,0.1)',
                 background: '#1a1d23'
               }}
             >
@@ -1020,20 +1020,20 @@ export default function MeetingRoom() {
                   </div>
                 </div>
               )}
-              <div className="absolute bottom-1.5 left-2 text-[10px] font-bold text-white/70">You</div>
+              <div className="absolute bottom-1.5 left-2 text-[10px] font-bold text-white">You</div>
             </motion.div>
 
             {/* Mobile timer */}
             {inCall && (
-              <div className="sm:hidden absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div className="sm:hidden absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(0,0,0,0.1)' }}>
                 <div className="w-2 h-2 rounded-full bg-health-400 animate-pulse" />
-                <span className="text-white font-mono font-bold text-xs">{fmt(elapsed)}</span>
+                <span className="text-slate-900 font-mono font-bold text-xs">{fmt(elapsed)}</span>
               </div>
             )}
           </div>
 
           {/* ── Call controls — Separate row below the video ── */}
-          <div className="shrink-0 flex items-center justify-center gap-4 py-4" style={{ background: '#1a1d23', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="shrink-0 flex items-center justify-center gap-4 py-4" style={{ background: '#ffffff', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
             {/* CC caption placeholder */}
             <VideoOverlayBtn label="CC" icon={<span className="text-[11px] font-black">CC</span>} onClick={() => { }} />
             {/* Mic */}
@@ -1057,14 +1057,14 @@ export default function MeetingRoom() {
               style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.5)' }}
               title="End call"
             >
-              <PhoneOff className="w-6 h-6 text-white" />
+              <PhoneOff className="w-6 h-6 text-slate-900" />
             </button>
           </div>
 
           {/* ── Tabs row — below video, horizontal scrollable ── */}
           <div
             className="shrink-0 flex items-stretch overflow-x-auto"
-            style={{ background: 'rgba(13,15,20,0.97)', borderTop: '1px solid rgba(255,255,255,0.07)', scrollbarWidth: 'none' }}
+            style={{ background: 'rgba(13,15,20,0.97)', borderTop: '1px solid rgba(0,0,0,0.05)', scrollbarWidth: 'none' }}
           >
             <TabBtn icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={activeTab === 'chat'} onClick={() => setActiveTab(activeTab === 'chat' ? null : 'chat')} badge={messages.length || null} />
             {isDoctor && (
@@ -1093,18 +1093,18 @@ export default function MeetingRoom() {
               exit={{ width: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="shrink-0 flex flex-col overflow-hidden min-h-0"
-              style={{ background: '#13161e', borderLeft: '1px solid rgba(255,255,255,0.07)' }}
+              style={{ background: '#13161e', borderLeft: '1px solid rgba(0,0,0,0.05)' }}
             >
               {/* Sidebar header */}
-              <div className="shrink-0 flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                <h3 className="text-white font-heading font-black text-base flex items-center gap-2">
+              <div className="shrink-0 flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                <h3 className="text-slate-900 font-heading font-black text-base flex items-center gap-2">
                   {activeTab === 'chat' && <><MessageSquare className="w-4 h-4 text-primary-400" /> Live Chat</>}
                   {activeTab === 'triage' && <><Activity className="w-4 h-4 text-health-400" /> AI Triage</>}
                   {activeTab === 'notes' && <><FileText className="w-4 h-4 text-health-400" /> Clinical Notes</>}
                 </h3>
                 <button
                   onClick={() => setActiveTab(null)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white/10 transition-all cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -1123,14 +1123,14 @@ export default function MeetingRoom() {
                   <div
                     ref={chatContainerRef}
                     className="flex-1 overflow-y-auto px-4 py-5 space-y-4"
-                    style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
                   >
                     {messages.length === 0 && (
                       <div className="flex flex-col items-center justify-center h-full gap-3 opacity-40 py-12">
-                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.03)' }}>
                           <MessageSquare className="w-8 h-8 text-slate-500" />
                         </div>
-                        <p className="text-slate-400 font-bold text-sm">No messages yet</p>
+                        <p className="text-slate-500 font-bold text-sm">No messages yet</p>
                         <p className="text-slate-600 text-xs font-medium">Start the conversation</p>
                       </div>
                     )}
@@ -1163,9 +1163,9 @@ export default function MeetingRoom() {
                                   borderRadius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
                                   background: isMe
                                     ? 'linear-gradient(135deg, #0e7490 0%, #059669 100%)'
-                                    : 'rgba(255,255,255,0.08)',
+                                    : 'rgba(0,0,0,0.08)',
                                   color: isMe ? 'white' : '#e2e8f0',
-                                  border: isMe ? 'none' : '1px solid rgba(255,255,255,0.08)'
+                                  border: isMe ? 'none' : '1px solid rgba(0,0,0,0.08)'
                                 }}
                               >
                                 {msg.text}
@@ -1181,25 +1181,25 @@ export default function MeetingRoom() {
                   <form
                     onSubmit={handleSendMessage}
                     className="shrink-0 flex items-center gap-2 p-3"
-                    style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}
+                    style={{ borderTop: '1px solid rgba(0,0,0,0.05)', background: 'rgba(0,0,0,0.01)' }}
                   >
                     <input
                       type="text"
                       value={newMessage}
                       onChange={e => setNewMessage(e.target.value)}
                       placeholder="Type a message…"
-                      className="flex-1 text-sm font-medium px-4 py-3 rounded-2xl outline-none text-white placeholder-slate-600 transition-all"
+                      className="flex-1 text-sm font-medium px-4 py-3 rounded-2xl outline-none text-slate-900 placeholder-slate-600 transition-all"
                       style={{
-                        background: 'rgba(255,255,255,0.07)',
-                        border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'rgba(0,0,0,0.05)',
+                        border: '1px solid rgba(0,0,0,0.1)',
                       }}
                       onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.6)'}
-                      onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                      onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                     />
                     <button
                       type="submit"
                       disabled={!newMessage.trim()}
-                      className="w-11 h-11 rounded-2xl flex items-center justify-center text-white disabled:opacity-30 transition-all cursor-pointer hover:scale-105 shrink-0"
+                      className="w-11 h-11 rounded-2xl flex items-center justify-center text-slate-900 disabled:opacity-30 transition-all cursor-pointer hover:scale-105 shrink-0"
                       style={{ background: 'linear-gradient(135deg,#0e7490,#059669)' }}
                     >
                       <Send className="w-4 h-4" />
@@ -1212,15 +1212,15 @@ export default function MeetingRoom() {
               {activeTab === 'triage' && isDoctor && (
                 <div
                   className="flex-1 overflow-y-auto p-5 space-y-4"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
                 >
                   {!appointment?.aiSummary ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4 opacity-50 py-16">
-                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.03)' }}>
                         <Activity className="w-8 h-8 text-slate-500" />
                       </div>
                       <div className="text-center">
-                        <p className="text-slate-300 font-bold text-sm mb-1">No Triage Data</p>
+                        <p className="text-slate-600 font-bold text-sm mb-1">No Triage Data</p>
                         <p className="text-slate-600 text-xs font-medium">AI triage not yet completed</p>
                       </div>
                     </div>
@@ -1242,8 +1242,8 @@ export default function MeetingRoom() {
                             </span>
                           )}
                         </div>
-                        <div className="px-4 py-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                          <p className="text-slate-300 text-sm leading-relaxed">
+                        <div className="px-4 py-4" style={{ background: 'rgba(0,0,0,0.02)' }}>
+                          <p className="text-slate-600 text-sm leading-relaxed">
                             {appointment.aiSummary.summary || 'No summary provided.'}
                           </p>
                         </div>
@@ -1275,9 +1275,9 @@ export default function MeetingRoom() {
                                   className="max-w-[88%] text-xs leading-relaxed px-3.5 py-2.5 break-words"
                                   style={{
                                     borderRadius: msg.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
-                                    background: msg.role === 'user' ? 'rgba(14,116,144,0.25)' : 'rgba(255,255,255,0.05)',
+                                    background: msg.role === 'user' ? 'rgba(14,116,144,0.25)' : 'rgba(0,0,0,0.03)',
                                     color: '#cbd5e1',
-                                    border: msg.role === 'user' ? '1px solid rgba(14,116,144,0.3)' : '1px solid rgba(255,255,255,0.07)'
+                                    border: msg.role === 'user' ? '1px solid rgba(14,116,144,0.3)' : '1px solid rgba(0,0,0,0.05)'
                                   }}
                                 >
                                   <span className="text-[9px] font-black uppercase tracking-widest block mb-1.5 opacity-50">
@@ -1299,7 +1299,7 @@ export default function MeetingRoom() {
               {activeTab === 'triage' && isDoctor && (
                 <div
                   className="shrink-0 flex items-center justify-between px-5 py-3 gap-3"
-                  style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.25)' }}
+                  style={{ borderTop: '1px solid rgba(0,0,0,0.05)', background: 'rgba(0,0,0,0.25)' }}
                 >
                   <div className="flex items-center gap-2">
                     <div className={`relative w-2 h-2 rounded-full ${micMuted ? '' : 'bg-green-500'}`}>
@@ -1333,7 +1333,7 @@ export default function MeetingRoom() {
               {activeTab === 'notes' && isDoctor && (
                 <div
                   className="flex-1 flex flex-col overflow-y-auto"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
                 >
                   <div className="flex-1 p-5 space-y-5">
                     {/* Observations */}
@@ -1346,10 +1346,10 @@ export default function MeetingRoom() {
                         onChange={e => setNotes(e.target.value)}
                         placeholder="Enter your clinical observations, diagnosis, and recommendations…"
                         rows={5}
-                        className="w-full text-sm font-medium px-4 py-3 rounded-2xl outline-none text-white placeholder-slate-600 resize-none transition-all leading-relaxed"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                        className="w-full text-sm font-medium px-4 py-3 rounded-2xl outline-none text-slate-900 placeholder-slate-600 resize-none transition-all leading-relaxed"
+                        style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.08)' }}
                         onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                        onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.08)'}
                       />
                     </div>
 
@@ -1390,15 +1390,15 @@ export default function MeetingRoom() {
                       )}
 
                       {/* Add medicine form */}
-                      <div className="space-y-2.5 p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div className="space-y-2.5 p-4 rounded-2xl" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.05)' }}>
                         <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Add Medicine</p>
                         <input
                           type="text"
                           placeholder="Medicine name *"
                           value={medInput.name}
                           onChange={e => setMedInput({ ...medInput, name: e.target.value })}
-                          className="w-full text-sm px-3.5 py-2.5 rounded-xl outline-none text-white placeholder-slate-600 transition-all"
-                          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}
+                          className="w-full text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
+                          style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
                           onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
                           onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
                         />
@@ -1408,8 +1408,8 @@ export default function MeetingRoom() {
                             placeholder="Dosage (e.g. 500mg)"
                             value={medInput.dosage}
                             onChange={e => setMedInput({ ...medInput, dosage: e.target.value })}
-                            className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-white placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}
+                            className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
+                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
                             onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
                             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
                           />
@@ -1418,8 +1418,8 @@ export default function MeetingRoom() {
                             placeholder="Frequency"
                             value={medInput.frequency}
                             onChange={e => setMedInput({ ...medInput, frequency: e.target.value })}
-                            className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-white placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}
+                            className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
+                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
                             onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
                             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
                           />
@@ -1430,15 +1430,15 @@ export default function MeetingRoom() {
                             placeholder="Duration (e.g. 7 days)"
                             value={medInput.duration}
                             onChange={e => setMedInput({ ...medInput, duration: e.target.value })}
-                            className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none text-white placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}
+                            className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
+                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
                             onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
                             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
                           />
                           <button
                             onClick={addMedicine}
                             disabled={!medInput.name.trim()}
-                            className="px-4 rounded-xl text-white cursor-pointer hover:scale-105 transition-all disabled:opacity-30 flex items-center gap-1.5 font-bold text-xs shrink-0"
+                            className="px-4 rounded-xl text-slate-900 cursor-pointer hover:scale-105 transition-all disabled:opacity-30 flex items-center gap-1.5 font-bold text-xs shrink-0"
                             style={{ background: 'linear-gradient(135deg,#059669,#06b6d4)' }}
                           >
                             <Plus className="w-4 h-4" /> Add
@@ -1449,11 +1449,11 @@ export default function MeetingRoom() {
                   </div>
 
                   {/* Sign & Complete — sticky bottom */}
-                  <div className="shrink-0 p-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div className="shrink-0 p-4" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                     {isPrimaryDoctor ? (
                       <button
                         onClick={requestCompleteConsultation}
-                        className="w-full py-3.5 rounded-2xl font-heading font-black text-white flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
+                        className="w-full py-3.5 rounded-2xl font-heading font-black text-slate-900 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
                         style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
                       >
                         <CheckCircle2 className="w-5 h-5" /> Sign & Complete Consultation
@@ -1461,7 +1461,7 @@ export default function MeetingRoom() {
                     ) : (
                       <button
                         onClick={submitInvitedDoctorNotes}
-                        className="w-full py-3.5 rounded-2xl font-heading font-black text-white flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
+                        className="w-full py-3.5 rounded-2xl font-heading font-black text-slate-900 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
                         style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
                       >
                         <CheckCircle2 className="w-5 h-5" /> Submit Notes & Leave
@@ -1513,7 +1513,7 @@ function TabBtn({ icon, label, active, onClick, badge, accent }) {
       <span className="group-hover:scale-110 transition-transform">{icon}</span>
       <span className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap">{label}</span>
       {badge && (
-        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500 text-slate-900 text-[9px] font-black flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
         </div>
       )}
@@ -1527,14 +1527,14 @@ function RoundBtn({ icon, onClick, muted, label }) {
       <div
         className="w-12 h-12 rounded-full flex items-center justify-center transition-all group-hover:scale-105"
         style={{
-          background: muted ? 'rgba(234,67,53,0.2)' : 'rgba(255,255,255,0.1)',
+          background: muted ? 'rgba(234,67,53,0.2)' : 'rgba(0,0,0,0.1)',
           border: muted ? '1px solid rgba(234,67,53,0.4)' : '1px solid rgba(255,255,255,0.12)',
           color: muted ? '#f87171' : 'white'
         }}
       >
         {icon}
       </div>
-      <span className="text-[10px] font-bold text-slate-400">{label}</span>
+      <span className="text-[10px] font-bold text-slate-500">{label}</span>
     </button>
   );
 }
@@ -1545,8 +1545,8 @@ function ControlBtn({ icon, label, active, onClick, badge }) {
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:scale-105"
         style={{
-          background: active ? 'rgba(14,116,144,0.25)' : 'rgba(255,255,255,0.07)',
-          border: active ? '1px solid rgba(14,116,144,0.5)' : '1px solid rgba(255,255,255,0.08)',
+          background: active ? 'rgba(14,116,144,0.25)' : 'rgba(0,0,0,0.05)',
+          border: active ? '1px solid rgba(14,116,144,0.5)' : '1px solid rgba(0,0,0,0.08)',
           color: active ? '#67e8f9' : '#94a3b8'
         }}
       >
@@ -1554,7 +1554,7 @@ function ControlBtn({ icon, label, active, onClick, badge }) {
       </div>
       <span className="text-[10px] font-bold" style={{ color: active ? '#67e8f9' : '#64748b' }}>{label}</span>
       {badge && (
-        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-slate-900 text-[9px] font-black flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
         </div>
       )}
