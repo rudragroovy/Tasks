@@ -29,10 +29,12 @@ model User {
   role      Role     @default(PATIENT)
   createdAt DateTime @default(now())
 
-  doctorProfile Doctor?
-  familyMembers FamilyMember[]
-  patientAppointments Appointment[] @relation("PatientAppointments")
-  doctorAppointments  Appointment[] @relation("DoctorAppointments")
+  doctorProfile       Doctor?
+  familyMembers       FamilyMember[]
+  patientAppointments Appointment[]   @relation("PatientAppointments")
+  doctorAppointments  Appointment[]   @relation("DoctorAppointments")
+  invitedAppointments InvitedDoctor[] @relation("InvitedDoctor")
+  doctorNotes         DoctorNote[]    @relation("DoctorNote")
 }
 
 model FamilyMember {
@@ -64,28 +66,30 @@ model Doctor {
 }
 
 model Appointment {
-  id        String   @id @default(uuid())
-  patientId String
-  doctorId  String
+  id             String  @id @default(uuid())
+  patientId      String
+  doctorId       String
   familyMemberId String?
-  status    String   // PENDING, ACCEPTED, REJECTED, COMPLETED
-  
+  status         String // PENDING, ACCEPTED, REJECTED, COMPLETED
+
   // Scheduling & Payment fields
-  type           String    @default("ON_DEMAND") // ON_DEMAND, SCHEDULED
-  scheduledFor   DateTime?
-  paymentStatus  String    @default("PENDING") // PENDING, PAID, FAILED
+  type            String    @default("ON_DEMAND") // ON_DEMAND, SCHEDULED
+  scheduledFor    DateTime?
+  paymentStatus   String    @default("PENDING") // PENDING, PAID, FAILED
   stripeSessionId String?
 
-  aiSummary Json?    // { symptoms, severity, duration }
-  
+  aiSummary Json? // { symptoms, severity, duration }
+
   patient      User          @relation("PatientAppointments", fields: [patientId], references: [id])
   doctor       User          @relation("DoctorAppointments", fields: [doctorId], references: [id])
   familyMember FamilyMember? @relation(fields: [familyMemberId], references: [id])
-  
-  consultation Consultation?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  messages        Message[]
+
+  consultation   Consultation?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  messages       Message[]
+  invitedDoctors InvitedDoctor[]
+  doctorNotes    DoctorNote[]
 }
 
 model Consultation {
@@ -95,7 +99,7 @@ model Consultation {
   notes           String?
   prescription    Json?
   prescriptionUrl String?
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime    @updatedAt
 }
 
 model Message {
@@ -106,4 +110,37 @@ model Message {
   senderRole    Role
   text          String
   createdAt     DateTime    @default(now())
+}
+
+model InvitedDoctor {
+  id            String   @id @default(uuid())
+  appointmentId String
+  doctorId      String
+  status        String   @default("PENDING") // PENDING, JOINED, COMPLETED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  doctor      User        @relation("InvitedDoctor", fields: [doctorId], references: [id])
+
+  @@unique([appointmentId, doctorId])
+  @@index([appointmentId])
+  @@index([doctorId])
+}
+
+model DoctorNote {
+  id            String   @id @default(uuid())
+  appointmentId String
+  doctorId      String
+  notes         String?
+  prescription  Json? // [{ name, dosage, frequency, duration }]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  doctor      User        @relation("DoctorNote", fields: [doctorId], references: [id])
+
+  @@unique([appointmentId, doctorId])
+  @@index([appointmentId])
+  @@index([doctorId])
 }
