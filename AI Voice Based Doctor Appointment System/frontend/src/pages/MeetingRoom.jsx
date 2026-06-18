@@ -1164,7 +1164,7 @@ export default function MeetingRoom() {
                                   background: isMe
                                     ? 'linear-gradient(135deg, #0e7490 0%, #059669 100%)'
                                     : 'rgba(0,0,0,0.08)',
-                                  color: isMe ? 'white' : '#e2e8f0',
+                                  color: isMe ? 'white' : '#334155',
                                   border: isMe ? 'none' : '1px solid rgba(0,0,0,0.08)'
                                 }}
                               >
@@ -1244,7 +1244,7 @@ export default function MeetingRoom() {
                         </div>
                         <div className="px-4 py-4" style={{ background: 'rgba(0,0,0,0.02)' }}>
                           <p className="text-slate-600 text-sm leading-relaxed">
-                            {appointment.aiSummary.summary || 'No summary provided.'}
+                            {appointment?.aiSummary?.summary || 'No summary provided.'}
                           </p>
                         </div>
                       </div>
@@ -1269,14 +1269,14 @@ export default function MeetingRoom() {
                         <div>
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 px-1">Patient Conversation</p>
                           <div className="space-y-2.5">
-                            {appointment.aiSummary.chatHistory.map((msg, i) => (
+                            {appointment?.aiSummary?.chatHistory?.map((msg, i) => (
                               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div
                                   className="max-w-[88%] text-xs leading-relaxed px-3.5 py-2.5 break-words"
                                   style={{
                                     borderRadius: msg.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
                                     background: msg.role === 'user' ? 'rgba(14,116,144,0.25)' : 'rgba(0,0,0,0.03)',
-                                    color: '#cbd5e1',
+                                    color: '#334155',
                                     border: msg.role === 'user' ? '1px solid rgba(14,116,144,0.3)' : '1px solid rgba(0,0,0,0.05)'
                                   }}
                                 >
