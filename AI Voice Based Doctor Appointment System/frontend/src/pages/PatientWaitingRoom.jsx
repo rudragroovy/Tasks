@@ -134,10 +134,10 @@ export default function PatientWaitingRoom() {
     navigate(`/room/${appointmentId}`);
   };
 
-  const handleDecline = () => {
+  function handleDecline() {
     socket.emit('call:response', { appointmentId, doctorId: appointment?.doctorId, accepted: false });
     navigate('/dashboard');
-  };
+  }
 
   const doctorName = appointment?.doctor?.name
     ? (appointment.doctor.name.startsWith('Dr.') ? appointment.doctor.name : `Dr. ${appointment.doctor.name}`)

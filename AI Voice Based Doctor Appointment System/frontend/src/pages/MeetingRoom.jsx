@@ -11,8 +11,6 @@ import { useSocket } from '../context/SocketContext';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { motion, AnimatePresence } from 'framer-motion';
-
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '1480fbbff91244f7a77f0a8ed1359c19';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -119,14 +117,17 @@ export default function MeetingRoom() {
 
   // ── Fetch appointment ──────────────────────────────────────
   useEffect(() => {
-    const fetchApt = async () => {
+    const fetchAppt = async () => {
       try {
         const { data } = await axios.get(`${API_URL}/api/appointments/${appointmentId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
-              senderName: m.senderRole === 'DOCTOR' ? appt.doctor.name : (appt.familyMember?.name || appt.patient.name)
-            })));
-          }
+        setAppointment(data);
+        if (data.messages) {
+          setMessages(data.messages.map(m => ({
+            ...m,
+            senderName: m.senderRole === 'DOCTOR' ? data.doctor.name : (data.familyMember?.name || data.patient.name)
+          })));
         }
       } catch (err) { console.error(err); }
     };
