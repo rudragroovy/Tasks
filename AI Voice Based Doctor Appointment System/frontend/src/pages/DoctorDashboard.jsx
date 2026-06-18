@@ -408,6 +408,11 @@ export default function DoctorDashboard() {
                               <CheckCircle className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> Completed
                             </span>
                           )}
+                          {apt.doctorId !== user.id && (
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(234,179,8,0.1)', color: '#ca8a04' }}>
+                              <Users className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> Invited
+                            </span>
+                          )}
                           {apt.status === 'REJECTED' && (
                             <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(234,67,53,0.1)', color: '#dc2626' }}>
                               <X className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> Declined
@@ -449,7 +454,7 @@ export default function DoctorDashboard() {
 
                     {/* Action buttons — full width on mobile, auto on md+ */}
                     <div className="flex items-center gap-2 shrink-0 w-full md:w-auto flex-wrap">
-                      {apt.status === 'PENDING' && (
+                      {apt.status === 'PENDING' && apt.doctorId === user.id && (
                         <motion.button
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.97 }}
@@ -475,12 +480,23 @@ export default function DoctorDashboard() {
                           <motion.button
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
-                            onClick={() => updateStatus(apt.id, 'COMPLETED')}
-                            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all flex-1 md:flex-none"
-                            style={{ background: 'rgba(0,0,0,0.05)', color: '#475569', border: '1px solid rgba(0,0,0,0.1)' }}
+                            onClick={() => navigate(`/room/${apt.id}`)}
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white cursor-pointer transition-all flex-1 md:flex-none"
+                            style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}
                           >
-                            <CheckCircle className="w-4 h-4" /> <span className="hidden sm:inline">Complete</span>
+                            <Video className="w-4 h-4" /> Join Call
                           </motion.button>
+                          {apt.doctorId === user.id && (
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.97 }}
+                              onClick={() => updateStatus(apt.id, 'COMPLETED')}
+                              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all flex-1 md:flex-none"
+                              style={{ background: 'rgba(0,0,0,0.05)', color: '#475569', border: '1px solid rgba(0,0,0,0.1)' }}
+                            >
+                              <CheckCircle className="w-4 h-4" /> <span className="hidden sm:inline">Complete</span>
+                            </motion.button>
+                          )}
                         </>
                       )}
 
@@ -620,6 +636,11 @@ export default function DoctorDashboard() {
                           {apt.aiSummary?.summary && (
                             <span className="text-[10px] font-bold flex items-center gap-1" style={{ color: '#0e7490' }}>
                               <Activity className="w-3 h-3" /> Triage available
+                            </span>
+                          )}
+                          {apt.doctorId !== user.id && (
+                            <span className="text-[10px] font-bold flex items-center gap-1" style={{ color: '#ca8a04' }}>
+                              <Users className="w-3 h-3" /> Invited Consultation
                             </span>
                           )}
                         </div>

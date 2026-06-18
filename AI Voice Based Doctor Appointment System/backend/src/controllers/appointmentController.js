@@ -56,6 +56,18 @@ exports.updateStatus = async (req, res) => {
     const { id } = req.params;
     const { status, notes, prescription } = req.body;
     
+    const appointmentCheck = await prisma.appointment.findUnique({
+      where: { id }
+    });
+
+    if (!appointmentCheck) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    if (appointmentCheck.doctorId !== req.user.id && ['ACCEPTED', 'REJECTED', 'COMPLETED'].includes(status)) {
+      return res.status(403).json({ error: 'Not authorized to change status' });
+    }
+
     const dataToUpdate = { status };
 
     if (status === 'COMPLETED') {
@@ -157,7 +169,12 @@ exports.getUserAppointments = async (req, res) => {
     let whereClause = {};
 
     if (role === 'DOCTOR') {
-      whereClause.doctorId = userId;
+      whereClause = {
+        OR: [
+          { doctorId: userId },
+          { invitedDoctors: { some: { doctorId: userId, status: { not: 'REJECTED' } } } }
+        ]
+      };
     } else {
       whereClause.patientId = userId;
     }
@@ -169,6 +186,7 @@ exports.getUserAppointments = async (req, res) => {
         patient: { select: { name: true, email: true } },
         familyMember: true,
         consultation: true,
+        invitedDoctors: true,
         messages: {
           orderBy: { createdAt: 'asc' }
         }
