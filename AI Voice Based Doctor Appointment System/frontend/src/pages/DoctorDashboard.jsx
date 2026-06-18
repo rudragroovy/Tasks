@@ -11,6 +11,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function DoctorDashboard() {
   const { user, logout } = useAuth();
   const socket = useSocket();
@@ -22,11 +24,12 @@ export default function DoctorDashboard() {
   const [selectedAptNotes, setSelectedAptNotes] = useState(null);
   const [selectedAptTab, setSelectedAptTab] = useState('summary');
   const [activeTab, setActiveTab] = useState('queue');
+  const [incomingInvite, setIncomingInvite] = useState(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/appointments', {
+        const res = await axios.get(`${API_URL}/api/appointments`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setAppointments(res.data);
@@ -42,18 +45,31 @@ export default function DoctorDashboard() {
   useEffect(() => {
     if (!socket) return;
     const refetch = () =>
-      axios.get('http://localhost:5000/api/appointments', {
+      axios.get(`${API_URL}/api/appointments`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       }).then(res => setAppointments(res.data));
+    
+    const handleInvite = (data) => {
+      setIncomingInvite(data);
+      playSuccessSound();
+      refetch();
+    };
+
     socket.on('appointment:new', refetch);
     socket.on('appointment:updated', refetch);
-    return () => { socket.off('appointment:new', refetch); socket.off('appointment:updated', refetch); };
+    socket.on('doctor:invited', handleInvite);
+    
+    return () => { 
+      socket.off('appointment:new', refetch); 
+      socket.off('appointment:updated', refetch); 
+      socket.off('doctor:invited', handleInvite);
+    };
   }, [socket]);
 
   const toggleOnline = async () => {
     try {
       const next = !isOnline;
-      await axios.put('http://localhost:5000/api/doctors/me/online', { isOnline: next }, {
+      await axios.put(`${API_URL}/api/doctors/me/online`, { isOnline: next }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setIsOnline(next);
@@ -79,10 +95,10 @@ export default function DoctorDashboard() {
   const updateStatus = async (id, status) => {
     try {
       playSuccessSound();
-      await axios.put(`http://localhost:5000/api/appointments/${id}/status`, { status }, {
+      await axios.put(`${API_URL}/api/appointments/${id}/status`, { status }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-      const res = await axios.get('http://localhost:5000/api/appointments', {
+      const res = await axios.get(`${API_URL}/api/appointments`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setAppointments(res.data);
@@ -514,7 +530,7 @@ export default function DoctorDashboard() {
                           {apt.consultation?.prescriptionUrl && (
                             <motion.a
                               whileHover={{ scale: 1.03 }}
-                              href={`http://localhost:5000${apt.consultation.prescriptionUrl}`}
+                              href={`${API_URL}${apt.consultation.prescriptionUrl}`}
                               target="_blank" rel="noreferrer"
                               className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs cursor-pointer transition-all flex-1 md:flex-none"
                               style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}
@@ -851,6 +867,49 @@ export default function DoctorDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Incoming Invite Toast ─────────────────────────────── */}
+      <AnimatePresence>
+        {incomingInvite && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-[100] bg-white p-6 rounded-3xl shadow-2xl border border-primary-100 max-w-sm w-full"
+            style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+                <Video className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg text-slate-900 leading-tight">Meeting Invite</h3>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Live Consultation</p>
+              </div>
+            </div>
+            <p className="text-slate-600 mb-6 text-sm font-medium">You have been invited to join an ongoing consultation by another doctor.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIncomingInvite(null)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => {
+                  setIncomingInvite(null);
+                  navigate(`/room/${incomingInvite.appointmentId}`);
+                }}
+                className="flex-1 py-3 rounded-xl text-white font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
+              >
+                <Check className="w-4 h-4" /> Accept & Join
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

@@ -4,14 +4,17 @@ import AgoraRTC from 'agora-rtc-sdk-ng';
 import {
   Video, VideoOff, Mic, MicOff, PhoneOff, Send, FileText,
   Pill, Plus, Activity, MessageSquare, ChevronRight, CheckCircle2,
-  Wifi, Shield, Clock
+  Wifi, Shield, Clock, UserPlus, Search, X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { motion, AnimatePresence } from 'framer-motion';
+
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '1480fbbff91244f7a77f0a8ed1359c19';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function MeetingRoom() {
   const { appointmentId } = useParams();
@@ -27,6 +30,13 @@ export default function MeetingRoom() {
   const [videoMuted, setVideoMuted] = useState(false);
   const [joining, setJoining] = useState(true); // auto-join in progress
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
+  const [showNotesSuccess, setShowNotesSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const localVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
@@ -60,19 +70,60 @@ export default function MeetingRoom() {
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { prescriptionRef.current = prescription; }, [prescription]);
 
+  // Invite modal state
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteSearchQuery, setInviteSearchQuery] = useState('');
+  const [doctorsList, setDoctorsList] = useState([]);
+  const [invitingDoctorId, setInvitingDoctorId] = useState(null);
+
+  // ── Fetch doctors for invite ──────────────────────────────
+  const fetchDoctorsForInvite = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/appointments/doctors`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      // Exclude self and already invited
+      const available = res.data.filter(d => 
+        d.userId !== user.id && 
+        !appointment?.invitedDoctors?.some(inv => inv.doctorId === d.userId)
+      );
+      setDoctorsList(available);
+    } catch (err) { console.error('Failed to fetch doctors', err); }
+  };
+
+  useEffect(() => {
+    if (showInviteModal) {
+      fetchDoctorsForInvite();
+    }
+  }, [showInviteModal, appointment]);
+
+  const handleInviteDoctor = async (doctorId) => {
+    try {
+      setInvitingDoctorId(doctorId);
+      await axios.post(`${API_URL}/api/appointments/${appointmentId}/invite`, {
+        doctorId
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      // Optionally show a toast
+      setShowInviteModal(false);
+      showToast('Doctor invited successfully!');
+    } catch (err) {
+      console.error('Failed to invite doctor', err);
+      showToast('Failed to invite doctor');
+    } finally {
+      setInvitingDoctorId(null);
+    }
+  };
+
+
   // ── Fetch appointment ──────────────────────────────────────
   useEffect(() => {
-    const fetchAppt = async () => {
+    const fetchApt = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/appointments', {
+        const { data } = await axios.get(`${API_URL}/api/appointments/${appointmentId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
-        const appt = res.data.find(a => a.id === appointmentId);
-        if (appt) {
-          setAppointment(appt);
-          if (appt.messages) {
-            setMessages(appt.messages.map(m => ({
-              ...m,
               senderName: m.senderRole === 'DOCTOR' ? appt.doctor.name : (appt.familyMember?.name || appt.patient.name)
             })));
           }
@@ -122,19 +173,25 @@ export default function MeetingRoom() {
       if (data.appointmentId === appointmentId && user?.role === 'DOCTOR') {
         setWaitingForPatientConfirmation(false);
         try {
-          await axios.put(`http://localhost:5000/api/appointments/${appointmentId}/status`,
+          await axios.put(`${API_URL}/api/appointments/${appointmentId}/status`,
             { status: 'COMPLETED', notes: notesRef.current, prescription: prescriptionRef.current },
             { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
           );
           leaveCall();
-        } catch { alert('Failed to complete consultation'); }
+        } catch (err) { 
+          if (err.response?.status === 400) {
+            showToast(err.response?.data?.error || 'Cannot complete consultation yet.');
+          } else {
+            showToast('Failed to complete consultation'); 
+          }
+        }
       }
     };
 
     const handleDeclineComplete = (data) => {
       if (data.appointmentId === appointmentId && user?.role === 'DOCTOR') {
         setWaitingForPatientConfirmation(false);
-        alert('The patient requested to continue the consultation.');
+        showToast('The patient requested to continue the consultation.');
       }
     };
 
@@ -195,7 +252,7 @@ export default function MeetingRoom() {
           tracks = [at, null];
         } catch (audioErr) { 
           console.warn('Mic fallback failed:', audioErr);
-          alert(`Could not access camera or microphone. \nIf testing on phone, ensure you use HTTPS or localhost.\nError: ${audioErr.message || 'Permission denied'}`);
+          showToast(`Could not access camera or microphone.`);
         }
       }
       
@@ -209,7 +266,7 @@ export default function MeetingRoom() {
       
       // Auto-join immediately
       try {
-        const res = await axios.get(`http://localhost:5000/api/agora/token?channelName=${appointmentId}`);
+        const res = await axios.get(`${API_URL}/api/agora/token?channelName=${appointmentId}`);
         if (!mounted) return;
 
         await client.join(APP_ID, appointmentId, res.data.token, null);
@@ -229,7 +286,7 @@ export default function MeetingRoom() {
       } catch (err) {
         console.error('Auto-join failed:', err);
         if (mounted) {
-          alert('Failed to join the meeting. Check console logs.');
+          showToast('Failed to join the meeting. Check console logs.');
         }
       }
       if (mounted) {
@@ -310,20 +367,63 @@ export default function MeetingRoom() {
   const completeConsultation = async () => {
     // Force completion directly without patient approval (fallback for doctor)
     try {
-      await axios.put(`http://localhost:5000/api/appointments/${appointmentId}/status`,
+      await axios.put(`${API_URL}/api/appointments/${appointmentId}/status`,
         { status: 'COMPLETED', notes: notesRef.current || notes, prescription: prescriptionRef.current || prescription },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       leaveCall();
-    } catch { alert('Failed to complete consultation'); }
+    } catch (err) {
+      if (err.response?.status === 400) {
+        showToast(err.response?.data?.error || 'Cannot complete consultation yet.');
+      } else {
+        showToast('Failed to complete consultation');
+      }
+    }
   };
 
-  const requestCompleteConsultation = () => {
-    setWaitingForPatientConfirmation(true);
-    socket.emit('call:request_complete', { appointmentId });
+  const submitInvitedDoctorNotes = async () => {
+    try {
+      await axios.post(`${API_URL}/api/appointments/${appointmentId}/notes`,
+        { notes: notesRef.current || notes, prescription: prescriptionRef.current || prescription },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      // Show success toast before leaving
+      setShowNotesSuccess(true);
+      setTimeout(() => {
+        leaveCall();
+      }, 2000);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to submit notes');
+    }
+  };
+
+  const requestCompleteConsultation = async () => {
+    try {
+      // PRE-FLIGHT CHECK
+      const { data: aptData } = await axios.get(`${API_URL}/api/appointments/${appointmentId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const pendingInvites = aptData.invitedDoctors?.filter(inv => inv.status !== 'COMPLETED');
+      if (pendingInvites && pendingInvites.length > 0) {
+        showToast('Cannot complete: Waiting for invited doctors to submit their notes.');
+        return;
+      }
+
+      await axios.post(`${API_URL}/api/appointments/${appointmentId}/notes`,
+        { notes: notesRef.current || notes, prescription: prescriptionRef.current || prescription },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setWaitingForPatientConfirmation(true);
+      socket.emit('call:request_complete', { appointmentId });
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to save notes before completing');
+    }
   };
 
   const isDoctor = user?.role === 'DOCTOR';
+  const isPrimaryDoctor = isDoctor && appointment?.doctorId === user?.id;
+  const isInvitedDoctor = isDoctor && appointment?.invitedDoctors?.some(inv => inv.doctorId === user?.id);
+
   const otherName = isDoctor 
     ? (appointment?.familyMember?.name || appointment?.patient?.name)
     : (appointment?.doctor?.name?.startsWith('Dr.') ? appointment.doctor.name : `Dr. ${appointment?.doctor?.name}`);
@@ -431,6 +531,85 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
+      {/* ── Invite Doctor Modal ───────────────────────── */}
+      <AnimatePresence>
+        {showInviteModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl flex flex-col"
+              style={{ maxHeight: '80vh' }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-primary-500" />
+                  Invite Doctor
+                </h2>
+                <button
+                  onClick={() => setShowInviteModal(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="relative mb-4">
+                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by name or specialization..."
+                  value={inviteSearchQuery}
+                  onChange={e => setInviteSearchQuery(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all text-sm font-medium"
+                />
+              </div>
+
+              <div className="flex-1 overflow-y-auto min-h-[200px]" style={{ scrollbarWidth: 'thin' }}>
+                {doctorsList.filter(d => 
+                  d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) || 
+                  d.specialization.name.toLowerCase().includes(inviteSearchQuery.toLowerCase())
+                ).length === 0 ? (
+                  <div className="text-center text-slate-500 py-8 font-medium">
+                    No doctors available to invite.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {doctorsList.filter(d => 
+                      d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) || 
+                      d.specialization.name.toLowerCase().includes(inviteSearchQuery.toLowerCase())
+                    ).map(d => (
+                      <div key={d.userId} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-primary-100 bg-slate-50 hover:bg-primary-50/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-sm">
+                            {d.user.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 text-sm">Dr. {d.user.name}</p>
+                            <p className="text-xs text-slate-500 font-medium">{d.specialization.name}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleInviteDoctor(d.userId)}
+                          disabled={invitingDoctorId === d.userId}
+                          className="px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:scale-105 disabled:opacity-50"
+                          style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
+                        >
+                          {invitingDoctorId === d.userId ? 'Inviting...' : 'Invite'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Consultation Completed overlay ─────────────────────────────── */}
       <AnimatePresence>
         {showCompletedDialog && (
@@ -462,6 +641,45 @@ export default function MeetingRoom() {
                 Return to Dashboard
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Notes Success Toast ─────────────────────────────── */}
+      <AnimatePresence>
+        {showNotesSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-[100] bg-white p-6 rounded-3xl shadow-2xl border border-health-100 max-w-sm w-full"
+            style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-health-100 flex items-center justify-center text-health-600">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg text-slate-900 leading-tight">Notes Submitted</h3>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Success</p>
+              </div>
+            </div>
+            <p className="text-slate-600 text-sm font-medium">Your notes have been saved. You are now leaving the consultation.</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Global Toast ─────────────────────────────── */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className="fixed top-6 left-1/2 z-[200] bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl border border-slate-700 flex items-center gap-3"
+          >
+            <div className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
+            <span className="font-bold text-sm">{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -546,9 +764,13 @@ export default function MeetingRoom() {
               </div>
             ) : (
               /* Remote video feeds */
-              <div className="absolute inset-0">
+              <div className={`absolute inset-0 p-2 flex flex-wrap gap-2 ${remoteUsers.length > 0 ? 'items-center justify-center' : ''}`}>
                 {remoteUsers.map(u => (
-                  <div key={u.uid} className="absolute inset-0 flex items-center justify-center">
+                  <div key={u.uid} className={`relative flex items-center justify-center bg-slate-900 rounded-2xl overflow-hidden shadow-lg border border-slate-700 transition-all ${
+                    remoteUsers.length === 1 ? 'w-full h-full' : 
+                    remoteUsers.length === 2 ? 'w-[calc(50%-4px)] h-full' : 
+                    'w-[calc(50%-4px)] h-[calc(50%-4px)]'
+                  }`}>
                     {u.hasVideo ? (
                       <div className="w-full h-full" ref={el => remoteVideoRefs.current[u.uid] = el} />
                     ) : (
@@ -666,7 +888,14 @@ export default function MeetingRoom() {
               <>
                 <TabBtn icon={<FileText className="w-5 h-5" />} label="Prescription" active={activeTab === 'notes'} onClick={() => setActiveTab(activeTab === 'notes' ? null : 'notes')} />
                 <TabBtn icon={<Activity className="w-5 h-5" />} label="AI Triage" active={activeTab === 'triage'} onClick={() => setActiveTab(activeTab === 'triage' ? null : 'triage')} />
-                <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Complete" active={false} onClick={requestCompleteConsultation} accent />
+                {isPrimaryDoctor && (
+                  <TabBtn icon={<UserPlus className="w-5 h-5" />} label="Invite Doctor" active={showInviteModal} onClick={() => setShowInviteModal(true)} />
+                )}
+                {isPrimaryDoctor ? (
+                  <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Complete" active={false} onClick={requestCompleteConsultation} accent />
+                ) : (
+                  <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Submit & Leave" active={false} onClick={() => setActiveTab('notes')} accent />
+                )}
               </>
             )}
           </div>
@@ -1038,13 +1267,23 @@ export default function MeetingRoom() {
 
                   {/* Sign & Complete — sticky bottom */}
                   <div className="shrink-0 p-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-                    <button
-                      onClick={requestCompleteConsultation}
-                      className="w-full py-3.5 rounded-2xl font-heading font-black text-white flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
-                      style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
-                    >
-                      <CheckCircle2 className="w-5 h-5" /> Sign & Complete Consultation
-                    </button>
+                    {isPrimaryDoctor ? (
+                      <button
+                        onClick={requestCompleteConsultation}
+                        className="w-full py-3.5 rounded-2xl font-heading font-black text-white flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
+                        style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
+                      >
+                        <CheckCircle2 className="w-5 h-5" /> Sign & Complete Consultation
+                      </button>
+                    ) : (
+                      <button
+                        onClick={submitInvitedDoctorNotes}
+                        className="w-full py-3.5 rounded-2xl font-heading font-black text-white flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
+                        style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
+                      >
+                        <CheckCircle2 className="w-5 h-5" /> Submit Notes & Leave
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
