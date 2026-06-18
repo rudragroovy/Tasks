@@ -62,15 +62,72 @@ exports.updateStatus = async (req, res) => {
       // Fetch full appointment for PDF generation
       const fullAppt = await prisma.appointment.findUnique({
         where: { id },
-        include: { doctor: true, patient: true }
+        include: { 
+          doctor: true, 
+          patient: true,
+          invitedDoctors: true,
+          doctorNotes: {
+            include: { doctor: true }
+          }
+        }
       });
 
-      const pdfUrl = await generatePrescriptionPDF(fullAppt, { notes, prescription });
+      if (!fullAppt) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+
+      if (fullAppt.status === 'COMPLETED') {
+        return res.json(fullAppt);
+      }
+
+      const incompleteInvites = fullAppt.invitedDoctors.filter(invite => invite.status !== 'COMPLETED');
+      if (incompleteInvites.length > 0) {
+        return res.status(400).json({ error: 'Cannot complete appointment until all invited doctors have submitted their notes.' });
+      }
+
+      const formatRx = (rx) => {
+        if (!rx || !Array.isArray(rx) || rx.length === 0) return 'None';
+        return rx.map(m => `${m.name} (${m.dosage}, ${m.frequency}, ${m.duration})`).join('; ');
+      };
+
+      let primaryNotes = notes;
+      let primaryPrescription = prescription;
+
+      const primaryDoctorNoteRecord = fullAppt.doctorNotes.find(dn => dn.doctorId === fullAppt.doctorId);
+      
+      if (!primaryNotes && primaryDoctorNoteRecord) {
+        primaryNotes = primaryDoctorNoteRecord.notes;
+      }
+      if (!primaryPrescription && primaryDoctorNoteRecord) {
+        primaryPrescription = primaryDoctorNoteRecord.prescription;
+      }
+
+      let aggregatedNotes = `- Primary Doctor: Dr. ${fullAppt.doctor.name}\n`;
+      aggregatedNotes += `  Notes: ${primaryNotes || 'None'}\n`;
+      aggregatedNotes += `  Prescription: ${formatRx(primaryPrescription)}\n`;
+
+      let aggregatedPrescription = Array.isArray(primaryPrescription) ? [...primaryPrescription] : [];
+
+      if (fullAppt.doctorNotes && fullAppt.doctorNotes.length > 0) {
+        fullAppt.doctorNotes.forEach(dn => {
+          if (dn.doctorId !== fullAppt.doctorId) {
+            aggregatedNotes += `\n- Invited Doctor: Dr. ${dn.doctor.name}\n`;
+            aggregatedNotes += `  Notes: ${dn.notes || 'None'}\n`;
+            aggregatedNotes += `  Prescription: ${formatRx(dn.prescription)}\n`;
+            
+            if (dn.prescription && Array.isArray(dn.prescription)) {
+              aggregatedPrescription.push(...dn.prescription);
+            }
+          }
+        });
+      }
+
+      const pdfUrl = await generatePrescriptionPDF(fullAppt, { notes: aggregatedNotes, prescription: aggregatedPrescription });
 
       dataToUpdate.consultation = {
         create: {
-          notes: notes || '',
-          prescription: prescription || [],
+          notes: aggregatedNotes,
+          prescription: aggregatedPrescription,
           prescriptionUrl: pdfUrl
         }
       };
