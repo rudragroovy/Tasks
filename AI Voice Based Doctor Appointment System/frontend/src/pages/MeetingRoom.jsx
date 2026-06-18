@@ -803,7 +803,7 @@ export default function MeetingRoom() {
             >
               <div className="absolute inset-0 bg-gradient-to-b from-health-500/10 to-transparent opacity-50 pointer-events-none" />
               
-              <div className="w-20 h-20 bg-health-500/20 text-health-400 rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
+              <div className="w-20 h-20 bg-health-500/20 text-health-600 rounded-full flex items-center justify-center mb-6 relative z-10 shadow-inner">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <h2 className="text-2xl font-heading font-black text-slate-900 mb-2 relative z-10">Consultation Complete</h2>
@@ -888,12 +888,12 @@ export default function MeetingRoom() {
         {/* Right: status badges */}
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(5,150,105,0.15)', border: '1px solid rgba(5,150,105,0.3)' }}>
-            <Shield className="w-3 h-3 text-health-400" />
-            <span className="text-health-400 text-[10px] font-black uppercase tracking-wider">Encrypted</span>
+            <Shield className="w-3 h-3 text-health-600" />
+            <span className="text-health-600 text-[10px] font-black uppercase tracking-wider">Encrypted</span>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: inCall ? 'rgba(5,150,105,0.15)' : 'rgba(234,67,53,0.15)', border: `1px solid ${inCall ? 'rgba(5,150,105,0.3)' : 'rgba(234,67,53,0.3)'}` }}>
             <div className={`w-2 h-2 rounded-full ${inCall ? 'bg-health-400 animate-pulse' : 'bg-red-400'}`} />
-            <span className={`text-[10px] font-black uppercase tracking-wider ${inCall ? 'text-health-400' : 'text-red-400'}`}>
+            <span className={`text-[10px] font-black uppercase tracking-wider ${inCall ? 'text-health-600' : 'text-red-400'}`}>
               {inCall ? 'Live' : 'Connecting'}
             </span>
           </div>
@@ -1093,14 +1093,14 @@ export default function MeetingRoom() {
               exit={{ width: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="shrink-0 flex flex-col overflow-hidden min-h-0"
-              style={{ background: '#13161e', borderLeft: '1px solid rgba(0,0,0,0.05)' }}
+              style={{ background: '#f8fafc', borderLeft: '1px solid rgba(0,0,0,0.05)' }}
             >
               {/* Sidebar header */}
               <div className="shrink-0 flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                 <h3 className="text-slate-900 font-heading font-black text-base flex items-center gap-2">
-                  {activeTab === 'chat' && <><MessageSquare className="w-4 h-4 text-primary-400" /> Live Chat</>}
-                  {activeTab === 'triage' && <><Activity className="w-4 h-4 text-health-400" /> AI Triage</>}
-                  {activeTab === 'notes' && <><FileText className="w-4 h-4 text-health-400" /> Clinical Notes</>}
+                  {activeTab === 'chat' && <><MessageSquare className="w-4 h-4 text-primary-600" /> Live Chat</>}
+                  {activeTab === 'triage' && <><Activity className="w-4 h-4 text-health-600" /> AI Triage</>}
+                  {activeTab === 'notes' && <><FileText className="w-4 h-4 text-health-600" /> Clinical Notes</>}
                 </h3>
                 <button
                   onClick={() => setActiveTab(null)}
@@ -1154,7 +1154,7 @@ export default function MeetingRoom() {
                               />
                             </div>
                             <div className={`flex flex-col gap-1 max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-                              <span className="text-[10px] font-bold px-1 uppercase tracking-wider" style={{ color: isMe ? '#67e8f9' : '#94a3b8' }}>
+                              <span className="text-[10px] font-bold px-1 uppercase tracking-wider" style={{ color: isMe ? '#0e7490' : '#94a3b8' }}>
                                 {isMe ? 'You' : msg.senderName}
                               </span>
                               <div
@@ -1229,7 +1229,7 @@ export default function MeetingRoom() {
                       {/* AI Summary card */}
                       <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(14,116,144,0.3)' }}>
                         <div className="flex items-center gap-2 px-4 py-3" style={{ background: 'rgba(14,116,144,0.2)' }}>
-                          <Activity className="w-4 h-4 text-primary-400" />
+                          <Activity className="w-4 h-4 text-primary-600" />
                           <span className="text-[11px] font-black text-primary-300 uppercase tracking-widest">AI Clinical Summary</span>
                           {appointment.aiSummary?.urgency && (
                             <span className="ml-auto text-[10px] font-black uppercase px-2 py-0.5 rounded-full"
@@ -1256,7 +1256,7 @@ export default function MeetingRoom() {
                           <div className="flex flex-wrap gap-2">
                             {appointment.aiSummary.symptoms.map((s, i) => (
                               <span key={i} className="text-xs font-bold px-3 py-1 rounded-full"
-                                style={{ background: 'rgba(14,116,144,0.2)', color: '#67e8f9', border: '1px solid rgba(14,116,144,0.3)' }}>
+                                style={{ background: 'rgba(14,116,144,0.2)', color: '#0e7490', border: '1px solid rgba(14,116,144,0.3)' }}>
                                 {s}
                               </span>
                             ))}
@@ -1299,7 +1299,7 @@ export default function MeetingRoom() {
               {activeTab === 'triage' && isDoctor && (
                 <div
                   className="shrink-0 flex items-center justify-between px-5 py-3 gap-3"
-                  style={{ borderTop: '1px solid rgba(0,0,0,0.05)', background: 'rgba(0,0,0,0.25)' }}
+                  style={{ borderTop: '1px solid rgba(0,0,0,0.05)', background: '#ffffff' }}
                 >
                   <div className="flex items-center gap-2">
                     <div className={`relative w-2 h-2 rounded-full ${micMuted ? '' : 'bg-green-500'}`}>
@@ -1373,9 +1373,9 @@ export default function MeetingRoom() {
                               <div className="min-w-0">
                                 <p className="text-health-300 font-bold text-sm leading-tight">{med.name}</p>
                                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                  {med.dosage && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#6ee7b7' }}>{med.dosage}</span>}
-                                  {med.frequency && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#6ee7b7' }}>{med.frequency}</span>}
-                                  {med.duration && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#6ee7b7' }}>{med.duration}</span>}
+                                  {med.dosage && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#059669' }}>{med.dosage}</span>}
+                                  {med.frequency && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#059669' }}>{med.frequency}</span>}
+                                  {med.duration && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#059669' }}>{med.duration}</span>}
                                 </div>
                               </div>
                               <button
@@ -1398,9 +1398,9 @@ export default function MeetingRoom() {
                           value={medInput.name}
                           onChange={e => setMedInput({ ...medInput, name: e.target.value })}
                           className="w-full text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                          style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
+                          style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
                           onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                          onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
+                          onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                         />
                         <div className="grid grid-cols-2 gap-2">
                           <input
@@ -1409,9 +1409,9 @@ export default function MeetingRoom() {
                             value={medInput.dosage}
                             onChange={e => setMedInput({ ...medInput, dosage: e.target.value })}
                             className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
+                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
                             onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
+                            onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                           />
                           <input
                             type="text"
@@ -1419,9 +1419,9 @@ export default function MeetingRoom() {
                             value={medInput.frequency}
                             onChange={e => setMedInput({ ...medInput, frequency: e.target.value })}
                             className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
+                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
                             onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
+                            onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                           />
                         </div>
                         <div className="flex gap-2">
@@ -1431,9 +1431,9 @@ export default function MeetingRoom() {
                             value={medInput.duration}
                             onChange={e => setMedInput({ ...medInput, duration: e.target.value })}
                             className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
+                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
                             onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.09)'}
+                            onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                           />
                           <button
                             onClick={addMedicine}
@@ -1547,12 +1547,12 @@ function ControlBtn({ icon, label, active, onClick, badge }) {
         style={{
           background: active ? 'rgba(14,116,144,0.25)' : 'rgba(0,0,0,0.05)',
           border: active ? '1px solid rgba(14,116,144,0.5)' : '1px solid rgba(0,0,0,0.08)',
-          color: active ? '#67e8f9' : '#94a3b8'
+          color: active ? '#0e7490' : '#94a3b8'
         }}
       >
         {icon}
       </div>
-      <span className="text-[10px] font-bold" style={{ color: active ? '#67e8f9' : '#64748b' }}>{label}</span>
+      <span className="text-[10px] font-bold" style={{ color: active ? '#0e7490' : '#64748b' }}>{label}</span>
       {badge && (
         <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-slate-900 text-[9px] font-black flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
