@@ -910,7 +910,8 @@ export default function MeetingRoom() {
           <div className="flex-1 relative overflow-hidden">
             {remoteUsers.length === 0 ? (
               /* Waiting for other party */
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: '#0d0f14' }}>
+              <div className="absolute inset-0 p-4 flex flex-wrap gap-4 items-center justify-center overflow-hidden">
+                <div className="relative flex flex-col items-center justify-center gap-4 bg-[#111318] rounded-3xl overflow-hidden shadow-2xl border border-white/5 transition-all w-full max-w-5xl max-h-full aspect-[16/9]">
                 <div className="relative">
                   <motion.div
                     animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
@@ -939,6 +940,7 @@ export default function MeetingRoom() {
                   />
                   Waiting for them to join…
                 </div>
+              </div>
               </div>
             ) : (
               /* Remote video feeds */
