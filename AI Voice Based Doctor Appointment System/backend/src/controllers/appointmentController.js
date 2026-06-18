@@ -125,3 +125,132 @@ exports.getUserAppointments = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch appointments' });
   }
 };
+
+exports.inviteDoctor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { doctorId } = req.body;
+    const userId = req.user.id;
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id }
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    if (appointment.doctorId !== userId) {
+      return res.status(403).json({ error: 'Only the primary doctor can invite others' });
+    }
+
+    if (doctorId === userId) {
+      return res.status(400).json({ error: 'Cannot invite yourself' });
+    }
+
+    const validDoctor = await prisma.user.findUnique({
+      where: { id: doctorId }
+    });
+
+    if (!validDoctor || validDoctor.role !== 'DOCTOR') {
+      return res.status(400).json({ error: 'Invalid doctor ID' });
+    }
+
+    const existingInvite = await prisma.invitedDoctor.findUnique({
+      where: {
+        appointmentId_doctorId: {
+          appointmentId: id,
+          doctorId: doctorId
+        }
+      }
+    });
+
+    if (existingInvite) {
+      return res.status(400).json({ error: 'Doctor already invited' });
+    }
+
+    const invitedDoctor = await prisma.invitedDoctor.create({
+      data: {
+        appointmentId: id,
+        doctorId: doctorId,
+        status: 'PENDING'
+      }
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${doctorId}`).emit('doctor:invited', {
+        appointmentId: id,
+        invitedBy: userId
+      });
+    }
+
+    res.status(201).json(invitedDoctor);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to invite doctor' });
+  }
+};
+
+exports.submitDoctorNote = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes, prescription } = req.body;
+    const doctorId = req.user.id;
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        invitedDoctors: true
+      }
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const isPrimaryDoctor = appointment.doctorId === doctorId;
+    const isInvitedDoctor = appointment.invitedDoctors.some(invite => invite.doctorId === doctorId);
+
+    if (!isPrimaryDoctor && !isInvitedDoctor) {
+      return res.status(403).json({ error: 'Not authorized to submit notes for this appointment' });
+    }
+
+    const safePrescription = Array.isArray(prescription) ? prescription : [];
+
+    const doctorNote = await prisma.doctorNote.upsert({
+      where: {
+        appointmentId_doctorId: {
+          appointmentId: id,
+          doctorId: doctorId
+        }
+      },
+      update: {
+        notes,
+        prescription: safePrescription
+      },
+      create: {
+        appointmentId: id,
+        doctorId: doctorId,
+        notes: notes || '',
+        prescription: safePrescription
+      }
+    });
+
+    await prisma.invitedDoctor.updateMany({
+      where: {
+        appointmentId: id,
+        doctorId: doctorId,
+        status: { not: 'COMPLETED' }
+      },
+      data: {
+        status: 'COMPLETED'
+      }
+    });
+
+    res.json(doctorNote);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to submit doctor note' });
+  }
+};
