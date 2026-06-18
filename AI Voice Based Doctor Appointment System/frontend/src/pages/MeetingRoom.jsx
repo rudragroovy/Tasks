@@ -1064,7 +1064,7 @@ export default function MeetingRoom() {
           {/* ── Tabs row — below video, horizontal scrollable ── */}
           <div
             className="shrink-0 flex items-stretch justify-center overflow-x-auto"
-            style={{ background: 'rgba(13,15,20,0.97)', borderTop: '1px solid rgba(0,0,0,0.05)', scrollbarWidth: 'none' }}
+            style={{ background: '#ffffff', borderTop: '1px solid rgba(0,0,0,0.05)', scrollbarWidth: 'none' }}
           >
             <TabBtn icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={activeTab === 'chat'} onClick={() => setActiveTab(activeTab === 'chat' ? null : 'chat')} badge={messages.length || null} />
             {isDoctor && (
