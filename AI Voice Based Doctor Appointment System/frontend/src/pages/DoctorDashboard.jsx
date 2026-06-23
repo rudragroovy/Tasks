@@ -9,7 +9,6 @@ import {
   MessageSquare, FileText, Zap, TrendingUp, Wifi, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 import SharedNavbar from '../components/SharedNavbar';
 import DoctorSlotSettings from '../components/doctor/DoctorSlotSettings';
 
@@ -150,11 +149,6 @@ export default function DoctorDashboard() {
   const completedCount = appointments.filter(a => a.status === 'COMPLETED').length;
   const acceptedCount = appointments.filter(a => a.status === 'ACCEPTED' && a.type === 'ON_DEMAND').length;
 
-  const weeklyData = [
-    { v: 4 }, { v: 7 }, { v: 3 }, { v: 9 }, { v: 5 },
-    { v: appointments.length + 1 }, { v: appointments.length + 5 }
-  ];
-
   const queueAppointments = appointments.filter(a =>
     a.type === 'ON_DEMAND' && (a.status === 'PENDING' || a.status === 'ACCEPTED')
   );
@@ -281,14 +275,13 @@ export default function DoctorDashboard() {
                   transition={{ delay: i * 0.08, type: 'spring', stiffness: 120 }}
                   className="rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
                 >
-                  {/* Recharts sparkline bg */}
-                  <div className="absolute inset-0 opacity-[0.06] pointer-events-none">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={weeklyData}>
-                        <Area type="monotone" dataKey="v" stroke={stat.strokeColor} fill={stat.strokeColor} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {/* Lightweight decorative background avoids chart sizing warnings */}
+                  <div
+                    className="absolute inset-0 opacity-[0.08] pointer-events-none"
+                    style={{
+                      background: `radial-gradient(120% 80% at 0% 100%, ${stat.strokeColor}22 0%, transparent 65%)`,
+                    }}
+                  />
                   <div className="relative z-10 flex items-start justify-between">
                     <div>
                       <p className="text-xs font-black uppercase tracking-wider mb-3 text-slate-400">{stat.label}</p>
