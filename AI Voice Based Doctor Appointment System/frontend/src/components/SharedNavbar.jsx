@@ -32,7 +32,7 @@ export default function SharedNavbar({
 
   return (
     <header className={className}>
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
         
         {/* Logo */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={onLogoClick}>
@@ -43,7 +43,7 @@ export default function SharedNavbar({
         </div>
 
         {/* Center nav links */}
-        <div className="hidden md:flex flex-1 items-center justify-center gap-4 lg:gap-6">
+        <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-6 min-w-0">
           {navItems.map(item => {
             const Icon = item.icon;
             return (
@@ -72,7 +72,7 @@ export default function SharedNavbar({
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 shrink-0">
           {/* Online toggle */}
           <motion.button
             whileTap={!statusOverride ? { scale: 0.95 } : undefined}
@@ -88,7 +88,7 @@ export default function SharedNavbar({
               {statusConfig.ping && <span className="absolute inset-0 rounded-full animate-ping bg-green-500 opacity-50" />}
               <span className="relative rounded-full w-2 h-2 block" style={{ background: statusConfig.dotColor || statusConfig.color }} />
             </div>
-            <span className="hidden sm:inline uppercase tracking-wider text-[11px]">
+            <span className="hidden lg:inline uppercase tracking-wider text-[11px]">
               {statusConfig.text}
             </span>
           </motion.button>
@@ -104,12 +104,12 @@ export default function SharedNavbar({
           <div className="w-px h-6 bg-slate-200 hidden sm:block" />
 
           {/* Doctor avatar */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-sm border border-primary-200">
               {avatarLetter}
             </div>
-            <div className="hidden sm:block text-sm">
-              <p className="font-bold text-slate-900 leading-none">{displayDoctorName}</p>
+            <div className="hidden lg:block text-sm min-w-0">
+              <p className="font-bold text-slate-900 leading-none truncate max-w-[120px]">{displayDoctorName}</p>
               <p className="text-slate-500 text-xs">{roleText}</p>
             </div>
           </div>
