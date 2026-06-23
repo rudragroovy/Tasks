@@ -88,7 +88,10 @@ export default function DoctorsList() {
               <DoctorCard 
                 key={doc.userId || Math.random()} 
                 doctor={doc} 
-                onBook={() => navigate(`/booking?specialization=${doc.specialization?.name || ''}`)} 
+                onBook={() => navigate(
+                  `/booking?specialization=${encodeURIComponent(doc.specialization?.name || '')}&doctorId=${encodeURIComponent(doc.userId || '')}`,
+                  { state: { selectedDoctorId: doc.userId } }
+                )} 
               />
             ))}
             </div>

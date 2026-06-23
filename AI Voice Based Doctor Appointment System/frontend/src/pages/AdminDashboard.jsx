@@ -7,6 +7,7 @@ import {
   ShieldCheck, Stethoscope, CalendarClock, TrendingUp, Bell, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDoctorName } from '../utils/doctorName';
 
 const STATUS_COLORS = {
   PENDING:   { bg: 'rgba(245,158,11,0.1)',  color: '#d97706', label: 'Pending'   },
@@ -106,7 +107,7 @@ export default function AdminDashboard() {
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">+</div>
-            <span className="font-heading font-black text-slate-900 text-lg tracking-tight hidden sm:block">MyDrScripts</span>
+            <span className="font-heading font-black text-slate-900 text-lg tracking-tight hidden sm:block">CareBridge</span>
             <span className="ml-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:block">Admin</span>
           </div>
 
@@ -268,7 +269,7 @@ export default function AdminDashboard() {
                         />
                         <div className="min-w-0">
                           <p className="font-bold text-slate-900 text-sm truncate">
-                            {doc.user.name?.startsWith('Dr.') ? doc.user.name : `Dr. ${doc.user.name}`}
+                              {formatDoctorName(doc.user.name, doc.user.name)}
                           </p>
                           <p className="text-slate-500 text-xs truncate">{doc.user.email}</p>
                         </div>
@@ -371,7 +372,7 @@ export default function AdminDashboard() {
                           <div className="min-w-0">
                             <p className="font-bold text-slate-900 text-sm truncate">{a.patient?.name}</p>
                             <p className="text-slate-500 text-xs truncate">
-                              {a.doctor?.name?.startsWith('Dr.') ? a.doctor.name : `Dr. ${a.doctor?.name || '—'}`}
+                              {formatDoctorName(a.doctor?.name, a.doctor?.name || '—')}
                             </p>
                           </div>
                         </div>

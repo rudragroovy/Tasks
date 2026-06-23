@@ -1,364 +1,380 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useConversation, ConversationProvider } from '@elevenlabs/react';
-import { Mic, MicOff, PhoneOff, Activity, Send } from 'lucide-react';
+import { Mic, MicOff, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-function AIVoiceAssistantInner({ onComplete }) {
+async function safeEndSession(conversation) {
+  try {
+    const maybePromise = conversation?.endSession?.();
+    if (maybePromise && typeof maybePromise.then === 'function') {
+      await maybePromise;
+    }
+  } catch (err) {
+    console.error('[ElevenLabs] endSession failed:', err);
+  }
+}
+
+function AIVoiceAssistantInner({ onComplete, onClose }) {
   const [history, setHistory] = useState([]);
   const historyRef = useRef([]);
-  const [inputText, setInputText] = useState('');
   const [status, setStatus] = useState('idle'); // idle | connecting | connected | ended
   const [micMuted, setMicMuted] = useState(false);
-  const chatEndRef = useRef(null);
   const triageDataRef = useRef(null);
+  const [hasTriageResult, setHasTriageResult] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   useEffect(() => {
     historyRef.current = history;
   }, [history]);
 
   const addMessage = useCallback((role, text) => {
-    setHistory(prev => {
-      // Deduplicate consecutive identical messages
-      if (prev.length > 0 && prev[prev.length - 1].text === text && prev[prev.length - 1].role === role) return prev;
+    setHistory((prev) => {
+      if (!text?.trim()) return prev;
+      if (prev.length > 0 && prev[prev.length - 1].text === text && prev[prev.length - 1].role === role) {
+        return prev;
+      }
       return [...prev, { id: crypto.randomUUID(), role, text }];
     });
   }, []);
 
-  // ─── Client Tools ────────────────────────────────────────────────────────────
-  const clientTools = useMemo(() => ({
+  const clientTools = useMemo(
+    () => ({
+      fetch_doctors: async (parameters) => {
+        const spec = parameters?.specialization || '';
+        try {
+          const res = await fetch(
+            `http://localhost:5000/api/appointments/doctors?specializationName=${encodeURIComponent(spec)}`,
+            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const doctors = await res.json();
 
-    fetch_doctors: async (parameters) => {
-      const spec = parameters?.specialization || '';
-      console.log('[Tool] fetch_doctors called with specialization:', spec);
-      try {
-        const res = await fetch(
-          `http://localhost:5000/api/appointments/doctors?specializationName=${encodeURIComponent(spec)}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const doctors = await res.json();
+          if (!doctors || doctors.length === 0) {
+            return JSON.stringify({ available: false, message: 'No doctors are currently online for this specialization.' });
+          }
 
-        if (!doctors || doctors.length === 0) {
-          return JSON.stringify({ available: false, message: 'No doctors are currently online for this specialization.' });
+          const list = doctors.map((d) => ({
+            id: d.userId,
+            name: d.user?.name || 'Unknown',
+            specialization: d.specialization?.name || spec,
+            fee: d.fee || 150,
+            isOnline: d.isOnline
+          }));
+
+          return JSON.stringify({ available: true, doctors: list });
+        } catch (err) {
+          console.error('[Tool] fetch_doctors error:', err);
+          return JSON.stringify({ available: false, error: 'Could not reach the database. Please try again.' });
+        }
+      },
+
+      save_symptom_session: async (parameters) => {
+        const { summary, specialization, doctorId, doctorName } = parameters || {};
+
+        if (!doctorId || !doctorName) {
+          return 'Error: Doctor information is missing. Please ask the patient to select a doctor first.';
         }
 
-        const list = doctors.map(d => ({
-          id: d.userId,
-          name: d.user?.name || 'Unknown',
-          specialization: d.specialization?.name || spec,
-          fee: d.fee || 150,
-          isOnline: d.isOnline
-        }));
+        triageDataRef.current = {
+          status: 'complete',
+          suggested_specialization: specialization || 'General Physician',
+          summary: summary || 'Symptoms recorded via AI voice triage.',
+          assigned_doctor_id: doctorId,
+          assigned_doctor_name: doctorName,
+          chatHistory: historyRef.current
+        };
+        setHasTriageResult(true);
 
-        console.log('[Tool] fetch_doctors returning:', list);
-        return JSON.stringify({ available: true, doctors: list });
-      } catch (err) {
-        console.error('[Tool] fetch_doctors error:', err);
-        return JSON.stringify({ available: false, error: 'Could not reach the database. Please try again.' });
+        return 'Success. The patient has been assigned and will be redirected to complete the booking now.';
       }
-    },
+    }),
+    []
+  );
 
-    save_symptom_session: async (parameters) => {
-      console.log('[Tool] save_symptom_session called with:', parameters);
-      const { summary, specialization, doctorId, doctorName } = parameters || {};
-
-      if (!doctorId || !doctorName) {
-        return 'Error: Doctor information is missing. Please ask the patient to select a doctor first.';
+  const callbacks = useMemo(
+    () => ({
+      onConnect: () => {
+        setStatus('connected');
+      },
+      onDisconnect: () => {
+        setStatus('ended');
+        setMicMuted(false);
+        if (triageDataRef.current && onComplete) {
+          setTimeout(() => onComplete(triageDataRef.current), 1200);
+        }
+      },
+      onMessage: (message) => {
+        const text = message?.message;
+        const source = message?.source || message?.role;
+        const role = source === 'ai' || source === 'agent' ? 'assistant' : 'user';
+        if (text) addMessage(role, text);
+      },
+      onError: (err) => {
+        console.error('[ElevenLabs] Error:', err);
+        setStatus('idle');
       }
+    }),
+    [onComplete, addMessage]
+  );
 
-      // Store triage data — the onComplete callback will fire after disconnect
-      triageDataRef.current = {
-        status: 'complete',
-        suggested_specialization: specialization || 'General Physician',
-        summary: summary || 'Symptoms recorded via AI voice triage.',
-        assigned_doctor_id: doctorId,
-        assigned_doctor_name: doctorName,
-        chatHistory: historyRef.current
-      };
+  const conversation = useConversation(
+    useMemo(
+      () => ({
+        ...callbacks,
+        clientTools
+      }),
+      [callbacks, clientTools]
+    )
+  );
 
-      console.log('[Tool] Triage data saved:', triageDataRef.current);
-      return 'Success. The patient has been assigned and will be redirected to complete the booking now.';
-    }
-
-  }), []);
-
-  // ─── Conversation Callbacks ──────────────────────────────────────────────────
-  const callbacks = useMemo(() => ({
-    onConnect: () => {
-      console.log('[ElevenLabs] Connected');
-      setStatus('connected');
-    },
-    onDisconnect: () => {
-      console.log('[ElevenLabs] Disconnected');
-      setStatus('ended');
-      if (triageDataRef.current && onComplete) {
-        // Small delay to let the AI finish speaking
-        setTimeout(() => onComplete(triageDataRef.current), 1500);
-      }
-    },
-    onMessage: (message) => {
-      console.log('[ElevenLabs] Message:', message);
-      const text = message?.message;
-      const source = message?.source || message?.role;
-      if (!text) return;
-      const role = (source === 'ai' || source === 'agent') ? 'assistant' : 'user';
-      addMessage(role, text);
-    },
-    onError: (err) => {
-      console.error('[ElevenLabs] Error:', err);
-      setStatus('idle');
-    }
-  }), [onComplete, addMessage]);
-
-  // Memoize the full options object to prevent WebSocket reconnect on every render
-  const conversationOptions = useMemo(() => ({
-    ...callbacks,
-    clientTools
-  }), [callbacks, clientTools]);
-
-  const conversation = useConversation(conversationOptions);
-
-  // Auto-scroll
+  const conversationRef = useRef(conversation);
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history]);
+    conversationRef.current = conversation;
+  }, [conversation]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (conversation.status === 'connected') {
-        conversation.endSession().catch(() => {});
+      const liveConversation = conversationRef.current;
+      if (liveConversation?.status === 'connected') {
+        void safeEndSession(liveConversation);
       }
     };
   }, []);
-
-  // ─── Start / End session ────────────────────────────────────────────────────
-  const toggleSession = async () => {
-    if (conversation.status === 'connected') {
-      await conversation.endSession();
-      return;
-    }
-
-    setStatus('connecting');
-    try {
-      const res = await fetch('http://localhost:5000/api/ai/signed-url', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (!res.ok) throw new Error('Could not get signed URL');
-      const { signedUrl } = await res.json();
-      await conversation.startSession({ signedUrl });
-    } catch (err) {
-      console.error('[ElevenLabs] Failed to start session:', err);
-      setStatus('idle');
-      alert('Could not connect to the voice agent. Please check your connection and try again.');
-    }
-  };
-
-  const handleSend = () => {
-    if (!inputText.trim()) return;
-    if (conversation.status === 'connected') {
-      try {
-        conversation.sendUserMessage(inputText);
-        addMessage('user', inputText);
-      } catch (err) {
-        console.error('Failed to send text:', err);
-      }
-    } else {
-      addMessage('user', inputText);
-      setTimeout(() => addMessage('assistant', "Please start the AI triage call first by clicking the microphone button."), 400);
-    }
-    setInputText('');
-  };
-
-  const toggleMic = async () => {
-    const newMuted = !micMuted;
-    setMicMuted(newMuted);
-    // Mute/unmute all active browser audio tracks
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      if (devices.some(d => d.kind === 'audioinput')) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        stream.getAudioTracks().forEach(track => {
-          track.enabled = !newMuted;
-          // Stop the extra stream we just created — we only needed to reach the shared track
-          track.stop();
-        });
-      }
-    } catch {
-      // No mic permission or unavailable — state still toggles for UX
-    }
-  };
 
   const isConnected = conversation.status === 'connected';
   const isConnecting = conversation.status === 'connecting' || status === 'connecting';
   const hasEnded = status === 'ended';
 
-  // Reset mic mute state when session ends
-  useEffect(() => {
-    if (!isConnected) setMicMuted(false);
-  }, [isConnected]);
+  const toggleSession = async () => {
+    if (conversation.status === 'connected') {
+      await safeEndSession(conversation);
+      return;
+    }
 
+    setStatus('connecting');
+    triageDataRef.current = null;
+    setHasTriageResult(false);
+    try {
+      const res = await fetch('http://localhost:5000/api/ai/signed-url', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) {
+        const message = await res.text();
+        throw new Error(message || `Could not get signed URL (HTTP ${res.status})`);
+      }
+      const { signedUrl } = await res.json();
+      await conversation.startSession({ signedUrl });
+    } catch (err) {
+      console.error('[ElevenLabs] Failed to start session:', err);
+      setStatus('idle');
+      alert(`Could not connect to the voice agent: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleClose = async () => {
+    if (conversation.status === 'connected') {
+      await safeEndSession(conversation);
+    }
+    onClose?.();
+  };
+
+  const toggleMic = async () => {
+    const newMuted = !micMuted;
+    setMicMuted(newMuted);
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (devices.some((d) => d.kind === 'audioinput')) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = !newMuted;
+          track.stop();
+        });
+      }
+    } catch {
+      // Keep UI state change even when direct device toggle is unavailable.
+    }
+  };
+
+  const latestAssistantMessage = [...history].reverse().find((msg) => msg.role === 'assistant');
+  const transcriptPreview = history.slice(-6);
+
+  let agentStatusLabel = 'Offline';
+  if (isConnecting) agentStatusLabel = 'Connecting';
+  if (isConnected) agentStatusLabel = conversation.isSpeaking ? 'Speaking' : 'Listening';
+  if (hasEnded && hasTriageResult) agentStatusLabel = 'Session Complete';
 
   return (
-    <div className="flex flex-col w-full h-[500px] relative">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#02091f] text-white">
+      <div className="ai-stars-layer ai-stars-layer-1" />
+      <div className="ai-stars-layer ai-stars-layer-2" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_80%,rgba(56,189,248,0.45),rgba(2,9,31,0.05)_40%,transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(124,58,237,0.22),transparent_45%)]" />
 
-      {/* Start button — shown only when no history */}
-      {history.length === 0 && !isConnected && !hasEnded && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-center mb-6"
-        >
-          <button
-            onClick={toggleSession}
-            disabled={isConnecting}
-            className="px-6 py-2.5 bg-primary-100 text-primary-800 text-sm font-bold rounded-full hover:bg-primary-200 transition-colors shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
-          >
-            <Activity className="w-4 h-4" />
-            {isConnecting ? 'Connecting...' : 'Start AI Triage Checkup'}
-          </button>
-        </motion.div>
-      )}
-
-      {/* Ended state */}
-      {hasEnded && !triageDataRef.current && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex justify-center mb-4"
-        >
-          <div className="px-4 py-2 bg-slate-100 text-slate-600 text-sm font-medium rounded-full">
-            Conversation ended
+      <div className="relative z-10 flex h-full flex-col items-center">
+        <div className="pt-4 sm:pt-5">
+          <div className="flex items-center gap-3">
+            <div className="grid h-8 w-8 place-items-center rounded-[0.7rem] border border-white/30 bg-white/10 text-[0.95rem] font-black text-white shadow-[0_0_16px_rgba(255,255,255,0.12)]">+</div>
+            <span className="font-heading text-[1.68rem] font-black tracking-tight text-white sm:text-[1.82rem]">CareBridge</span>
           </div>
-        </motion.div>
-      )}
+        </div>
 
-      {/* Redirecting state */}
-      {hasEnded && triageDataRef.current && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex justify-center mb-4"
-        >
-          <div className="px-5 py-2.5 bg-health-50 border border-health-200 text-health-700 text-sm font-bold rounded-full flex items-center gap-2">
-            <div className="w-3 h-3 border-2 border-health-500 border-t-transparent rounded-full animate-spin" />
-            Redirecting to your doctor...
-          </div>
-        </motion.div>
-      )}
-
-      {/* Chat History */}
-      <div className="flex-1 overflow-y-auto mb-4 space-y-4 px-2 pr-4 custom-scrollbar">
-        {history.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm text-center px-6">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-              <Mic className="w-8 h-8 text-slate-300" />
-            </div>
-            <p className="font-heading font-bold text-slate-600 mb-1">I'm ready to listen.</p>
-            <p>Click "Start AI Triage Checkup" above to begin. I'll ask about your symptoms and connect you with the right specialist.</p>
-          </div>
-        ) : (
-          <AnimatePresence initial={false}>
-            {history.map((msg) => (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed shadow-sm ${
-                  msg.role === 'user'
-                    ? 'bg-gradient-to-br from-primary-800 to-primary-900 text-white rounded-tr-sm font-medium'
-                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
-                }`}>
-                  {msg.text}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        )}
-
-        {/* Speaking Indicator */}
-        {conversation.isSpeaking && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex justify-start"
-          >
-            <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm flex gap-1.5 items-center">
-              <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0 }} />
-              <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }} />
-              <motion.div className="w-2 h-2 bg-health-500 rounded-full" animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }} />
-            </div>
-          </motion.div>
-        )}
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Input Bar */}
-      <div className="flex gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm items-center">
-        {/* Hang-up / Start button */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={toggleSession}
-          disabled={isConnecting || hasEnded}
-          className={`relative p-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 disabled:opacity-40 ${
-            isConnected
-              ? 'bg-red-50 text-red-500'
-              : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-          }`}
-          title={isConnected ? 'End voice call' : 'Start voice call'}
-        >
-          {isConnected && <span className="absolute inset-0 rounded-xl bg-red-400 animate-ping opacity-20" />}
-          {isConnected ? <PhoneOff className="w-5 h-5 relative z-10" /> : <Mic className="w-5 h-5 relative z-10" />}
-        </motion.button>
-
-        {/* Mic mute/unmute — only while connected */}
-        {isConnected && (
+        <div className="relative flex w-full flex-1 flex-col items-center px-6 text-center">
           <motion.button
-            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={toggleMic}
-            className={`relative p-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 ${
-              micMuted
-                ? 'bg-red-50 text-red-500 ring-1 ring-red-200'
-                : 'bg-green-50 text-green-600 hover:bg-green-100'
-            }`}
-            title={micMuted ? 'Unmute microphone' : 'Mute microphone'}
-          >
-            {micMuted
-              ? <MicOff className="w-5 h-5" />
-              : <Mic className="w-5 h-5" />
+            animate={
+              isConnected
+                ? { boxShadow: ['0 0 0 0 rgba(56,189,248,0.45)', '0 0 0 34px rgba(56,189,248,0)'] }
+                : { scale: [1, 1.04, 1] }
             }
-            {!micMuted && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-green-500 rounded-full" />}
+            transition={isConnected ? { duration: 1.9, repeat: Infinity } : { duration: 2.6, repeat: Infinity }}
+            onClick={toggleSession}
+            disabled={isConnecting || (hasEnded && hasTriageResult)}
+            className="relative mt-[10vh] flex h-36 w-36 items-center justify-center rounded-full border border-white/40 bg-[radial-gradient(circle_at_30%_25%,#93c5fd,#3b82f6_35%,#312e81_70%,#1e1b4b)] shadow-[0_0_110px_rgba(59,130,246,0.5)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 sm:mt-[10vh] sm:h-44 sm:w-44"
+            title={isConnected ? 'End AI triage call' : 'Start AI triage call'}
+          >
+            {isConnecting ? <Loader2 className="h-12 w-12 animate-spin" /> : <Mic className="h-12 w-12" />}
+            <div className="absolute -top-2 flex h-12 w-12 items-center justify-center rounded-full border border-white/40 bg-white text-indigo-700 shadow-xl">
+              <Mic className="h-5 w-5" />
+            </div>
           </motion.button>
+
+          <h1 className="mt-2 text-4xl font-black tracking-tight text-white sm:text-5xl">
+            {isConnecting ? 'Connecting' : hasEnded && hasTriageResult ? 'Triage Complete' : isConnected ? 'Listening' : 'Tap to Start'}
+          </h1>
+          <p className="mt-0 text-[1.35rem] font-semibold text-sky-200 sm:text-[1.5rem]">Voice Assistant</p>
+
+          <AnimatePresence mode="wait">
+            {latestAssistantMessage?.text && (
+              <motion.p
+                key={latestAssistantMessage.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="mt-4 max-w-2xl rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-medium text-slate-100 backdrop-blur-sm"
+              >
+                {latestAssistantMessage.text}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          <div className="absolute bottom-[7.75rem] left-1/2 z-10 w-[min(92vw,430px)] -translate-x-1/2 rounded-2xl border border-white/20 bg-white/14 px-4 py-3 backdrop-blur-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/35 bg-white/90 text-sm font-black text-indigo-700">OA</div>
+                <div className="text-left">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-200">Your AI Agent</p>
+                  <p className="text-[1.35rem] font-black leading-none tracking-tight">OLA AI</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    isConnected ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]' : isConnecting ? 'bg-amber-300' : 'bg-slate-400'
+                  }`}
+                />
+                {agentStatusLabel}
+              </div>
+            </div>
+          </div>
+
+          <div className="absolute bottom-[2.8rem] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3">
+            {isConnected && (
+              <button
+                onClick={toggleMic}
+                className={`flex h-11 w-11 items-center justify-center rounded-full border transition cursor-pointer ${
+                  micMuted
+                    ? 'border-red-300 bg-red-500/25 text-red-100'
+                    : 'border-emerald-300 bg-emerald-500/20 text-emerald-100'
+                }`}
+                title={micMuted ? 'Unmute microphone' : 'Mute microphone'}
+              >
+                {micMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </button>
+            )}
+            <button
+              onClick={isConnected ? toggleSession : handleClose}
+              className="flex h-[3.75rem] w-[3.75rem] items-center justify-center rounded-full border border-red-300 bg-red-500/90 text-white shadow-[0_14px_28px_rgba(239,68,68,0.45)] transition hover:bg-red-500 cursor-pointer"
+              title={isConnected ? 'End AI triage call' : 'Close AI triage'}
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          {hasEnded && hasTriageResult && (
+            <div className="absolute bottom-7 left-1/2 z-10 -translate-x-1/2">
+              <p className="flex items-center gap-2 rounded-full border border-emerald-200/70 bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-100">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Redirecting to booking...
+              </p>
+            </div>
+          )}
+        </div>
+
+        {history.length > 0 && (
+          <div className="absolute bottom-5 left-5 z-20">
+            <button
+              onClick={() => setShowTranscript((prev) => !prev)}
+              className="rounded-full border border-white/20 bg-slate-900/45 px-4 py-2 text-xs font-semibold text-slate-100 backdrop-blur-sm transition hover:bg-slate-900/60 cursor-pointer"
+            >
+              {showTranscript ? 'Hide Transcript' : 'View Transcript'}
+            </button>
+          </div>
         )}
 
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder={isConnected ? (micMuted ? 'Mic muted — type instead…' : 'Speak or type here...') : 'Start the call to chat'}
-          className="flex-1 bg-transparent border-none px-2 text-[15px] text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none w-full"
-        />
-
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleSend}
-          disabled={!inputText.trim()}
-          className="p-3.5 bg-primary-900 text-white rounded-xl shadow-md shadow-primary-900/20 disabled:opacity-40 disabled:shadow-none transition-all cursor-pointer shrink-0 flex items-center justify-center"
-        >
-          <Send className="w-5 h-5" />
-        </motion.button>
+        <AnimatePresence>
+          {showTranscript && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-20 left-5 z-20 w-[min(92vw,460px)] max-h-64 overflow-y-auto rounded-2xl border border-white/20 bg-slate-950/70 p-3 backdrop-blur-md"
+            >
+              {transcriptPreview.map((msg) => (
+                <div key={msg.id} className={`mb-2 rounded-xl px-3 py-2 text-sm ${msg.role === 'user' ? 'bg-sky-500/30' : 'bg-white/10'}`}>
+                  <p className="mb-1 text-[11px] font-black uppercase tracking-wider text-slate-300">
+                    {msg.role === 'user' ? 'You' : 'AI'}
+                  </p>
+                  <p className="text-slate-100">{msg.text}</p>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        .ai-stars-layer {
+          position: absolute;
+          inset: 0;
+          background-repeat: repeat;
+          pointer-events: none;
+        }
+        .ai-stars-layer-1 {
+          background-image:
+            radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.95), transparent),
+            radial-gradient(1.5px 1.5px at 130px 80px, rgba(255,255,255,0.85), transparent),
+            radial-gradient(2px 2px at 300px 120px, rgba(255,255,255,0.9), transparent),
+            radial-gradient(1.5px 1.5px at 520px 60px, rgba(255,255,255,0.8), transparent),
+            radial-gradient(2px 2px at 700px 150px, rgba(255,255,255,0.9), transparent);
+          background-size: 800px 260px;
+          opacity: 0.95;
+          animation: ai-stars-drift 80s linear infinite;
+        }
+        .ai-stars-layer-2 {
+          background-image:
+            radial-gradient(1.5px 1.5px at 70px 40px, rgba(147,197,253,0.8), transparent),
+            radial-gradient(1.5px 1.5px at 260px 160px, rgba(255,255,255,0.7), transparent),
+            radial-gradient(1.5px 1.5px at 460px 110px, rgba(191,219,254,0.8), transparent),
+            radial-gradient(2px 2px at 660px 40px, rgba(255,255,255,0.65), transparent),
+            radial-gradient(1.5px 1.5px at 760px 210px, rgba(255,255,255,0.75), transparent);
+          background-size: 900px 280px;
+          opacity: 0.55;
+          animation: ai-stars-drift 110s linear infinite reverse;
+        }
+        @keyframes ai-stars-drift {
+          from { transform: translate3d(0, 0, 0); }
+          to { transform: translate3d(-120px, -80px, 0); }
+        }
       `}</style>
     </div>
   );

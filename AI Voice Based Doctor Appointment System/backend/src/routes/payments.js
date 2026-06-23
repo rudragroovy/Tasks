@@ -2,6 +2,7 @@ const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_mock'); // Using a mock/dummy key if none provided
 const { authenticate } = require('../middlewares/authMiddleware');
 const prisma = require('../models/prismaClient');
+const { formatDoctorName } = require('../utils/doctorName');
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Consultation with Dr. ${doctor.user.name}`,
+              name: `Consultation with ${formatDoctorName(doctor.user.name, doctor.user.name)}`,
             },
             unit_amount: Math.round((parseFloat(doctor.fee) || 150) * 100),
           },
@@ -71,10 +72,24 @@ router.post('/confirm', authenticate, async (req, res) => {
     const { appointmentId, sessionId } = req.body;
     
     // In a real app, verify sessionId with Stripe
-    
+
+    const existingAppointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      select: { id: true, doctorId: true, type: true }
+    });
+
+    if (!existingAppointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    // Flow rule:
+    // - ON_DEMAND: doctor must accept (PENDING after payment)
+    // - SCHEDULED: auto-confirm directly in doctor's schedule (ACCEPTED after payment)
+    const nextStatus = existingAppointment.type === 'SCHEDULED' ? 'ACCEPTED' : 'PENDING';
+
     const appointment = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: 'PAID', status: 'PENDING' } // Move to PENDING so doctor sees it
+      data: { paymentStatus: 'PAID', status: nextStatus }
     });
 
     // Notify doctor

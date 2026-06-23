@@ -28,33 +28,65 @@
 }
 
 :root {
-  --background: #020C1B;
-  --foreground: #E2E8F0;
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+  --surface-1: #ffffff;
+  --surface-2: #f8fafc;
+  --line-soft: #e2e8f0;
+  --line-softer: #e7edf5;
+  --shadow-soft: 0 8px 28px rgba(15, 23, 42, 0.06);
+  --shadow-soft-hover: 0 14px 34px rgba(15, 23, 42, 0.1);
 }
 
 body {
-  background-color: var(--background);
+  background:
+    radial-gradient(circle at 8% -10%, rgba(20, 184, 166, 0.08), transparent 40%),
+    radial-gradient(circle at 92% 8%, rgba(14, 116, 144, 0.06), transparent 38%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
 }
 
-/* Smooth scrollbar for dark mode */
+/* Dashboard shell utilities */
+.app-shell {
+  background-color: transparent;
+}
+
+.app-panel {
+  background: color-mix(in srgb, var(--surface-1) 95%, white 5%);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-soft);
+}
+
+.app-panel:hover {
+  box-shadow: var(--shadow-soft-hover);
+}
+
+/* Smooth scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(148, 163, 184, 0.1);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(100, 116, 139, 0.35);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(71, 85, 105, 0.5);
 }
 
-/* Date/time input dark mode */
+/* Date/time input */
 input[type="date"],
 input[type="time"] {
-  color-scheme: dark;
+  color-scheme: light;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event {
+  border: 1px dashed rgba(5, 150, 105, 0.55);
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event {
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.3);
 }

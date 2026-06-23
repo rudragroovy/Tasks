@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const { formatDoctorName } = require('../utils/doctorName');
 
 exports.generatePrescriptionPDF = async (appointment, consultation) => {
   return new Promise((resolve, reject) => {
@@ -19,14 +20,14 @@ exports.generatePrescriptionPDF = async (appointment, consultation) => {
       doc.pipe(writeStream);
 
       // Header
-      doc.fontSize(24).font('Helvetica-Bold').text('MyDrScripts', { align: 'center' });
+      doc.fontSize(24).font('Helvetica-Bold').text('CareBridge', { align: 'center' });
       doc.fontSize(10).font('Helvetica').text('Consultation Summary & Prescription', { align: 'center' });
       doc.moveDown(2);
 
       // Info Block
       doc.fontSize(12).font('Helvetica-Bold').text('Consultation Details:');
       doc.font('Helvetica').text(`Date: ${new Date(appointment.createdAt).toLocaleDateString()}`);
-      doc.text(`Doctor: Dr. ${appointment.doctor.name}`);
+      doc.text(`Doctor: ${formatDoctorName(appointment.doctor.name, appointment.doctor.name)}`);
       doc.text(`Patient: ${appointment.patient.name}`);
       doc.text(`Consultation ID: ${appointment.id}`);
       doc.moveDown(1.5);

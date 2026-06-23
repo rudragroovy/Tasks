@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { formatDoctorName } = require('../utils/doctorName');
 
 module.exports = function(io) {
   io.on('connection', (socket) => {
@@ -53,7 +54,8 @@ module.exports = function(io) {
 
     socket.on('call:tentative_join', async (data) => {
       const { appointmentId, doctorName, delayMinutes } = data;
-      const text = `Dr. ${doctorName} will join the meeting in ${delayMinutes} minutes.`;
+      const displayDoctorName = formatDoctorName(doctorName, doctorName || 'Doctor');
+      const text = `${displayDoctorName} will join the meeting in ${delayMinutes} minutes.`;
       
       try {
         const msg = await prisma.message.create({

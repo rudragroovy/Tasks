@@ -85,7 +85,7 @@ export default function Register() {
           </div>
 
           <div className="flex items-center gap-4 text-primary-200 text-sm font-medium pt-8 border-t border-white/10">
-            <span>© 2026 MyDrScripts</span>
+            <span>© 2026 CareBridge</span>
             <span className="w-1 h-1 bg-primary-400 rounded-full"></span>
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
             <span className="w-1 h-1 bg-primary-400 rounded-full"></span>
@@ -106,7 +106,7 @@ export default function Register() {
                  <div className="absolute w-5 h-5 bg-white top-0 left-0 rounded-br-lg" />
                  <div className="absolute w-5 h-5 bg-health-500 bottom-0 right-0 rounded-tl-lg" />
               </div>
-              <span className="font-heading font-black text-primary-900 text-2xl tracking-tight">MyDrScripts</span>
+              <span className="font-heading font-black text-primary-900 text-2xl tracking-tight">CareBridge</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-heading font-bold text-primary-900 tracking-tight">
               Create an account

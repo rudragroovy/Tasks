@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@bryntum/calendar": "npm:@bryntum/calendar-trial@^7.3.2",
+    "@bryntum/calendar-react": "^7.3.2",
     "@elevenlabs/react": "^1.6.7",
     "@google/genai": "^2.8.0",
     "@google/generative-ai": "^0.24.1",

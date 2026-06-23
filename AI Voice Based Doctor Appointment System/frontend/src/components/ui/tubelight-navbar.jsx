@@ -31,7 +31,7 @@ export function NavBar({ items, className }) {
              <div className="absolute w-4 h-4 bg-white top-0 left-0 rounded-br-md" />
              <div className="absolute w-4 h-4 bg-health-500 bottom-0 right-0 rounded-tl-md" />
           </div>
-          <span className="font-heading font-black text-primary-900 text-lg tracking-tight hidden md:block">MyDrScripts</span>
+          <span className="font-heading font-black text-primary-900 text-lg tracking-tight hidden md:block">CareBridge</span>
         </div>
 
         {items.map((item) => {

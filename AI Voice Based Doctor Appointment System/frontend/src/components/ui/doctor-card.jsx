@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Check, Video, Star, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../../lib/utils";
+import { formatDoctorName } from "../../utils/doctorName";
 
 export function DoctorCard({
   doctor,
@@ -14,7 +15,7 @@ export function DoctorCard({
   const shouldReduceMotion = useReducedMotion();
   const shouldAnimate = enableAnimations && !shouldReduceMotion;
 
-  const name = doctor.user?.name?.startsWith('Dr.') ? doctor.user.name : `Dr. ${doctor.user?.name || 'Unknown'}`;
+  const name = formatDoctorName(doctor.user?.name, 'Dr. Unknown');
   const description = doctor.specialization?.name || 'Specialist';
   const isVerified = true;
   const fee = doctor.fee || '150';

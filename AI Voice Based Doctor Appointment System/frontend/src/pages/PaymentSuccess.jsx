@@ -13,6 +13,7 @@ export default function PaymentSuccess() {
   const sessionId = searchParams.get('session_id');
   const appointmentId = searchParams.get('appointmentId');
   const type = searchParams.get('type');
+  const isOnDemand = type === 'ON_DEMAND';
 
   useEffect(() => {
     if (!sessionId || !appointmentId) {
@@ -32,7 +33,7 @@ export default function PaymentSuccess() {
         setVerifying(false);
 
         setTimeout(() => {
-          if (type === 'ON_DEMAND') {
+          if (isOnDemand) {
             navigate(`/waiting-room?id=${appointmentId}`);
           } else {
             navigate('/dashboard');
@@ -46,7 +47,7 @@ export default function PaymentSuccess() {
     };
 
     confirmPayment();
-  }, [sessionId, appointmentId, type, navigate]);
+  }, [sessionId, appointmentId, isOnDemand, navigate]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col overflow-hidden">
@@ -92,12 +93,16 @@ export default function PaymentSuccess() {
               ) : (
                 <div className="space-y-4">
                   <div className="bg-health-50 border border-health-100 rounded-2xl p-4 text-center">
-                    <p className="text-sm font-bold text-health-700">Your appointment has been successfully booked.</p>
+                    <p className="text-sm font-bold text-health-700">
+                      {isOnDemand
+                        ? 'Your consultation request is now in doctor queue.'
+                        : 'Your scheduled appointment is confirmed and added to doctor schedule.'}
+                    </p>
                   </div>
 
                   <div className="flex items-center justify-center gap-2 text-sm font-bold text-slate-400">
                     <div className="w-4 h-4 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
-                    Redirecting you shortly...
+                    {isOnDemand ? 'Redirecting you to waiting room...' : 'Redirecting you to dashboard...'}
                   </div>
                 </div>
               )}
@@ -109,7 +114,7 @@ export default function PaymentSuccess() {
                 >
                   <LayoutDashboard className="w-4 h-4" /> Dashboard
                 </button>
-                {type === 'ON_DEMAND' && (
+                {isOnDemand && (
                   <button
                     onClick={() => navigate(`/waiting-room?id=${appointmentId}`)}
                     className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 text-white font-bold hover:bg-primary-700 transition-colors text-sm shadow-md shadow-primary-600/20"

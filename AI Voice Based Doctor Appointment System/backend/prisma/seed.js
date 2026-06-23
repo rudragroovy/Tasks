@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { ensureDefaultWorkingHours } = require('../src/utils/doctorAvailability');
 const prisma = new PrismaClient();
 
 async function main() {
@@ -67,6 +68,8 @@ async function main() {
     }
   });
 
+  await ensureDefaultWorkingHours(prisma, docUser1.id);
+
   await prisma.doctor.upsert({
     where: { userId: docUser2.id },
     update: { isOnline: true },
@@ -77,6 +80,56 @@ async function main() {
       isOnline: true
     }
   });
+
+  await ensureDefaultWorkingHours(prisma, docUser2.id);
+
+  const docUser3 = await prisma.user.upsert({
+    where: { email: 'dr.white@example.com' },
+    update: {},
+    create: {
+      name: 'Dr. Emily White',
+      email: 'dr.white@example.com',
+      password: hashedPassword,
+      role: 'DOCTOR',
+    }
+  });
+
+  await prisma.doctor.upsert({
+    where: { userId: docUser3.id },
+    update: { isOnline: true },
+    create: {
+      userId: docUser3.id,
+      specializationId: dermatologist.id,
+      fee: 150.0,
+      isOnline: true
+    }
+  });
+
+  await ensureDefaultWorkingHours(prisma, docUser3.id);
+
+  const docUser4 = await prisma.user.upsert({
+    where: { email: 'dr.johnson@example.com' },
+    update: {},
+    create: {
+      name: 'Dr. Michael Johnson',
+      email: 'dr.johnson@example.com',
+      password: hashedPassword,
+      role: 'DOCTOR',
+    }
+  });
+
+  await prisma.doctor.upsert({
+    where: { userId: docUser4.id },
+    update: { isOnline: true },
+    create: {
+      userId: docUser4.id,
+      specializationId: generalPhysician.id,
+      fee: 90.0,
+      isOnline: true
+    }
+  });
+
+  await ensureDefaultWorkingHours(prisma, docUser4.id);
 
   console.log('Seeding finished.');
 }

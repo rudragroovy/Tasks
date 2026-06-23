@@ -5,6 +5,7 @@ import { TopHeader } from '../components/ui/top-header';
 import { HistoryModal } from '../components/ui/history-modal';
 import { Search, FileText, Calendar, Clock, Stethoscope, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { formatDoctorName } from '../utils/doctorName';
 
 export default function MedicalHistory() {
   const { user } = useAuth();
@@ -116,7 +117,7 @@ export default function MedicalHistory() {
                   />
                   <div className="min-w-0">
                     <h4 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
-                      {apt.doctor?.name?.startsWith('Dr.') ? apt.doctor?.name : `Dr. ${apt.doctor?.name}`}
+                      {formatDoctorName(apt.doctor?.name, apt.doctor?.name)}
                     </h4>
                     <p className="text-xs sm:text-sm font-bold text-slate-500 flex items-center gap-1.5 mt-0.5">
                       <Stethoscope className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />

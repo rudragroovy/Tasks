@@ -1,5 +1,80 @@
 const prisma = require('../models/prismaClient');
 const { generatePrescriptionPDF } = require('../services/pdfService');
+const {
+  DEFAULT_CONSULTATION_MODE,
+  normalizeConsultationMode,
+  getSlotDurationForMode,
+  minutesToHHMM,
+  getMinutesSinceMidnight,
+  parseDateOnly,
+  getWorkingHoursForDate,
+} = require('../utils/doctorAvailability');
+const { formatDoctorName } = require('../utils/doctorName');
+
+const SLOT_FREE_STATUSES = new Set(['CANCELLED', 'REJECTED']);
+const SCHEDULED_APPOINTMENT_TYPE = 'SCHEDULED';
+
+function parseAiSummary(aiSummary) {
+  return typeof aiSummary === 'object' ? aiSummary : JSON.parse(aiSummary || '{}');
+}
+
+function intervalsOverlap(startA, endA, startB, endB) {
+  return startA < endB && endA > startB;
+}
+
+function buildSlotDurationMap(doctor) {
+  return {
+    VIDEO: getSlotDurationForMode(doctor, 'VIDEO'),
+    AUDIO: getSlotDurationForMode(doctor, 'AUDIO'),
+    IN_PERSON: getSlotDurationForMode(doctor, 'IN_PERSON'),
+  };
+}
+
+function getAppointmentEndAt(appointment, slotDurationByMode) {
+  if (!appointment?.scheduledFor) return null;
+
+  const start = new Date(appointment.scheduledFor);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const storedEnd = appointment.scheduledUntil ? new Date(appointment.scheduledUntil) : null;
+  if (storedEnd && !Number.isNaN(storedEnd.getTime()) && storedEnd > start) {
+    return storedEnd;
+  }
+
+  const mode = normalizeConsultationMode(appointment.consultationMode || DEFAULT_CONSULTATION_MODE);
+  const fallbackMinutes = slotDurationByMode?.[mode] || slotDurationByMode?.VIDEO || 30;
+  return new Date(start.getTime() + fallbackMinutes * 60 * 1000);
+}
+
+function buildWorkingHoursPayload(workingHours) {
+  const sortedWorkingHours = [...workingHours].sort((a, b) => {
+    if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
+    return a.endMinutes - b.endMinutes;
+  });
+
+  const firstWorkingHour = sortedWorkingHours[0];
+  const lastWorkingHour = sortedWorkingHours[sortedWorkingHours.length - 1];
+
+  return {
+    start: minutesToHHMM(firstWorkingHour.startMinutes),
+    end: minutesToHHMM(lastWorkingHour.endMinutes),
+    source: sortedWorkingHours.some((hour) => hour.source === 'configured') ? 'configured' : 'default',
+    segments: sortedWorkingHours.map((hour, index) => ({
+      segmentIndex: Number.isInteger(hour.segmentIndex) ? hour.segmentIndex : index,
+      start: minutesToHHMM(hour.startMinutes),
+      end: minutesToHHMM(hour.endMinutes),
+      startMinutes: hour.startMinutes,
+      endMinutes: hour.endMinutes,
+    })),
+  };
+}
+
+async function releaseBookedSlot(tx, appointmentId) {
+  await tx.doctorSlot.updateMany({
+    where: { appointmentId },
+    data: { appointmentId: null },
+  });
+}
 
 exports.getDoctors = async (req, res) => {
   try {
@@ -23,29 +98,270 @@ exports.getDoctors = async (req, res) => {
   }
 };
 
+exports.getDoctorAvailableSlots = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const { date } = req.query;
+    const consultationMode = normalizeConsultationMode(req.query?.mode || DEFAULT_CONSULTATION_MODE);
+
+    if (!date) {
+      return res.status(400).json({ error: 'date query param is required (YYYY-MM-DD)' });
+    }
+
+    const dayStart = parseDateOnly(date);
+    if (!dayStart) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+
+    const doctor = await prisma.doctor.findUnique({
+      where: { userId: doctorId },
+      select: {
+        userId: true,
+        slotDurationMinutesVideo: true,
+        slotDurationMinutesAudio: true,
+        slotDurationMinutesInPerson: true,
+      },
+    });
+
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found' });
+    }
+
+    const slotDurationByMode = buildSlotDurationMap(doctor);
+    const slotDurationMinutes = slotDurationByMode[consultationMode];
+    const workingHours = await getWorkingHoursForDate(prisma, doctorId, dayStart, consultationMode);
+
+    if (!workingHours || workingHours.length === 0) {
+      return res.json({
+        date,
+        consultationMode,
+        slotDurationMinutes,
+        slotDurationsByMode: slotDurationByMode,
+        workingHours: null,
+        slots: [],
+      });
+    }
+
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    const bookedAppointments = await prisma.appointment.findMany({
+      where: {
+        doctorId,
+        type: SCHEDULED_APPOINTMENT_TYPE,
+        status: { notIn: Array.from(SLOT_FREE_STATUSES) },
+        scheduledFor: { lt: dayEnd },
+        OR: [
+          { scheduledUntil: { gt: dayStart } },
+          { scheduledUntil: null },
+        ],
+      },
+      select: {
+        id: true,
+        consultationMode: true,
+        scheduledFor: true,
+        scheduledUntil: true,
+      },
+    });
+
+    const busyIntervals = bookedAppointments
+      .map((appointment) => {
+        const startAt = new Date(appointment.scheduledFor);
+        const endAt = getAppointmentEndAt(appointment, slotDurationByMode);
+        if (!endAt || Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) return null;
+        return { startAt, endAt };
+      })
+      .filter(Boolean);
+
+    const now = new Date();
+    const slots = [];
+    const seenSlotKeys = new Set();
+
+    for (const workingHour of workingHours) {
+      for (
+        let minutes = workingHour.startMinutes;
+        minutes + slotDurationMinutes <= workingHour.endMinutes;
+        minutes += slotDurationMinutes
+      ) {
+        const slotStart = new Date(dayStart);
+        slotStart.setMinutes(minutes, 0, 0);
+
+        if (slotStart < now) continue;
+
+        const slotEnd = new Date(slotStart.getTime() + slotDurationMinutes * 60 * 1000);
+        const slotKey = slotStart.toISOString();
+        if (seenSlotKeys.has(slotKey)) continue;
+        seenSlotKeys.add(slotKey);
+        const isBooked = busyIntervals.some(({ startAt, endAt }) =>
+          intervalsOverlap(startAt, endAt, slotStart, slotEnd)
+        );
+
+        slots.push({
+          startAt: slotStart.toISOString(),
+          endAt: slotEnd.toISOString(),
+          label: minutesToHHMM(minutes),
+          available: !isBooked,
+        });
+      }
+    }
+
+    res.json({
+      date,
+      consultationMode,
+      slotDurationMinutes,
+      slotDurationsByMode: slotDurationByMode,
+      workingHours: buildWorkingHoursPayload(workingHours),
+      slots,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch available slots' });
+  }
+};
+
 exports.createAppointment = async (req, res) => {
   try {
     const { doctorId, aiSummary, type, scheduledFor, familyMemberId } = req.body;
     const patientId = req.user.id; // from authMiddleware
-
-    const appointment = await prisma.appointment.create({
-      data: {
-        patientId,
-        doctorId,
-        familyMemberId: familyMemberId || null,
-        aiSummary: typeof aiSummary === 'object' ? aiSummary : JSON.parse(aiSummary || '{}'),
-        status: 'PENDING',
-        type: type || 'ON_DEMAND',
-        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-        paymentStatus: 'PENDING_PAYMENT'
-      }
+    const normalizedType = type || 'ON_DEMAND';
+    const consultationMode = normalizeConsultationMode(
+      req.body?.consultationMode || req.body?.mode || DEFAULT_CONSULTATION_MODE
+    );
+    const doctorProfile = await prisma.doctor.findUnique({
+      where: { userId: doctorId },
+      include: {
+        user: { select: { name: true } },
+      },
     });
+
+    if (!doctorProfile) {
+      return res.status(404).json({ error: 'Doctor not found' });
+    }
+    const slotDurationByMode = buildSlotDurationMap(doctorProfile);
+    const slotDurationMinutes = slotDurationByMode[consultationMode];
+
+    const normalizedAiSummary = parseAiSummary(aiSummary);
+    if (normalizedAiSummary && typeof normalizedAiSummary === 'object') {
+      normalizedAiSummary.assigned_doctor_id = doctorId;
+      if (doctorProfile.user?.name) {
+        normalizedAiSummary.assigned_doctor_name = formatDoctorName(
+          doctorProfile.user.name,
+          doctorProfile.user.name
+        );
+      }
+    }
+
+    let appointment;
+
+    if (normalizedType === SCHEDULED_APPOINTMENT_TYPE) {
+      if (!scheduledFor) {
+        return res.status(400).json({ error: 'scheduledFor is required for scheduled appointments' });
+      }
+
+      const slotStart = new Date(scheduledFor);
+      if (Number.isNaN(slotStart.getTime())) {
+        return res.status(400).json({ error: 'Invalid scheduledFor datetime' });
+      }
+
+      slotStart.setSeconds(0, 0);
+
+      if (slotStart < new Date()) {
+        return res.status(400).json({ error: 'Selected slot is in the past' });
+      }
+
+      const workingHours = await getWorkingHoursForDate(prisma, doctorId, slotStart, consultationMode);
+      if (!workingHours || workingHours.length === 0) {
+        return res.status(400).json({ error: 'Doctor is not available on this day' });
+      }
+
+      const slotStartMinutes = getMinutesSinceMidnight(slotStart);
+      const matchingWorkingHour = workingHours.find((workingHour) => {
+        const isInsideWorkingWindow =
+          slotStartMinutes >= workingHour.startMinutes &&
+          slotStartMinutes + slotDurationMinutes <= workingHour.endMinutes;
+        if (!isInsideWorkingWindow) return false;
+        return (slotStartMinutes - workingHour.startMinutes) % slotDurationMinutes === 0;
+      });
+
+      if (!matchingWorkingHour) {
+        return res.status(400).json({ error: 'Selected time is outside doctor working hours' });
+      }
+
+      const slotEnd = new Date(slotStart.getTime() + slotDurationMinutes * 60 * 1000);
+
+      appointment = await prisma.$transaction(async (tx) => {
+        const potentiallyConflictingAppointments = await tx.appointment.findMany({
+          where: {
+            doctorId,
+            type: SCHEDULED_APPOINTMENT_TYPE,
+            status: { notIn: Array.from(SLOT_FREE_STATUSES) },
+            scheduledFor: { lt: slotEnd },
+            OR: [
+              { scheduledUntil: { gt: slotStart } },
+              { scheduledUntil: null },
+            ],
+          },
+          select: {
+            id: true,
+            consultationMode: true,
+            scheduledFor: true,
+            scheduledUntil: true,
+          },
+        });
+
+        const hasConflict = potentiallyConflictingAppointments.some((existingAppointment) => {
+          const existingStart = new Date(existingAppointment.scheduledFor);
+          const existingEnd = getAppointmentEndAt(existingAppointment, slotDurationByMode);
+          if (!existingEnd) return false;
+          return intervalsOverlap(existingStart, existingEnd, slotStart, slotEnd);
+        });
+
+        if (hasConflict) {
+          const conflictError = new Error('Slot is already booked');
+          conflictError.code = 'SLOT_TAKEN';
+          throw conflictError;
+        }
+
+        return tx.appointment.create({
+          data: {
+            patientId,
+            doctorId,
+            familyMemberId: familyMemberId || null,
+            aiSummary: normalizedAiSummary,
+            status: 'PENDING',
+            type: normalizedType,
+            consultationMode,
+            scheduledFor: slotStart,
+            scheduledUntil: slotEnd,
+            paymentStatus: 'PENDING_PAYMENT',
+          },
+        });
+      });
+    } else {
+      appointment = await prisma.appointment.create({
+        data: {
+          patientId,
+          doctorId,
+          familyMemberId: familyMemberId || null,
+          aiSummary: normalizedAiSummary,
+          status: 'PENDING',
+          type: normalizedType,
+          consultationMode,
+          scheduledFor: null,
+          scheduledUntil: null,
+          paymentStatus: 'PENDING_PAYMENT'
+        }
+      });
+    }
 
     // We don't emit 'appointment:new' to doctor yet, because payment is pending!
     // We will emit it in the payments/confirm route.
 
     res.status(201).json(appointment);
   } catch (error) {
+    if (error?.code === 'SLOT_TAKEN') {
+      return res.status(409).json({ error: 'This slot was just booked by another patient. Please pick another slot.' });
+    }
     console.error(error);
     res.status(500).json({ error: 'Failed to create appointment' });
   }
@@ -54,7 +370,7 @@ exports.createAppointment = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, notes, prescription } = req.body;
+    const { status, notes, prescription, declineReason } = req.body;
     
     const appointmentCheck = await prisma.appointment.findUnique({
       where: { id }
@@ -64,11 +380,29 @@ exports.updateStatus = async (req, res) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    if (appointmentCheck.doctorId !== req.user.id && ['ACCEPTED', 'REJECTED', 'COMPLETED'].includes(status)) {
+    const isPrimaryDoctor = appointmentCheck.doctorId === req.user.id;
+    const isPatient = appointmentCheck.patientId === req.user.id;
+
+    if (!isPrimaryDoctor && ['ACCEPTED', 'REJECTED', 'COMPLETED'].includes(status)) {
       return res.status(403).json({ error: 'Not authorized to change status' });
     }
 
+    if (status === 'CANCELLED' && !isPrimaryDoctor && !isPatient) {
+      return res.status(403).json({ error: 'Not authorized to cancel this appointment' });
+    }
+
     const dataToUpdate = { status };
+
+    if (status === 'REJECTED') {
+      const normalizedReason = typeof declineReason === 'string' ? declineReason.trim() : '';
+      if (!normalizedReason) {
+        return res.status(400).json({ error: 'Decline reason is required.' });
+      }
+      if (normalizedReason.length < 5) {
+        return res.status(400).json({ error: 'Decline reason must be at least 5 characters long.' });
+      }
+      dataToUpdate.declineReason = normalizedReason;
+    }
 
     if (status === 'COMPLETED') {
       // Fetch full appointment for PDF generation
@@ -117,7 +451,7 @@ exports.updateStatus = async (req, res) => {
         primaryPrescription = primaryDoctorNoteRecord.prescription;
       }
 
-      let aggregatedNotes = `- Primary Doctor: Dr. ${fullAppt.doctor.name}\n`;
+      let aggregatedNotes = `- Primary Doctor: ${formatDoctorName(fullAppt.doctor.name, fullAppt.doctor.name)}\n`;
       aggregatedNotes += `  Notes: ${primaryNotes || 'None'}\n`;
       aggregatedNotes += `  Prescription: ${formatRx(primaryPrescription)}\n`;
 
@@ -126,7 +460,7 @@ exports.updateStatus = async (req, res) => {
       if (fullAppt.doctorNotes && fullAppt.doctorNotes.length > 0) {
         fullAppt.doctorNotes.forEach(dn => {
           if (dn.doctorId !== fullAppt.doctorId) {
-            aggregatedNotes += `\n- Invited Doctor: Dr. ${dn.doctor.name}\n`;
+            aggregatedNotes += `\n- Invited Doctor: ${formatDoctorName(dn.doctor.name, dn.doctor.name)}\n`;
             aggregatedNotes += `  Notes: ${dn.notes || 'None'}\n`;
             aggregatedNotes += `  Prescription: ${formatRx(dn.prescription)}\n`;
             
@@ -148,9 +482,19 @@ exports.updateStatus = async (req, res) => {
       };
     }
 
-    const appointment = await prisma.appointment.update({
-      where: { id },
-      data: dataToUpdate
+    const shouldReleaseSlot = appointmentCheck.type === 'SCHEDULED' && ['CANCELLED', 'REJECTED'].includes(status);
+
+    const appointment = await prisma.$transaction(async (tx) => {
+      const updatedAppointment = await tx.appointment.update({
+        where: { id },
+        data: dataToUpdate,
+      });
+
+      if (shouldReleaseSlot) {
+        await releaseBookedSlot(tx, id);
+      }
+
+      return updatedAppointment;
     });
 
     const io = req.app.get('io');
@@ -161,6 +505,19 @@ exports.updateStatus = async (req, res) => {
     res.json(appointment);
   } catch (error) {
     console.error(error);
+
+    if (error?.name === 'PrismaClientValidationError' && String(error?.message || '').includes('declineReason')) {
+      return res.status(500).json({
+        error: 'Server Prisma client is outdated for declineReason. Run `npx prisma generate` and restart backend.'
+      });
+    }
+
+    if (error?.code === 'P2022' && String(error?.meta?.column || '').includes('declineReason')) {
+      return res.status(500).json({
+        error: 'Database schema is missing declineReason column. Run Prisma migration and restart backend.'
+      });
+    }
+
     res.status(500).json({ error: 'Failed to update status' });
   }
 };

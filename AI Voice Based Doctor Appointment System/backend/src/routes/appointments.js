@@ -1,6 +1,7 @@
 const express = require('express');
 const { 
   getDoctors, 
+  getDoctorAvailableSlots,
   createAppointment, 
   updateStatus, 
   getUserAppointments,
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.get('/', authenticate, getUserAppointments);
 router.get('/doctors', authenticate, getDoctors);
+router.get('/doctors/:doctorId/slots', authenticate, getDoctorAvailableSlots);
 router.get('/:id', authenticate, getAppointmentById);
 router.post('/', authenticate, createAppointment);
 router.put('/:id/status', authenticate, updateStatus);

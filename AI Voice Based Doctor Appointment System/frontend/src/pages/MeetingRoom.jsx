@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import {
-  Video, VideoOff, Mic, MicOff, PhoneOff, Send, FileText,
+  Video, VideoOff, Mic, MicOff, Phone, PhoneOff, Send, FileText,
   Pill, Plus, Activity, MessageSquare, ChevronRight, CheckCircle2,
   Wifi, Shield, Clock, UserPlus, Search, X, Check, LogOut,
   LayoutDashboard, Calendar, Settings, Bell
@@ -12,6 +12,7 @@ import { useSocket } from '../context/SocketContext';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import SharedNavbar from '../components/SharedNavbar';
+import { formatDoctorName } from '../utils/doctorName';
 
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '1480fbbff91244f7a77f0a8ed1359c19';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -26,16 +27,22 @@ export default function MeetingRoom() {
   const [inCall, setInCall] = useState(false);
   const [localTracks, setLocalTracks] = useState([]);
   const [remoteUsers, setRemoteUsers] = useState([]);
+  const [activeRemoteUid, setActiveRemoteUid] = useState(null);
+  const [isManualFocus, setIsManualFocus] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
   const [joining, setJoining] = useState(true); // auto-join in progress
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
   const [showNotesSuccess, setShowNotesSuccess] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
-  
+
   // For notifications while in meeting
   const [incomingCall, setIncomingCall] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  const consultationMode = appointment?.consultationMode || 'VIDEO';
+  const isAudioMode = consultationMode === 'AUDIO';
+  const isInPersonMode = consultationMode === 'IN_PERSON';
+  const isRtcMode = !isInPersonMode;
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -61,7 +68,7 @@ export default function MeetingRoom() {
   const [notes, setNotes] = useState('');
   const [prescription, setPrescription] = useState([]);
   const [medInput, setMedInput] = useState({ name: '', dosage: '', frequency: '', duration: '' });
-  
+
   const [userNames, setUserNames] = useState({});
   const myUidRef = useRef(null);
 
@@ -110,15 +117,15 @@ export default function MeetingRoom() {
   const [doctorsList, setDoctorsList] = useState([]);
   const [invitingDoctorId, setInvitingDoctorId] = useState(null);
 
-  // ── Fetch doctors for invite ──────────────────────────────
+  // â”€â”€ Fetch doctors for invite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchDoctorsForInvite = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/appointments/doctors`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       // Exclude self and already invited
-      const available = res.data.filter(d => 
-        d.userId !== user.id && 
+      const available = res.data.filter(d =>
+        d.userId !== user.id &&
         !appointment?.invitedDoctors?.some(inv => inv.doctorId === d.userId)
       );
       setDoctorsList(available);
@@ -151,7 +158,7 @@ export default function MeetingRoom() {
   };
 
 
-  // ── Fetch appointment ──────────────────────────────────────
+  // â”€â”€ Fetch appointment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const fetchAppt = async () => {
       try {
@@ -170,7 +177,14 @@ export default function MeetingRoom() {
     fetchAppt();
   }, [appointmentId]);
 
-  // ── Socket ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!appointment) return;
+    if (appointment.consultationMode === 'IN_PERSON') {
+      setActiveTab((prev) => prev || 'chat');
+    }
+  }, [appointment]);
+
+  // â”€â”€ Socket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!socket || !appointmentId) return;
     socket.emit('join_appointment', appointmentId);
@@ -181,7 +195,7 @@ export default function MeetingRoom() {
 
   useEffect(() => {
     if (!socket || !appointmentId || !appointment) return;
-    if (user?.role === 'DOCTOR' && appointment.status === 'ACCEPTED') {
+    if (user?.role === 'DOCTOR' && appointment.status === 'ACCEPTED' && isRtcMode) {
       socket.emit('call:initiate', {
         appointmentId,
         patientId: appointment.patientId,
@@ -194,7 +208,7 @@ export default function MeetingRoom() {
         navigate('/dashboard');
       }
     };
-    
+
     const handleStatusUpdate = (updatedApt) => {
       if (updatedApt.id === appointmentId && updatedApt.status === 'COMPLETED') {
         setShowCompletedDialog(true);
@@ -216,11 +230,11 @@ export default function MeetingRoom() {
             { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
           );
           leaveCall();
-        } catch (err) { 
+        } catch (err) {
           if (err.response?.status === 400) {
             showToast(err.response?.data?.error || 'Cannot complete consultation yet.');
           } else {
-            showToast('Failed to complete consultation'); 
+            showToast('Failed to complete consultation');
           }
         }
       }
@@ -268,19 +282,32 @@ export default function MeetingRoom() {
       socket.off('call:incoming', handleIncomingCall);
       socket.off('agora:user_joined', handleAgoraUserJoined);
     };
-  }, [socket, appointmentId, appointment, user, navigate]);
+  }, [socket, appointmentId, appointment, user, navigate, isRtcMode]);
 
   // Guarantee that we broadcast our name to the room as soon as we are in the call 
   // and the socket is fully available. This covers the edge case where the socket 
   // connects slightly after the Agora setup useEffect has already run.
   useEffect(() => {
-    if (inCall && socket && myUidRef.current && user?.name) {
+    if (isRtcMode && inCall && socket && myUidRef.current && user?.name) {
       socket.emit('agora:join', { appointmentId, uid: myUidRef.current, name: user.name, requestReply: true });
     }
-  }, [inCall, socket, appointmentId, user?.name]);
+  }, [inCall, socket, appointmentId, user?.name, isRtcMode]);
 
-  // ── Agora setup + AUTO JOIN ────────────────────────────────
+  // â”€â”€ Agora setup + AUTO JOIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
+    if (!appointment) return;
+    if (!isRtcMode) {
+      setJoining(false);
+      setInCall(true);
+      if (!timerRef.current) {
+        timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+      }
+      return () => {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      };
+    }
+
     if (initRef.current) return;
     initRef.current = true;
 
@@ -314,18 +341,23 @@ export default function MeetingRoom() {
     const init = async () => {
       let tracks = [];
       try {
-        tracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+        if (isAudioMode) {
+          const at = await AgoraRTC.createMicrophoneAudioTrack();
+          tracks = [at, null];
+        } else {
+          tracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+        }
       } catch (err) {
         console.warn('Camera/Mic failed:', err);
         try {
           const at = await AgoraRTC.createMicrophoneAudioTrack();
           tracks = [at, null];
-        } catch (audioErr) { 
+        } catch (audioErr) {
           console.warn('Mic fallback failed:', audioErr);
           showToast(`Could not access camera or microphone.`);
         }
       }
-      
+
       if (!mounted) {
         // If component unmounted while waiting for permissions, discard tracks and abort
         tracks.forEach(t => t && t.close());
@@ -333,7 +365,7 @@ export default function MeetingRoom() {
       }
 
       setLocalTracks(tracks);
-      
+
       // Auto-join immediately
       try {
         const res = await axios.get(`${API_URL}/api/agora/token?channelName=${appointmentId}`);
@@ -353,7 +385,7 @@ export default function MeetingRoom() {
         if (tracks.length > 0) {
           await client.publish(tracks.filter(Boolean));
         }
-        
+
         if (!mounted) return;
         setInCall(true);
         // Start timer
@@ -373,31 +405,105 @@ export default function MeetingRoom() {
     return () => {
       mounted = false;
       client.removeAllListeners();
-      try { client.leave(); } catch (e) {}
+      try { client.leave(); } catch (e) { }
       clearInterval(timerRef.current);
+      timerRef.current = null;
       initRef.current = false;
     };
-  }, []); // eslint-disable-line
-
-  // Local video
-  useEffect(() => {
-    if (localTracks[1] && localVideoRef.current) {
-      localTracks[1].play(localVideoRef.current);
-    }
-  }, [localTracks]);
+  }, [appointment, isRtcMode, isAudioMode]); // eslint-disable-line
 
   useEffect(() => {
     return () => localTracks.forEach(t => { if (t) { t.stop(); t.close(); } });
   }, [localTracks]);
 
-  // Remote video
+  // Local video (self preview tile)
   useEffect(() => {
-    remoteUsers.forEach(u => {
-      if (u.videoTrack && remoteVideoRefs.current[u.uid]) {
-        u.videoTrack.play(remoteVideoRefs.current[u.uid]);
+    const localVideoTrack = localTracks[1];
+    if (!localVideoTrack) return;
+
+    if (videoMuted) {
+      try {
+        localVideoTrack.stop();
+      } catch (err) {
+        console.warn('Failed to stop local video track:', err);
+      }
+      if (localVideoRef.current) {
+        localVideoRef.current.innerHTML = '';
+      }
+      return;
+    }
+
+    if (!localVideoRef.current) return;
+    if (!localVideoRef.current.querySelector('video')) {
+      localVideoRef.current.innerHTML = '';
+      try {
+        localVideoTrack.play(localVideoRef.current);
+      } catch (err) {
+        console.warn('Failed to play local video track:', err);
+      }
+    }
+  }, [localTracks, videoMuted, remoteUsers.length, inCall]);
+
+  // Remote video (main stage + stacked participant tiles)
+  useEffect(() => {
+    remoteUsers.forEach((u) => {
+      const container = remoteVideoRefs.current[u.uid];
+      if (!u?.videoTrack || !container) return;
+      try {
+        // Avoid redundant replays/flicker if this container already has a playing video element.
+        if (!container.querySelector('video')) {
+          container.innerHTML = '';
+          u.videoTrack.play(container);
+        }
+      } catch (err) {
+        console.warn('Failed to play remote video track:', err);
       }
     });
-  }, [remoteUsers]);
+  }, [remoteUsers, activeRemoteUid]);
+
+  // Keep one active remote user selected for the main display.
+  // Doctor view: prefer patient in center.
+  // Patient view: prefer primary doctor in center.
+  useEffect(() => {
+    if (remoteUsers.length === 0) {
+      setActiveRemoteUid(null);
+      setIsManualFocus(false);
+      return;
+    }
+
+    const normalizeName = (name = '') => name.toLowerCase().replace(/^dr\.?\s+/, '').replace(/[^a-z0-9]/g, '');
+    const roleIsDoctor = user?.role === 'DOCTOR';
+    const preferredCenterName = roleIsDoctor
+      ? (appointment?.familyMember?.name || appointment?.patient?.name || '')
+      : (appointment?.doctor?.name || '');
+    const preferredCenterNorm = normalizeName(preferredCenterName);
+    const preferredMatch = remoteUsers.find((u) => normalizeName(userNames[u.uid] || '') === preferredCenterNorm);
+    const preferredUid = preferredMatch?.uid || remoteUsers[0]?.uid;
+
+    // Doctors should always keep the patient on the main screen.
+    if (roleIsDoctor) {
+      if (preferredUid) {
+        setActiveRemoteUid(preferredUid);
+      }
+      if (isManualFocus) {
+        setIsManualFocus(false);
+      }
+      return;
+    }
+
+    setActiveRemoteUid((prev) => {
+      const prevStillPresent = prev && remoteUsers.some((u) => u.uid === prev);
+      if (isManualFocus && prevStillPresent) return prev;
+      if (preferredMatch?.uid) return preferredMatch.uid;
+      if (prevStillPresent) return prev;
+      return preferredUid;
+    });
+
+    const prevStillPresent = activeRemoteUid && remoteUsers.some((u) => u.uid === activeRemoteUid);
+    if (isManualFocus && !prevStillPresent) {
+      setIsManualFocus(false);
+    }
+  }, [remoteUsers, appointment, userNames, isManualFocus, activeRemoteUid, user?.role]);
 
   // Chat scroll
   useEffect(() => {
@@ -406,14 +512,17 @@ export default function MeetingRoom() {
     }
   }, [messages]);
 
-  // ── Helpers ────────────────────────────────────────────────
+  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const leaveCall = async (skipNavigate = false) => {
     localTracks.forEach(t => { if (t) { t.stop(); t.close(); } });
     setLocalTracks([]);
     clearInterval(timerRef.current);
-    await client.leave();
+    timerRef.current = null;
+    if (isRtcMode) {
+      await client.leave();
+    }
     setInCall(false);
     if (skipNavigate !== true) {
       navigate('/dashboard');
@@ -501,15 +610,44 @@ export default function MeetingRoom() {
   const isPrimaryDoctor = isDoctor && appointment?.doctorId === user?.id;
   const isInvitedDoctor = isDoctor && appointment?.invitedDoctors?.some(inv => inv.doctorId === user?.id);
 
-  const otherName = isDoctor 
+  const otherName = isDoctor
     ? (appointment?.familyMember?.name || appointment?.patient?.name)
-    : (appointment?.doctor?.name?.startsWith('Dr.') ? appointment.doctor.name : `Dr. ${appointment?.doctor?.name}`);
+    : formatDoctorName(appointment?.doctor?.name, appointment?.doctor?.name);
+  const patientName = appointment?.familyMember?.name || appointment?.patient?.name || 'Patient';
+  const activeRemoteUser = remoteUsers.find((u) => u.uid === activeRemoteUid) || remoteUsers[0] || null;
+  const stackedRemoteUsers = activeRemoteUser
+    ? remoteUsers.filter((u) => u.uid !== activeRemoteUser.uid)
+    : remoteUsers;
+  const getRemoteDisplayName = (u) => {
+    const known = userNames[u.uid];
+    if (known) return known;
+    if (u.uid === activeRemoteUser?.uid && isDoctor) return patientName;
+    if (remoteUsers.length === 1) return otherName;
+    return 'Participant';
+  };
+  const activeRemoteHasVideo = Boolean(activeRemoteUser?.videoTrack || activeRemoteUser?.hasVideo);
+  const activeRemoteHasAudio = Boolean(activeRemoteUser?.audioTrack || activeRemoteUser?.hasAudio);
+  const participantStackUsers = activeRemoteUser ? [activeRemoteUser, ...stackedRemoteUsers] : [];
+  const participantStackCount = 1 + participantStackUsers.length; // includes "You" tile
+  const participantTileWidthClass = participantStackCount >= 6
+    ? 'w-20 sm:w-24 md:w-28'
+    : participantStackCount >= 4
+      ? 'w-24 sm:w-28 md:w-32'
+      : 'w-28 sm:w-32 md:w-36';
+  const participantStackMaxHeightClass = participantStackCount > 3
+    ? 'max-h-[calc(100%-1.25rem)]'
+    : 'max-h-[calc(100%-1.5rem)]';
+  const participantStackScrollClass = participantStackCount > 3
+    ? 'overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+    : '';
   const sidebarOpen = activeTab !== null;
-  // ── Render ─────────────────────────────────────────────────
+  const consultationModeLabel = isInPersonMode ? 'In-Person' : (isAudioMode ? 'Audio' : 'Video');
+  const roomTitle = isInPersonMode ? `${consultationModeLabel} Consultation Room` : `${consultationModeLabel} Consultation`;
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div className="flex flex-col font-sans select-none overflow-hidden" style={{ height: '100dvh', background: '#f8fafc' }}>
 
-      {/* ── Top Nav — matches patient TopHeader exactly ── */}
+      {/* â”€â”€ Top Nav â€” matches patient TopHeader exactly â”€â”€ */}
       <SharedNavbar
         className="bg-white border-b border-slate-200 shrink-0 z-40"
         user={user}
@@ -532,10 +670,10 @@ export default function MeetingRoom() {
         pendingCount={0}
         doctorName={user?.name}
         isDoctor={isDoctor}
-        onLogout={() => { leaveCall(true).then(() => { if(typeof logout === 'function') logout(); else navigate('/login'); }) }}
+        onLogout={() => { leaveCall(true).then(() => { if (typeof logout === 'function') logout(); else navigate('/login'); }) }}
       />
 
-      {/* ── Joining overlay ─────────────────────────────── */}
+      {/* â”€â”€ Joining overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {joining && (
           <motion.div
@@ -549,13 +687,13 @@ export default function MeetingRoom() {
               transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
               className="w-14 h-14 rounded-full border-4 border-primary-500 border-t-transparent"
             />
-            <p className="text-slate-900 font-heading font-black text-xl tracking-tight">Connecting to call…</p>
+            <p className="text-slate-900 font-heading font-black text-xl tracking-tight">Connecting to call...</p>
             <p className="text-slate-500 text-sm font-medium">Setting up your camera & microphone</p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Call Incoming Toast ─────────────────────────────── */}
+      {/* â”€â”€ Call Incoming Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {incomingCall && (
           <motion.div
@@ -588,17 +726,17 @@ export default function MeetingRoom() {
                 </button>
                 <button
                   onClick={() => {
-                    socket.emit('call:tentative_join', { 
-                      appointmentId: incomingCall.appointmentId, 
-                      doctorName: user.name || 'Invited Doctor', 
-                      delayMinutes: 5 
+                    socket.emit('call:tentative_join', {
+                      appointmentId: incomingCall.appointmentId,
+                      doctorName: user.name || 'Invited Doctor',
+                      delayMinutes: 5
                     });
                     try {
                       const saved = localStorage.getItem('deferredInvites');
                       const invites = saved ? JSON.parse(saved) : [];
                       invites.push(incomingCall);
                       localStorage.setItem('deferredInvites', JSON.stringify(invites));
-                    } catch (e) {}
+                    } catch (e) { }
                     setIncomingCall(null);
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-orange-100 text-orange-600 font-bold text-sm hover:bg-orange-200 transition-colors cursor-pointer"
@@ -631,7 +769,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* ── Patient End Confirmation Overlay ───────────────────────── */}
+      {/* â”€â”€ Patient End Confirmation Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {showPatientEndConfirm && (
           <motion.div
@@ -676,7 +814,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* ── Doctor Waiting Overlay ───────────────────────── */}
+      {/* â”€â”€ Doctor Waiting Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {waitingForPatientConfirmation && (
           <motion.div
@@ -709,7 +847,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* ── Invite Doctor Modal ───────────────────────── */}
+      {/* â”€â”€ Invite Doctor Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {showInviteModal && (
           <motion.div
@@ -747,8 +885,8 @@ export default function MeetingRoom() {
               </div>
 
               <div className="flex-1 overflow-y-auto min-h-[200px]" style={{ scrollbarWidth: 'thin' }}>
-                {doctorsList.filter(d => 
-                  d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) || 
+                {doctorsList.filter(d =>
+                  d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) ||
                   d.specialization.name.toLowerCase().includes(inviteSearchQuery.toLowerCase())
                 ).length === 0 ? (
                   <div className="text-center text-slate-500 py-8 font-medium">
@@ -756,8 +894,8 @@ export default function MeetingRoom() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {doctorsList.filter(d => 
-                      d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) || 
+                    {doctorsList.filter(d =>
+                      d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) ||
                       d.specialization.name.toLowerCase().includes(inviteSearchQuery.toLowerCase())
                     ).map(d => (
                       <div key={d.userId} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-primary-100 bg-slate-50 hover:bg-primary-50/50 transition-colors">
@@ -766,7 +904,7 @@ export default function MeetingRoom() {
                             {d.user.name.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 text-sm">Dr. {d.user.name}</p>
+                            <p className="font-bold text-slate-900 text-sm">{formatDoctorName(d.user.name, d.user.name)}</p>
                             <p className="text-xs text-slate-500 font-medium">{d.specialization.name}</p>
                           </div>
                         </div>
@@ -788,7 +926,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* ── Consultation Completed overlay ─────────────────────────────── */}
+      {/* â”€â”€ Consultation Completed overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {showCompletedDialog && (
           <motion.div
@@ -823,7 +961,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* ── Notes Success Toast ─────────────────────────────── */}
+      {/* â”€â”€ Notes Success Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {showNotesSuccess && (
           <motion.div
@@ -847,7 +985,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* ── Global Toast ─────────────────────────────── */}
+      {/* â”€â”€ Global Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -862,209 +1000,266 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* ── Top bar ─────────────────────────────────────── */}
+      {/* â”€â”€ Top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 z-10" style={{ background: 'rgba(255,255,255,0.95)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
         {/* Left: logo + name */}
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}>
-            <Video className="w-4 h-4 text-slate-900" />
+            {isInPersonMode ? <MessageSquare className="w-4 h-4 text-slate-900" /> : (isAudioMode ? <Phone className="w-4 h-4 text-slate-900" /> : <Video className="w-4 h-4 text-slate-900" />)}
           </div>
           <div className="min-w-0">
             <p className="text-slate-900 font-heading font-black text-sm leading-tight truncate">
-              {otherName || 'Consultation'}
+              {otherName || roomTitle}
             </p>
-            <p className="text-slate-500 text-[10px] font-medium">{appointment?.doctor?.specialization || 'Telemedicine Session'}</p>
+            <p className="text-slate-500 text-[10px] font-medium">{consultationModeLabel} · {appointment?.doctor?.specialization || 'Consultation Session'}</p>
           </div>
         </div>
 
-        {/* Center: timer */}
-        {inCall && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)' }}>
-            <div className="w-2 h-2 rounded-full bg-health-400 animate-pulse" />
-            <span className="text-slate-900 font-mono font-bold text-xs">{fmt(elapsed)}</span>
-          </div>
-        )}
-
-        {/* Right: status badges */}
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(5,150,105,0.15)', border: '1px solid rgba(5,150,105,0.3)' }}>
-            <Shield className="w-3 h-3 text-health-600" />
-            <span className="text-health-600 text-[10px] font-black uppercase tracking-wider">Encrypted</span>
-          </div>
+          {inCall && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)' }}>
+              <Clock className="w-3 h-3 text-slate-500" />
+              <span className="text-slate-900 font-mono font-bold text-xs">{fmt(elapsed)}</span>
+            </div>
+          )}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: inCall ? 'rgba(5,150,105,0.15)' : 'rgba(234,67,53,0.15)', border: `1px solid ${inCall ? 'rgba(5,150,105,0.3)' : 'rgba(234,67,53,0.3)'}` }}>
             <div className={`w-2 h-2 rounded-full ${inCall ? 'bg-health-400 animate-pulse' : 'bg-red-400'}`} />
             <span className={`text-[10px] font-black uppercase tracking-wider ${inCall ? 'text-health-600' : 'text-red-400'}`}>
-              {inCall ? 'Live' : 'Connecting'}
+              {inCall ? (isInPersonMode ? 'Active Chat' : 'Live') : 'Connecting'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* ── Main area ───────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-
+      {/* Main area */}
+      <div className="flex-1 relative flex overflow-hidden min-h-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-20 sm:pb-20">
         {/* Video section */}
-        <div className="flex-1 flex flex-col relative overflow-hidden">
-
-          {/* Remote video / waiting state */}
-          <div className="flex-1 relative overflow-hidden">
-            {remoteUsers.length === 0 ? (
-              /* Waiting for other party */
-              <div className="absolute inset-0 p-4 flex flex-wrap gap-4 items-center justify-center overflow-hidden">
-                <div className="relative flex flex-col items-center justify-center gap-4 bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 shadow-sm transition-all w-full max-w-4xl max-h-full aspect-[16/9]">
-                <div className="relative">
-                  <motion.div
-                    animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute inset-0 rounded-full border-2 border-primary-500"
-                  />
-                  <motion.div
-                    animate={{ scale: [1, 1.3], opacity: [0.4, 0] }}
-                    transition={{ duration: 2, delay: 0.6, repeat: Infinity }}
-                    className="absolute inset-0 rounded-full border-2 border-primary-400"
-                  />
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 relative z-10" style={{ borderColor: 'rgba(14,116,144,0.5)' }}>
-                    <img
-                      src={`https://api.dicebear.com/7.x/initials/svg?seed=${otherName}&backgroundColor=0e7490`}
-                      alt={otherName}
-                      className="w-full h-full"
-                    />
+        <div className="flex-1 flex flex-col relative overflow-hidden w-full max-w-[1180px] mx-auto border rounded-2xl">
+          <div className="flex-1 relative overflow-hidden min-h-0">
+            <div className="absolute inset-0 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-sm">
+              {isInPersonMode ? (
+                <div className="absolute inset-0 flex items-center justify-center p-6">
+                  <div className="max-w-xl w-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-primary-100 text-primary-600 flex items-center justify-center">
+                      <MessageSquare className="w-7 h-7" />
+                    </div>
+                    <h3 className="mt-4 text-xl font-heading font-black text-slate-900">In-Person Consultation Workspace</h3>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Use the chat tab to coordinate with the patient and the prescription tab to record medicines.
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      This mode does not start an Agora call.
+                    </p>
                   </div>
                 </div>
-                <p className="text-slate-900 font-heading font-black text-lg">{otherName}</p>
-                <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                    className="w-4 h-4 rounded-full border-2 border-slate-400 border-t-transparent"
-                  />
-                  Waiting for them to join…
-                </div>
-              </div>
-              </div>
-            ) : (
-              /* Remote video feeds */
-              <div className={`absolute inset-0 p-4 flex flex-wrap gap-4 items-center justify-center ${remoteUsers.length > 2 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
-                {remoteUsers.map(u => (
-                  <div key={u.uid} className={`relative flex items-center justify-center bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 shadow-sm transition-all
-                    ${remoteUsers.length === 1 ? 'w-full max-w-4xl max-h-full aspect-[16/9]' : ''}
-                    ${remoteUsers.length === 2 ? 'w-[calc(50%-8px)] max-w-3xl max-h-full aspect-[16/9]' : ''}
-                    ${remoteUsers.length >= 3 ? 'w-[calc(33.33%-11px)] max-w-xl aspect-[16/9] min-w-[300px]' : ''}
-                  `}>
-                    {u.hasVideo ? (
-                      <div className="w-full h-full [&>div>video]:object-cover" ref={el => remoteVideoRefs.current[u.uid] = el} />
-                    ) : (
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="relative w-28 h-28">
-                          <div
-                            id={`vol-${u.uid}`}
-                            className="absolute inset-0 rounded-full transition-all duration-75"
-                            style={{ background: 'rgba(14,116,144,0.3)', opacity: 0.1 }}
-                          />
-                          <div className="absolute inset-0 rounded-full overflow-hidden border-4" style={{ borderColor: 'rgba(14,116,144,0.4)' }}>
-                            <img
-                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}&backgroundColor=0e7490`}
-                              alt={userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}
-                              className="w-full h-full"
-                            />
-                          </div>
-                        </div>
-                        <p className="text-slate-900 font-heading font-black text-lg">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</p>
-                      </div>
-                    )}
-                    
-                    {/* Status Overlay */}
-                    <div className="absolute bottom-6 left-6 flex items-center gap-2">
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 text-slate-800 backdrop-blur-md border border-slate-200">
-                        <span className="text-slate-900 text-sm font-bold truncate max-w-[150px]">{userNames[u.uid] || (remoteUsers.length === 1 ? otherName : 'Participant')}</span>
-                        <div className="w-px h-3 bg-white/20 mx-1" />
-                        {!u.hasAudio ? (
-                          <MicOff className="w-4 h-4 text-red-500" />
-                        ) : (
-                          <Mic className="w-4 h-4 text-emerald-400" />
-                        )}
-                        {!u.hasVideo ? (
-                          <VideoOff className="w-4 h-4 text-red-500" />
-                        ) : (
-                          <Video className="w-4 h-4 text-emerald-400" />
-                        )}
+              ) : remoteUsers.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center p-4">
+                  <div className="flex flex-col items-center justify-center gap-4">
+                    <div className="relative">
+                      <motion.div
+                        animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="absolute inset-0 rounded-full border-2 border-primary-500"
+                      />
+                      <motion.div
+                        animate={{ scale: [1, 1.3], opacity: [0.35, 0] }}
+                        transition={{ duration: 2, delay: 0.6, repeat: Infinity }}
+                        className="absolute inset-0 rounded-full border-2 border-primary-400"
+                      />
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-4 relative z-10" style={{ borderColor: 'rgba(14,116,144,0.5)' }}>
+                        <img
+                          src={`https://api.dicebear.com/7.x/initials/svg?seed=${otherName}&backgroundColor=0e7490`}
+                          alt={otherName}
+                          className="w-full h-full"
+                        />
                       </div>
                     </div>
+                    <p className="text-slate-900 font-heading font-black text-lg">{otherName}</p>
+                    <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                        className="w-4 h-4 rounded-full border-2 border-slate-400 border-t-transparent"
+                      />
+                      Waiting for them to join…
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Local PIP */}
-            <motion.div
-              drag
-              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              className="absolute top-4 right-4 z-20 rounded-2xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing"
-              style={{
-                width: '140px',
-                aspectRatio: '4/3',
-                border: '2px solid rgba(0,0,0,0.1)',
-                background: '#1a1d23'
-              }}
-            >
-              {!videoMuted && localTracks.length > 0 ? (
-                <div className="w-full h-full transform scale-x-[-1]" ref={localVideoRef} />
+                </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-slate-700 bg-slate-800 flex items-center justify-center">
-                    <img
-                      src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.name || 'Me'}&backgroundColor=334155`}
-                      alt="Me"
-                      className="w-full h-full opacity-50"
-                    />
+                <div className="absolute inset-0 bg-slate-900">
+                  {activeRemoteHasVideo ? (
+                    <div className="w-full h-full [&>div>video]:object-cover" ref={(el) => { remoteVideoRefs.current[activeRemoteUser.uid] = el; }} />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-slate-100">
+                      <div className="relative w-28 h-28">
+                        <div
+                          id={`vol-${activeRemoteUser?.uid}`}
+                          className="absolute inset-0 rounded-full transition-all duration-75"
+                          style={{ background: 'rgba(14,116,144,0.3)', opacity: 0.1 }}
+                        />
+                        <div className="absolute inset-0 rounded-full overflow-hidden border-4" style={{ borderColor: 'rgba(14,116,144,0.4)' }}>
+                          <img
+                            src={`https://api.dicebear.com/7.x/initials/svg?seed=${activeRemoteUser ? getRemoteDisplayName(activeRemoteUser) : 'Participant'}&backgroundColor=0e7490`}
+                            alt={activeRemoteUser ? getRemoteDisplayName(activeRemoteUser) : 'Participant'}
+                            className="w-full h-full"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-slate-900 font-heading font-black text-lg">
+                        {activeRemoteUser ? getRemoteDisplayName(activeRemoteUser) : 'Participant'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeRemoteUser && remoteUsers.length > 0 && (
+                <div className="absolute bottom-20 left-4 z-20">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 text-slate-800 backdrop-blur-md border border-slate-200">
+                    <span className="text-slate-900 text-sm font-bold truncate max-w-[180px]">{getRemoteDisplayName(activeRemoteUser)}</span>
+                    <div className="w-px h-3 bg-slate-300 mx-1" />
+                    {!activeRemoteHasAudio ? (
+                      <MicOff className="w-4 h-4 text-red-500" />
+                    ) : (
+                      <Mic className="w-4 h-4 text-emerald-500" />
+                    )}
+                    {!activeRemoteHasVideo ? (
+                      <VideoOff className="w-4 h-4 text-red-500" />
+                    ) : (
+                      <Video className="w-4 h-4 text-emerald-500" />
+                    )}
                   </div>
                 </div>
               )}
-              <div className="absolute bottom-1.5 left-2 text-[10px] font-bold text-white">You</div>
-            </motion.div>
 
-            {/* Mobile timer */}
-            {inCall && (
-              <div className="sm:hidden absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(0,0,0,0.1)' }}>
-                <div className="w-2 h-2 rounded-full bg-health-400 animate-pulse" />
-                <span className="text-slate-900 font-mono font-bold text-xs">{fmt(elapsed)}</span>
-              </div>
-            )}
+              {/* Right-side participant stack: active/main participant first, then others */}
+              {!isInPersonMode && (participantStackUsers.length > 0 || Boolean(localTracks[1]) || Boolean(localTracks[0])) && (
+                <div className={`absolute top-3 right-3 z-20 ${participantStackMaxHeightClass} ${participantStackScrollClass}`}>
+                  <div className="flex flex-col gap-2">
+                    {/* You tile */}
+                    <div
+                      className={`${participantTileWidthClass} text-left rounded-xl overflow-hidden border border-white/50 shadow-lg bg-slate-900/90`}
+                      style={{ aspectRatio: '4/3' }}
+                    >
+                      <div className="relative w-full h-full">
+                        {!videoMuted && Boolean(localTracks[1]) ? (
+                          <div className="w-full h-full transform scale-x-[-1] [&>div>video]:object-cover" ref={localVideoRef} />
+                        ) : (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-slate-900/70 via-slate-800/50 to-slate-700/40">
+                            <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/35 bg-slate-700/45">
+                              <img
+                                src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.name || 'Me'}&backgroundColor=334155`}
+                                alt="You"
+                                className="w-full h-full"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-between gap-2 px-2 py-1 bg-gradient-to-t from-slate-900/70 to-transparent text-white text-[10px]">
+                          <span className="font-bold truncate">You</span>
+                          <div className="flex items-center gap-1">
+                            {micMuted ? <MicOff className="w-3 h-3 text-red-300 shrink-0" /> : <Mic className="w-3 h-3 text-emerald-300 shrink-0" />}
+                            {isAudioMode ? <Phone className="w-3 h-3 text-emerald-300 shrink-0" /> : (videoMuted ? <VideoOff className="w-3 h-3 text-red-300 shrink-0" /> : <Video className="w-3 h-3 text-emerald-300 shrink-0" />)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {participantStackUsers.map((u, idx) => {
+                      const isActiveTile = idx === 0;
+                      const remoteHasVideo = Boolean(u.videoTrack || u.hasVideo);
+                      const remoteHasAudio = Boolean(u.audioTrack || u.hasAudio);
+                      return (
+                        <button
+                          key={u.uid}
+                          onClick={() => {
+                            if (isDoctor) return;
+                            setIsManualFocus(true);
+                            setActiveRemoteUid(u.uid);
+                          }}
+                          className={`${participantTileWidthClass} text-left rounded-xl overflow-hidden shadow-lg bg-slate-900/90 ${isDoctor ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} transition-transform ${isActiveTile ? 'border-2 border-primary-300' : 'border border-white/50'}`}
+                          style={{ aspectRatio: '4/3' }}
+                          title={`${isActiveTile ? 'On main screen: ' : 'Show on main screen: '}${getRemoteDisplayName(u)}`}
+                        >
+                          <div className="relative w-full h-full">
+                            {remoteHasVideo && !isActiveTile ? (
+                              <div
+                                className="w-full h-full [&>div>video]:object-cover"
+                                ref={(el) => { remoteVideoRefs.current[u.uid] = el; }}
+                              />
+                            ) : (
+                              <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-slate-900/70 via-slate-800/50 to-slate-700/40">
+                                <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/35 bg-slate-700/45">
+                                  <img
+                                    src={`https://api.dicebear.com/7.x/initials/svg?seed=${getRemoteDisplayName(u)}&backgroundColor=0e7490`}
+                                    alt={getRemoteDisplayName(u)}
+                                    className="w-full h-full"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {isActiveTile && (
+                              <div className="absolute top-1.5 right-1.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-primary-500/90 text-white">
+                                MAIN
+                              </div>
+                            )}
+                            <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-between gap-2 px-2 py-1 bg-gradient-to-t from-slate-900/70 to-transparent text-white text-[10px]">
+                              <span className="font-bold truncate">{getRemoteDisplayName(u)}</span>
+                              <div className="flex items-center gap-1">
+                                {remoteHasAudio ? <Mic className="w-3 h-3 text-emerald-300 shrink-0" /> : <MicOff className="w-3 h-3 text-red-300 shrink-0" />}
+                                 {isAudioMode ? <Phone className="w-3 h-3 text-emerald-300 shrink-0" /> : (remoteHasVideo ? <Video className="w-3 h-3 text-emerald-300 shrink-0" /> : <VideoOff className="w-3 h-3 text-red-300 shrink-0" />)}
+                               </div>
+                             </div>
+                           </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {inCall && (
+                <div className="sm:hidden absolute top-3 left-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 border border-slate-200">
+                  <Clock className="w-3 h-3 text-slate-500" />
+                  <span className="text-slate-900 font-mono font-bold text-xs">{fmt(elapsed)}</span>
+                </div>
+              )}
+
+              {/* Floating controls inside the stage */}
+              {isRtcMode && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-3 py-2 rounded-full bg-white/90 border border-slate-200 shadow-lg">
+                  <VideoOverlayBtn label="CC" icon={<span className="text-[11px] font-black">CC</span>} onClick={() => { }} />
+                  <VideoOverlayBtn
+                    label={micMuted ? 'Unmute' : 'Mute'}
+                    icon={micMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    onClick={toggleMic}
+                    danger={micMuted}
+                  />
+                  {!isAudioMode && (
+                    <VideoOverlayBtn
+                      label={videoMuted ? 'Show' : 'Hide'}
+                      icon={videoMuted ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                      onClick={toggleVideo}
+                      danger={videoMuted}
+                    />
+                  )}
+                  <button
+                    onClick={() => leaveCall()}
+                    className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-lg"
+                    style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.45)' }}
+                    title="End call"
+                  >
+                    <PhoneOff className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* ── Call controls — Separate row below the video ── */}
-          <div className="shrink-0 flex items-center justify-center gap-4 py-4" style={{ background: '#ffffff', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-            {/* CC caption placeholder */}
-            <VideoOverlayBtn label="CC" icon={<span className="text-[11px] font-black">CC</span>} onClick={() => { }} />
-            {/* Mic */}
-            <VideoOverlayBtn
-              label={micMuted ? 'Unmute' : 'Mute'}
-              icon={micMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              onClick={toggleMic}
-              danger={micMuted}
-            />
-            {/* Video */}
-            <VideoOverlayBtn
-              label={videoMuted ? 'Show' : 'Hide'}
-              icon={videoMuted ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-              onClick={toggleVideo}
-              danger={videoMuted}
-            />
-            {/* End call — larger red */}
-            <button
-              onClick={() => leaveCall()}
-              className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-lg"
-              style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.5)' }}
-              title="End call"
-            >
-              <PhoneOff className="w-6 h-6 text-white" />
-            </button>
-          </div>
-
-          {/* ── Tabs row — below video, horizontal scrollable ── */}
+          {/* Tabs row — below video, horizontal scrollable */}
           <div
-            className="shrink-0 flex items-stretch justify-center overflow-x-auto"
-            style={{ background: '#ffffff', borderTop: '1px solid rgba(0,0,0,0.05)', scrollbarWidth: 'none' }}
+            className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm flex items-stretch justify-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none' }}
           >
             <TabBtn icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={activeTab === 'chat'} onClick={() => setActiveTab(activeTab === 'chat' ? null : 'chat')} badge={messages.length || null} />
             {isDoctor && (
@@ -1083,16 +1278,15 @@ export default function MeetingRoom() {
             )}
           </div>
         </div>
-
-        {/* ── Sidebar ───────────────────────────────────── */}
+        {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <AnimatePresence>
           {sidebarOpen && (
             <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 360, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
+              initial={{ x: 380, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 380, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="shrink-0 flex flex-col overflow-hidden min-h-0"
+              className="absolute top-0 right-0 z-40 h-full w-[min(92vw,360px)] flex flex-col overflow-hidden min-h-0"
               style={{ background: '#f8fafc', borderLeft: '1px solid rgba(0,0,0,0.05)' }}
             >
               {/* Sidebar header */}
@@ -1110,7 +1304,7 @@ export default function MeetingRoom() {
                 </button>
               </div>
 
-              {/* ── CHAT TAB ────────────────────────────────── */}
+              {/* â”€â”€ CHAT TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {activeTab === 'chat' && (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* Encrypted badge */}
@@ -1187,7 +1381,7 @@ export default function MeetingRoom() {
                       type="text"
                       value={newMessage}
                       onChange={e => setNewMessage(e.target.value)}
-                      placeholder="Type a message…"
+                      placeholder="Type a message..."
                       className="flex-1 text-sm font-medium px-4 py-3 rounded-2xl outline-none text-slate-900 placeholder-slate-600 transition-all"
                       style={{
                         background: 'rgba(0,0,0,0.05)',
@@ -1208,7 +1402,7 @@ export default function MeetingRoom() {
                 </div>
               )}
 
-              {/* ── AI TRIAGE TAB ────────────────────────────── */}
+              {/* â”€â”€ AI TRIAGE TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {activeTab === 'triage' && isDoctor && (
                 <div
                   className="flex-1 overflow-y-auto p-5 space-y-4"
@@ -1281,7 +1475,7 @@ export default function MeetingRoom() {
                                   }}
                                 >
                                   <span className="text-[9px] font-black uppercase tracking-widest block mb-1.5 opacity-50">
-                                    {msg.role === 'user' ? '👤 Patient' : '🤖 AI'}
+                                    {msg.role === 'user' ? 'ðŸ‘¤ Patient' : 'ðŸ¤– AI'}
                                   </span>
                                   {msg.text}
                                 </div>
@@ -1295,7 +1489,7 @@ export default function MeetingRoom() {
                 </div>
               )}
 
-              {/* ── AI TRIAGE mic control bar ── sticky bottom ── */}
+              {/* â”€â”€ AI TRIAGE mic control bar â”€â”€ sticky bottom â”€â”€ */}
               {activeTab === 'triage' && isDoctor && (
                 <div
                   className="shrink-0 flex items-center justify-between px-5 py-3 gap-3"
@@ -1329,7 +1523,7 @@ export default function MeetingRoom() {
                 </div>
               )}
 
-              {/* ── PRESCRIPTION / NOTES TAB ─────────────────── */}
+              {/* â”€â”€ PRESCRIPTION / NOTES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {activeTab === 'notes' && isDoctor && (
                 <div
                   className="flex-1 flex flex-col overflow-y-auto"
@@ -1344,7 +1538,7 @@ export default function MeetingRoom() {
                       <textarea
                         value={notes}
                         onChange={e => setNotes(e.target.value)}
-                        placeholder="Enter your clinical observations, diagnosis, and recommendations…"
+                        placeholder="Enter your clinical observations, diagnosis, and recommendations..."
                         rows={5}
                         className="w-full text-sm font-medium px-4 py-3 rounded-2xl outline-none text-slate-900 placeholder-slate-600 resize-none transition-all leading-relaxed"
                         style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.08)' }}
@@ -1448,7 +1642,7 @@ export default function MeetingRoom() {
                     </div>
                   </div>
 
-                  {/* Sign & Complete — sticky bottom */}
+                  {/* Sign & Complete â€” sticky bottom */}
                   <div className="shrink-0 p-4" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                     {isPrimaryDoctor ? (
                       <button
@@ -1479,7 +1673,7 @@ export default function MeetingRoom() {
   );
 }
 
-/* ── Sub-components ───────────────────────────────── */
+/* â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Small round button INSIDE the video overlay */
 function VideoOverlayBtn({ icon, label, onClick, danger }) {
@@ -1504,8 +1698,10 @@ function TabBtn({ icon, label, active, onClick, badge, accent }) {
   return (
     <button
       onClick={onClick}
-      className="relative flex flex-col items-center justify-center gap-1.5 px-5 py-3 shrink-0 cursor-pointer transition-all group"
+      className="relative w-28 sm:w-32 flex flex-col items-center justify-center gap-1.5 py-3 shrink-0 cursor-pointer transition-all group hover:scale-100 hover:overflow-hidden"
       style={{
+        border: active ? '1px solid rgba(14,116,144,0.35)' : '1px solid rgba(100,116,139,0.2)',
+        background: active ? 'rgba(14,116,144,0.08)' : 'transparent',
         borderBottom: active ? '2px solid #0e7490' : '2px solid transparent',
         color: active ? '#0e7490' : accent ? '#059669' : '#64748b'
       }}
@@ -1561,3 +1757,4 @@ function ControlBtn({ icon, label, active, onClick, badge }) {
     </button>
   );
 }
+

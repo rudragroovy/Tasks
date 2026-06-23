@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { TopHeader } from '../components/ui/top-header';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDoctorName } from '../utils/doctorName';
 import {
-  ArrowLeft, Stethoscope, Video, Clock, Phone, PhoneOff,
-  ShieldCheck, Wifi, CheckCircle2, Loader2, CalendarClock
+  ArrowLeft, Stethoscope, Video, Phone, PhoneOff,
+  ShieldCheck, Wifi, CheckCircle2, Loader2, CalendarClock, MessageSquare
 } from 'lucide-react';
 
 /* ── Animated pulsing ring ── */
@@ -61,7 +62,6 @@ function StepRow({ icon: Icon, label, sub, active, done }) {
 }
 
 export default function PatientWaitingRoom() {
-  const { user } = useAuth();
   const socket = useSocket();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -71,6 +71,29 @@ export default function PatientWaitingRoom() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [timeLeft, setTimeLeft] = useState(120);
   const [step, setStep] = useState(0); // 0=payment done, 1=assigned, 2=call ready
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelErrorMessage, setCancelErrorMessage] = useState('');
+  const consultationMode = appointment?.consultationMode || 'VIDEO';
+  const isScheduledAppointment = appointment?.type === 'SCHEDULED';
+  const consultationLabel = consultationMode === 'IN_PERSON'
+    ? 'In-Person'
+    : consultationMode === 'AUDIO'
+      ? 'Audio'
+      : 'Video';
+  const consultationIcon = consultationMode === 'AUDIO'
+    ? Phone
+    : consultationMode === 'IN_PERSON'
+      ? MessageSquare
+      : Video;
+  const isAppointmentReadyByRule = useCallback((appt) =>
+    appt?.status === 'ACCEPTED' ||
+    (appt?.type === 'SCHEDULED' && appt?.consultationMode === 'IN_PERSON' && appt?.paymentStatus === 'PAID'), []);
+
+  const handleDecline = useCallback(() => {
+    socket.emit('call:response', { appointmentId, doctorId: appointment?.doctorId, accepted: false });
+    navigate('/dashboard');
+  }, [socket, appointmentId, appointment?.doctorId, navigate]);
 
   useEffect(() => {
     if (!appointmentId) return;
@@ -82,14 +105,14 @@ export default function PatientWaitingRoom() {
         const appt = res.data.find(a => a.id === appointmentId);
         if (appt) {
           setAppointment(appt);
-          setStep(appt.status === 'ACCEPTED' ? 2 : 1);
+          setStep(isAppointmentReadyByRule(appt) ? 2 : 1);
         }
       } catch (err) {
         console.error(err);
       }
     };
     fetchAppointment();
-  }, [appointmentId]);
+  }, [appointmentId, isAppointmentReadyByRule]);
 
   useEffect(() => {
     if (!socket || !appointmentId) return;
@@ -97,8 +120,8 @@ export default function PatientWaitingRoom() {
     const handleUpdate = (updatedAppt) => {
       if (updatedAppt.id === appointmentId) {
         setAppointment(updatedAppt);
-        if (updatedAppt.status === 'ACCEPTED') setStep(2);
-        if (updatedAppt.status === 'REJECTED') {
+        setStep(isAppointmentReadyByRule(updatedAppt) ? 2 : 1);
+        if (updatedAppt.status === 'REJECTED' || updatedAppt.status === 'CANCELLED') {
           navigate('/dashboard');
         }
       }
@@ -117,7 +140,7 @@ export default function PatientWaitingRoom() {
       socket.off('appointment:updated', handleUpdate);
       socket.off('call:incoming', handleIncomingCall);
     };
-  }, [socket, appointmentId, navigate]);
+  }, [socket, appointmentId, navigate, isAppointmentReadyByRule]);
 
   useEffect(() => {
     let timer;
@@ -127,21 +150,39 @@ export default function PatientWaitingRoom() {
       handleDecline();
     }
     return () => clearInterval(timer);
-  }, [incomingCall, timeLeft]);
+  }, [incomingCall, timeLeft, handleDecline]);
 
   const handleAccept = () => {
     socket.emit('call:response', { appointmentId, doctorId: appointment?.doctorId, accepted: true });
     navigate(`/room/${appointmentId}`);
   };
 
-  function handleDecline() {
-    socket.emit('call:response', { appointmentId, doctorId: appointment?.doctorId, accepted: false });
-    navigate('/dashboard');
-  }
+  const handleCancelScheduledCall = async () => {
+    setIsCancelling(true);
+    try {
+      const { data } = await axios.put(
+        `http://localhost:5000/api/appointments/${appointmentId}/status`,
+        { status: 'CANCELLED' },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setAppointment(data);
+      setShowCancelConfirm(false);
+      navigate('/dashboard');
+    } catch (err) {
+      setShowCancelConfirm(false);
+      setCancelErrorMessage(err?.response?.data?.error || 'Failed to cancel scheduled call.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
-  const doctorName = appointment?.doctor?.name
-    ? (appointment.doctor.name.startsWith('Dr.') ? appointment.doctor.name : `Dr. ${appointment.doctor.name}`)
-    : 'Your Doctor';
+  const doctorName = formatDoctorName(appointment?.doctor?.name, 'Your Doctor');
+
+  const canCancelScheduledCall =
+    appointment?.type === 'SCHEDULED' &&
+    appointment?.status !== 'CANCELLED' &&
+    appointment?.status !== 'COMPLETED' &&
+    appointment?.status !== 'REJECTED';
 
   const timerPct = (timeLeft / 120) * 100;
 
@@ -184,7 +225,7 @@ export default function PatientWaitingRoom() {
               {/* Top: eyebrow + title + doctor info */}
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-primary-300 text-xs font-black uppercase tracking-widest">Virtual Waiting Room</p>
+                  <p className="text-primary-300 text-xs font-black uppercase tracking-widest">{isScheduledAppointment ? 'Scheduled Appointment' : 'Virtual Waiting Room'}</p>
                   <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white/10 border border-white/15 rounded-xl flex items-center justify-center backdrop-blur-sm">
                     <CalendarClock className="w-4 h-4 sm:w-5 sm:h-5 text-health-400" />
                   </div>
@@ -205,7 +246,7 @@ export default function PatientWaitingRoom() {
                       ? 'bg-health-500/20 text-health-300 border border-health-500/30'
                       : 'bg-primary-500/20 text-primary-200 border border-primary-400/20'
                     }`}>
-                    {step >= 2 ? 'Ready' : 'Pending'}
+                    {step >= 2 ? (isScheduledAppointment ? 'Scheduled' : 'Ready') : 'Pending'}
                   </span>
                 </div>
 
@@ -213,7 +254,11 @@ export default function PatientWaitingRoom() {
 
                 {/* Status line — mobile only */}
                 <p className="mt-3 text-primary-200 text-xs sm:text-sm font-medium lg:hidden">
-                  {step >= 2 ? '✓ Doctor accepted — you can join the call.' : 'Reviewing your triage notes…'}
+                  {step >= 2
+                    ? (isScheduledAppointment
+                      ? 'Appointment confirmed and added to doctor schedule.'
+                      : 'Doctor accepted, you can join the call.')
+                    : 'Reviewing your triage notes...'}
                 </p>
               </div>
 
@@ -245,8 +290,8 @@ export default function PatientWaitingRoom() {
                 </p>
                 <p className="mt-1 text-primary-300 text-xs font-medium text-center max-w-[240px] leading-relaxed">
                   {step >= 2
-                    ? '✓ Accepted — ready to join'
-                    : 'Reviewing your triage notes…'}
+                    ? (isScheduledAppointment ? 'Confirmed and scheduled' : 'Accepted and ready to join')
+                    : 'Reviewing your triage notes...'}
                 </p>
               </div>
 
@@ -305,15 +350,15 @@ export default function PatientWaitingRoom() {
                 />
                 <StepRow
                   icon={Stethoscope}
-                  label="Doctor Reviewing Triage"
-                  sub="Matching with your specialist"
-                  active={step < 2}
+                  label={isScheduledAppointment ? 'Appointment Confirmed' : 'Doctor Reviewing Triage'}
+                  sub={isScheduledAppointment ? 'Added directly to doctor schedule' : 'Matching with your specialist'}
+                  active={!isScheduledAppointment && step < 2}
                   done={step >= 2}
                 />
                 <StepRow
-                  icon={Video}
-                  label="Video Call Ready"
-                  sub="Join when the doctor accepts"
+                  icon={consultationMode === 'AUDIO' ? Phone : (consultationMode === 'IN_PERSON' ? Stethoscope : Video)}
+                  label={`${consultationLabel} Session Ready`}
+                  sub={isScheduledAppointment ? 'Join at your scheduled time' : 'Join when the doctor accepts'}
                   active={step >= 2}
                   done={false}
                 />
@@ -334,8 +379,14 @@ export default function PatientWaitingRoom() {
                         className="w-full py-3 sm:py-4 rounded-2xl font-heading font-black text-white text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all shadow-lg shadow-health-500/25 hover:shadow-health-500/40 hover:scale-[1.01] active:scale-[0.98]"
                         style={{ background: 'linear-gradient(135deg, #059669 0%, #06B6D4 100%)' }}
                       >
-                        <Video className="w-4 h-4 animate-pulse" />
-                        Join Video Call Now
+                        {consultationMode === 'AUDIO'
+                          ? <Phone className="w-4 h-4 animate-pulse" />
+                          : (consultationMode === 'IN_PERSON'
+                            ? <MessageSquare className="w-4 h-4 animate-pulse" />
+                            : <Video className="w-4 h-4 animate-pulse" />)}
+                        {consultationMode === 'IN_PERSON'
+                          ? 'Open In-Person Chat'
+                          : `${isScheduledAppointment ? 'Open' : 'Join'} ${consultationLabel} Session`}
                       </button>
                     </motion.div>
                   )}
@@ -348,6 +399,16 @@ export default function PatientWaitingRoom() {
                   <ArrowLeft className="w-4 h-4" />
                   Back to Dashboard
                 </button>
+
+                {canCancelScheduledCall && (
+                  <button
+                    onClick={() => setShowCancelConfirm(true)}
+                    disabled={isCancelling}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl border-2 border-red-100 bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 hover:border-red-200 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isCancelling ? 'Cancelling...' : 'Cancel Scheduled Call'}
+                  </button>
+                )}
               </div>
 
               {/* Mobile security note — hidden on very small screens */}
@@ -377,6 +438,31 @@ export default function PatientWaitingRoom() {
           </motion.div>
         </motion.div>
       </main>
+
+      <ConfirmDialog
+        open={showCancelConfirm}
+        title="Cancel Scheduled Call?"
+        message="This will cancel your scheduled appointment and release the reserved slot."
+        confirmText="Yes, Cancel"
+        cancelText="Keep Appointment"
+        confirmVariant="danger"
+        isLoading={isCancelling}
+        onConfirm={handleCancelScheduledCall}
+        onCancel={() => {
+          if (!isCancelling) setShowCancelConfirm(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(cancelErrorMessage)}
+        title="Unable to Cancel Appointment"
+        message={cancelErrorMessage}
+        confirmText="OK"
+        confirmVariant="primary"
+        hideCancel
+        onConfirm={() => setCancelErrorMessage('')}
+        onCancel={() => setCancelErrorMessage('')}
+      />
 
 
       {/* ══ Incoming Call Modal ══ */}
@@ -409,7 +495,7 @@ export default function PatientWaitingRoom() {
                   />
                 </div>
                 <div className="absolute bottom-1 right-1 w-8 h-8 bg-health-500 rounded-full border-4 border-slate-900/80 flex items-center justify-center z-20">
-                  <Video className="w-3.5 h-3.5 text-white" />
+                  {React.createElement(consultationIcon, { className: 'w-3.5 h-3.5 text-white' })}
                 </div>
               </div>
 
@@ -419,10 +505,10 @@ export default function PatientWaitingRoom() {
                 transition={{ duration: 1.5, repeat: Infinity }}
                 className="text-health-400 text-xs font-black uppercase tracking-widest mb-3"
               >
-                Incoming Video Call
+                Incoming {consultationLabel} Call
               </motion.p>
               <h2 className="text-white font-heading font-black text-2xl sm:text-3xl text-center mb-1">
-                {incomingCall.doctorName?.startsWith('Dr.') ? incomingCall.doctorName : `Dr. ${incomingCall.doctorName}`}
+                {formatDoctorName(incomingCall.doctorName, incomingCall.doctorName)}
               </h2>
               <p className="text-slate-400 font-medium text-sm text-center mb-8">
                 is calling you for your appointment

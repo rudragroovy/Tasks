@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 16 R&D · Species Data Aggregation Pipeline · Groovy Web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #ffffff;
+    --navy-2: #f8fafc;
+    --navy-3: #f1f5f9;
+    --blue: #104cba;
+    --blue-soft: #1e40af;
+    --blue-glow: rgba(16,76,186,0.06);
+    --blue-border: rgba(16,76,186,0.25);
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-faint: #94a3b8;
+    --border: #e2e8f0;
+    --white: #0f172a;
+    --orange: #ea580c;
+    --green: #16a34a;
+    --pink: #db2777;
+    --amber: #d97706;
+    --red: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; background: var(--navy); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 15px; line-height: 1.6; }
+  body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(16,76,186,0.03) 0%, transparent 60%); }
+  .wrap { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  /* TOPBAR */
+  .topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 18px; border-bottom: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; gap: 10px; }
+  .logo-pill { display: inline-flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--navy-2); border: 1px solid var(--border); border-radius: 100px; }
+  .logo-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+  .logo-pill .text { font-size: 12px; font-weight: 700; color: var(--white); letter-spacing: 0.05em; }
+  .topbar-right { font-size: 11px; color: var(--text-faint); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
+  .print-btn { background: var(--blue); color: #fff; font-weight: 600; font-size: 12px; padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; }
+  .print-btn:hover { background: #0d3e9c; }
+
+  /* HERO */
+  h1 { font-size: clamp(32px, 4.2vw, 48px); font-weight: 900; line-height: 1.05; letter-spacing: -1.2px; color: var(--white); margin-bottom: 12px; }
+  h1 .accent { color: var(--blue-soft); }
+  h2 { font-size: 22px; font-weight: 800; color: var(--white); line-height: 1.2; margin: 32px 0 12px; letter-spacing: -0.3px; padding-top: 8px; border-top: 1px solid var(--border); }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  h3 { font-size: 16px; font-weight: 700; color: var(--white); margin: 18px 0 8px; }
+  p { color: var(--text); font-size: 14.5px; line-height: 1.65; margin-bottom: 10px; }
+  p.intro { font-size: 16px; max-width: 760px; color: var(--text-muted); }
+
+  /* META BAR */
+  .meta-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 6px; }
+  .meta-pill { padding: 6px 12px; background: var(--navy-2); border: 1px solid var(--border); border-radius: 100px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .meta-pill strong { color: var(--blue-soft); }
+  .meta-pill.warn { background: rgba(249,115,22,0.08); border-color: rgba(249,115,22,0.3); color: var(--orange); }
+  .meta-pill.green { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.3); color: var(--green); }
+
+  /* CALLOUT */
+  .callout { background: rgba(16,76,186,0.06); border-left: 4px solid var(--blue); padding: 14px 18px; border-radius: 6px; margin: 16px 0; font-size: 13.5px; color: var(--white); line-height: 1.6; }
+  .callout strong { color: var(--blue-soft); }
+  .callout.warn { background: rgba(249,115,22,0.06); border-left-color: var(--orange); }
+  .callout.warn strong { color: var(--orange); }
+  .callout.green { background: rgba(34,197,94,0.06); border-left-color: var(--green); }
+  .callout.green strong { color: var(--green); }
+  .callout.red { background: rgba(220,38,38,0.06); border-left-color: var(--red); }
+  .callout.red strong { color: var(--red); }
+
+  /* CARDS */
+  .card { background: var(--navy-2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin: 14px 0; }
+
+  /* API GRID */
+  .api-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 14px 0; }
+  .api-card { background: var(--navy-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; border-left: 4px solid var(--blue-soft); }
+  .api-card.req { border-left-color: var(--green); }
+  .api-card.opt { border-left-color: var(--amber); }
+  .api-card .api-name { font-size: 15px; font-weight: 800; color: var(--white); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .api-card .api-tag { padding: 2px 8px; border-radius: 100px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(34,197,94,0.14); color: var(--green); }
+  .api-card .api-tag.opt { background: rgba(217,119,6,0.14); color: var(--amber); }
+  .api-card .api-tag.auth { background: rgba(220,38,38,0.14); color: var(--red); }
+  .api-card .api-url { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; color: var(--blue-soft); background: var(--navy-3); padding: 2px 6px; border-radius: 4px; display: inline-block; margin: 4px 0 6px; word-break: break-all; }
+  .api-card .api-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+
+  /* SCHEMA / CODE */
+  pre.code { background: var(--navy-3); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; font-family: 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.65; color: var(--text); overflow-x: auto; margin: 12px 0; }
+  pre.code .k { color: var(--blue-soft); font-weight: 600; }
+  pre.code .s { color: var(--green); }
+  pre.code .c { color: var(--text-faint); font-style: italic; }
+  code.inline { font-family: 'SF Mono', Menlo, monospace; font-size: 12px; background: var(--navy-3); padding: 1.5px 6px; border-radius: 4px; color: var(--blue-soft); border: 1px solid var(--border); }
+
+  /* CHECKLIST */
+  .checklist { list-style: none; padding: 0; margin: 8px 0 0; }
+  .check-item { display: flex; align-items: flex-start; gap: 12px; padding: 9px 4px; border-bottom: 1px dashed var(--border); cursor: pointer; transition: background 120ms; }
+  .check-item:last-child { border-bottom: none; }
+  .check-item:hover { background: rgba(59,130,246,0.04); border-radius: 6px; }
+  .check-box { width: 20px; height: 20px; border: 2px solid var(--text-faint); border-radius: 5px; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: all 150ms; }
+  .check-item.checked .check-box { background: var(--green); border-color: var(--green); }
+  .check-box::after { content: '✓'; color: #fff; font-weight: 800; font-size: 13px; opacity: 0; transition: opacity 100ms; }
+  .check-item.checked .check-box::after { opacity: 1; }
+  .check-text { font-size: 13.5px; color: var(--text); line-height: 1.55; flex: 1; }
+  .check-text strong { color: var(--white); font-weight: 700; }
+  .check-item.checked .check-text { color: var(--text-muted); text-decoration: line-through; }
+
+  /* RUBRIC TABLE */
+  table.rubric { width: 100%; border-collapse: collapse; margin: 12px 0; background: var(--navy-2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  table.rubric th { background: var(--navy-3); padding: 10px 14px; text-align: left; font-size: 11.5px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  table.rubric td { padding: 11px 14px; font-size: 13px; color: var(--text); border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.rubric tr:last-child td { border-bottom: none; }
+  table.rubric td.w { font-weight: 700; color: var(--blue-soft); width: 70px; white-space: nowrap; }
+  table.rubric td.cat { font-weight: 700; color: var(--white); width: 180px; }
+
+  /* PIPELINE DIAGRAM */
+  .pipeline { background: var(--navy-3); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.6; color: var(--text); white-space: pre; overflow-x: auto; margin: 12px 0; }
+
+  /* DELIV PILL */
+  .deliv-pill { display: inline-block; margin: 4px 6px 4px 0; padding: 5px 12px; background: rgba(34,197,94,0.10); color: var(--green); border: 1px solid rgba(34,197,94,0.3); border-radius: 100px; font-size: 12px; font-weight: 700; }
+
+  .footer { text-align: center; margin-top: 50px; padding-top: 22px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-faint); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  @media (max-width: 700px) {
+    .api-grid { grid-template-columns: 1fr; }
+    table.rubric td.cat { width: auto; }
+  }
+
+  @media print {
+    body { background: white; color: #000; }
+    body::before { display: none; }
+    .wrap { max-width: 100%; padding: 0; }
+    .topbar { display: none; }
+    .card, .callout, .api-card, .pipeline, table.rubric { background: #f8f9fc !important; color: #000 !important; }
+    h1, h2, h3, .check-text { color: #0a1628 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="logo-pill">
+      <span class="dot"></span>
+      <span class="text">GROOVY WEB</span>
+    </div>
+    <button class="print-btn" onclick="window.print()">Print ↓</button>
+  </div>
+
+  <div class="meta-bar">
+    <span class="meta-pill"><strong>Day 16</strong> · Mon</span>
+    <span class="meta-pill">Week 4 · R&amp;D Track</span>
+    <span class="meta-pill warn">Replaces · Real Repo Onboarding</span>
+    <span class="meta-pill green">Free APIs only</span>
+  </div>
+
+  <h1>Species Data <span class="accent">Aggregation Pipeline</span></h1>
+  <p class="intro">Build a full pipeline that ingests species names, fans out across multiple free public APIs, merges results into a unified schema, fills gaps with an LLM, and stores a dense biodiversity dataset. Pure R&amp;D · pure code · no single API will give you everything.</p>
+
+  <h2>1. Objective</h2>
+  <div class="card">
+    <p>Input: list of species names (CSV or JSON). Output: normalized dataset of <strong>50+ species</strong> with extensive per-species fields, full source provenance, and an LLM-fill report. Ship a working CLI pipeline, a stored dataset, and a coverage report.</p>
+    <p style="margin-top:8px;color:var(--text-muted);font-size:13.5px;">No single source covers every field. The interesting work is in adapter design, schema merging, conflict resolution, gap detection, and disciplined LLM fallback.</p>
+  </div>
+
+  <h2>2. Why R&amp;D · what's being tested</h2>
+  <div class="card">
+    <ul style="padding-left:18px;color:var(--text);font-size:13.5px;line-height:1.7;">
+      <li>Real data engineering · multiple flaky 3rd-party APIs · rate limits · partial responses.</li>
+      <li>Schema design · choose canonical fields · resolve conflicts between sources.</li>
+      <li>Disciplined LLM usage · only fill gaps · never override authoritative data · track provenance.</li>
+      <li>Code architecture · 1 adapter per source · single orchestrator · clean separation.</li>
+      <li>Cost discipline · async fan-out · response caching · prompt caching for LLM.</li>
+    </ul>
+  </div>
+
+  <h2>3. Free data sources · use ≥ 4</h2>
+  <p style="color:var(--text-muted);font-size:13px;">Pick at least 4. <strong style="color:var(--green);">REQUIRED</strong> sources have no auth. <strong style="color:var(--amber);">OPTIONAL</strong> need a free token. Document why you chose each in <code class="inline">sources.md</code>.</p>
+
+  <div class="api-grid">
+    <div class="api-card req">
+      <div class="api-name">GBIF <span class="api-tag">required · no auth</span></div>
+      <div class="api-url">https://api.gbif.org/v1/</div>
+      <div class="api-desc">Taxonomy backbone · name resolution (<code class="inline">species/match</code>) · occurrence counts · geographic distribution. Authoritative for canonical scientific names.</div>
+    </div>
+
+    <div class="api-card req">
+      <div class="api-name">iNaturalist <span class="api-tag">required · no auth</span></div>
+      <div class="api-url">https://api.inaturalist.org/v1/</div>
+      <div class="api-desc">Common names · observation counts · user photos · regional presence. Strong for vernacular naming across languages.</div>
+    </div>
+
+    <div class="api-card req">
+      <div class="api-name">Wikipedia REST <span class="api-tag">required · no auth</span></div>
+      <div class="api-url">https://en.wikipedia.org/api/rest_v1/page/summary/{title}</div>
+      <div class="api-desc">Plain-language description · thumbnail image · canonical article URL. Best for human-readable summary and quick image.</div>
+    </div>
+
+    <div class="api-card req">
+      <div class="api-name">Wikidata SPARQL <span class="api-tag">required · no auth</span></div>
+      <div class="api-url">https://query.wikidata.org/sparql</div>
+      <div class="api-desc">Structured facts · lifespan · mass · length · diet type · taxon parent. Query by Wikidata QID resolved from Wikipedia.</div>
+    </div>
+
+    <div class="api-card req">
+      <div class="api-name">EOL · Encyclopedia of Life <span class="api-tag">required · no auth</span></div>
+      <div class="api-url">https://eol.org/api/</div>
+      <div class="api-desc">Aggregated traits · habitat · behavior · multi-source attribution. Good fallback aggregator.</div>
+    </div>
+
+    <div class="api-card opt">
+      <div class="api-name">IUCN Red List <span class="api-tag opt">optional</span> <span class="api-tag auth">free token</span></div>
+      <div class="api-url">https://apiv3.iucnredlist.org/api/v3/</div>
+      <div class="api-desc">Conservation status · population trend · threat categories. Token via free email registration. Authoritative for conservation fields.</div>
+    </div>
+
+    <div class="api-card opt">
+      <div class="api-name">ITIS <span class="api-tag opt">optional</span></div>
+      <div class="api-url">https://www.itis.gov/ws_description.html</div>
+      <div class="api-desc">Cross-check taxonomic hierarchy. Useful when GBIF and Wikidata disagree.</div>
+    </div>
+
+    <div class="api-card opt">
+      <div class="api-name">NCBI Taxonomy <span class="api-tag opt">optional</span></div>
+      <div class="api-url">https://eutils.ncbi.nlm.nih.gov/entrez/eutils/</div>
+      <div class="api-desc">Scientific classification from a molecular-biology angle. Free, generous rate limit with a key.</div>
+    </div>
+
+    <div class="api-card opt">
+      <div class="api-name">Wikimedia Commons <span class="api-tag opt">optional</span></div>
+      <div class="api-url">https://commons.wikimedia.org/w/api.php</div>
+      <div class="api-desc">High-quality images via category traversal. Use to populate <code class="inline">image_urls[]</code> beyond Wikipedia thumbnail.</div>
+    </div>
+
+    <div class="api-card opt">
+      <div class="api-name">BHL · Biodiversity Heritage Library <span class="api-tag opt">optional</span></div>
+      <div class="api-url">https://www.biodiversitylibrary.org/api3/</div>
+      <div class="api-desc">Historical literature references. Stretch use only — adds depth for rare species.</div>
+    </div>
+  </div>
+
+  <h2>4. Target schema</h2>
+  <p style="color:var(--text-muted);font-size:13px;">Every stored species record must match this shape. Provenance per field is mandatory.</p>
+<pre class="code">{
+  <span class="k">"scientific_name"</span>:        <span class="s">"Panthera tigris"</span>,
+  <span class="k">"common_names"</span>:           [<span class="s">"Tiger"</span>, <span class="s">"Bengal Tiger"</span>],
+  <span class="k">"taxonomy"</span>: {
+    <span class="k">"kingdom"</span>: <span class="s">"Animalia"</span>, <span class="k">"phylum"</span>: <span class="s">"Chordata"</span>,
+    <span class="k">"class"</span>:   <span class="s">"Mammalia"</span>, <span class="k">"order"</span>:  <span class="s">"Carnivora"</span>,
+    <span class="k">"family"</span>:  <span class="s">"Felidae"</span>,  <span class="k">"genus"</span>:  <span class="s">"Panthera"</span>,
+    <span class="k">"species"</span>: <span class="s">"tigris"</span>
+  },
+  <span class="k">"description"</span>:           <span class="s">"..."</span>,
+  <span class="k">"habitat"</span>:               <span class="s">"..."</span>,
+  <span class="k">"geographic_range"</span>:      [<span class="s">"IN"</span>, <span class="s">"BD"</span>, <span class="s">"NP"</span>, <span class="s">"RU"</span>],
+  <span class="k">"diet_type"</span>:             <span class="s">"carnivore"</span>,
+  <span class="k">"conservation_status"</span>:   <span class="s">"Endangered"</span>,
+  <span class="k">"population_trend"</span>:      <span class="s">"decreasing"</span>,
+  <span class="k">"lifespan_years"</span>:        <span class="s">"10–15"</span>,
+  <span class="k">"weight_kg"</span>:             <span class="s">"90–310"</span>,
+  <span class="k">"length_cm"</span>:             <span class="s">"180–390"</span>,
+  <span class="k">"behavior"</span>:              <span class="s">"..."</span>,
+  <span class="k">"reproduction"</span>:          <span class="s">"..."</span>,
+  <span class="k">"image_urls"</span>:            [<span class="s">"..."</span>],
+  <span class="k">"wikipedia_url"</span>:         <span class="s">"https://en.wikipedia.org/wiki/Tiger"</span>,
+  <span class="k">"sources_used"</span>:          [<span class="s">"gbif"</span>, <span class="s">"wikipedia"</span>, <span class="s">"iucn"</span>, <span class="s">"wikidata"</span>],
+  <span class="k">"field_provenance"</span>: {       <span class="c">// which source supplied each field</span>
+    <span class="k">"taxonomy"</span>:            <span class="s">"gbif"</span>,
+    <span class="k">"conservation_status"</span>: <span class="s">"iucn"</span>,
+    <span class="k">"description"</span>:         <span class="s">"wikipedia"</span>,
+    <span class="k">"behavior"</span>:            <span class="s">"llm"</span>
+  },
+  <span class="k">"llm_filled_fields"</span>:     [<span class="s">"behavior"</span>, <span class="s">"reproduction"</span>],
+  <span class="k">"confidence_scores"</span>:     { <span class="k">"behavior"</span>: 0.7, <span class="k">"reproduction"</span>: 0.65 },
+  <span class="k">"last_updated"</span>:          <span class="s">"2026-06-11T10:00:00Z"</span>
+}</pre>
+
+  <h2>5. Pipeline architecture</h2>
+<div class="pipeline">  ┌─────────────┐
+  │ species.csv │  scientific or common names
+  └──────┬──────┘
+         ▼
+  ┌──────────────────────┐
+  │ Resolver             │  GBIF species/match → canonical name + taxonKey
+  └──────┬───────────────┘
+         ▼
+  ┌──────────────────────────────────────────────┐
+  │ Fan-out adapters (async / parallel)          │
+  │   GBIF · iNat · Wikipedia · Wikidata · EOL   │
+  │   IUCN · ITIS · NCBI · Commons               │
+  │   each → { partial_record, source_tag }      │
+  └──────┬───────────────────────────────────────┘
+         ▼
+  ┌──────────────────────┐
+  │ Merger               │  per-field priority rules
+  │                      │  record field_provenance
+  └──────┬───────────────┘
+         ▼
+  ┌──────────────────────┐
+  │ Gap detector         │  list missing / low-confidence fields
+  └──────┬───────────────┘
+         ▼
+  ┌──────────────────────┐
+  │ LLM filler           │  JSON-only output · cite confidence
+  │  (Claude / OpenRouter)│ never overwrites API data
+  └──────┬───────────────┘
+         ▼
+  ┌──────────────────────┐
+  │ Validator            │  type · range · sanity checks
+  └──────┬───────────────┘
+         ▼
+  ┌──────────────────────┐
+  │ Storage              │  Postgres (JSONB) or MongoDB
+  │                      │  idempotent upsert on scientific_name
+  └──────┬───────────────┘
+         ▼
+  ┌──────────────────────┐
+  │ Reporter             │  coverage_report.md
+  └──────────────────────┘</div>
+
+  <h3>Per-field priority rules · sample</h3>
+  <pre class="code"><span class="k">taxonomy</span>            → gbif &gt; itis &gt; ncbi &gt; wikidata
+<span class="k">conservation_status</span> → iucn &gt; wikidata &gt; llm
+<span class="k">description</span>         → wikipedia &gt; eol &gt; llm
+<span class="k">common_names</span>        → inat &gt; wikipedia &gt; gbif
+<span class="k">lifespan_years</span>      → wikidata &gt; eol &gt; llm
+<span class="k">image_urls</span>          → commons &gt; wikipedia &gt; inat
+<span class="k">behavior</span>            → eol &gt; wikipedia &gt; llm
+<span class="k">geographic_range</span>    → gbif &gt; iucn &gt; wikidata</pre>
+
+  <h2>6. LLM guardrails · non-negotiable</h2>
+  <div class="callout warn">
+    <strong>Rules for LLM use.</strong>
+    <ul style="margin-top:8px;padding-left:18px;line-height:1.7;">
+      <li>LLM <strong>never</strong> overwrites a field already filled by an API.</li>
+      <li>LLM only fills missing fields listed by the gap detector.</li>
+      <li>Force JSON-only output via schema-bound prompt. Reject malformed responses.</li>
+      <li>Every LLM-filled field appears in <code class="inline">llm_filled_fields[]</code> with a confidence ∈ [0, 1].</li>
+      <li>Share system prompt across all species via <strong>prompt caching</strong>. Vary only the per-species facts.</li>
+      <li>Validator rejects LLM hallucinations (e.g., lifespan_years &lt;= 0, weight in wrong units).</li>
+      <li>Total LLM spend for full 50-species run must stay <strong>under $2</strong>. Log token totals.</li>
+    </ul>
+  </div>
+
+  <h2>7. Action items · day 16 checklist</h2>
+  <ul class="checklist" id="dayList">
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Repo init</strong> · create <code class="inline">Tasks-main/ex16</code> · push empty README with goal statement</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Source survey</strong> · test each of ≥ 4 chosen APIs with curl · record endpoint shape · rate limit · auth in <code class="inline">sources.md</code></span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Schema lock</strong> · finalize target schema · paste into <code class="inline">README.md</code> · include sample record</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Resolver</strong> · build name normalization via GBIF <code class="inline">species/match</code> · handle synonyms · misspellings</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Adapter scaffolding</strong> · 1 module per source · common interface <code class="inline">fetch(canonical_name) → partial_dict</code></span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Implement adapters</strong> · ≥ 4 sources · async I/O · per-source response cache to disk</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Merger</strong> · per-field priority rules · populate <code class="inline">field_provenance</code> · merge images deduped</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Gap detector</strong> · scan merged record · output list of missing or low-confidence fields</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>LLM filler</strong> · prompt-cached system prompt · JSON output · confidence per field · tagged in <code class="inline">llm_filled_fields[]</code></span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Validator</strong> · type · range · enum checks · reject obvious hallucinations · log rejections</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Storage</strong> · Postgres (JSONB) or MongoDB · idempotent upsert keyed by <code class="inline">scientific_name</code></span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Resilience</strong> · backoff + retry per source · pipeline survives 1 dead API · log failures</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Seed input</strong> · prepare list of <strong>≥ 50 species</strong> · ≥ 3 taxa classes (mammals · birds · reptiles · fish · plants · insects)</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Full run</strong> · execute <code class="inline">python pipeline.py --input species.csv --out species.db</code> end-to-end</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Coverage report</strong> · generate <code class="inline">coverage_report.md</code> · % filled per field · per-source contribution · LLM fill %</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Cost log</strong> · capture total LLM tokens · cache hit rate · dollar estimate</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Polish</strong> · README with architecture diagram · run instructions reproducible in &lt; 10 min</span></li>
+    <li class="check-item"><span class="check-box"></span><span class="check-text"><strong>Demo</strong> · 5-min recording or live walkthrough · show pipeline running on 1 species end-to-end</span></li>
+  </ul>
+
+  <h2>8. Deliverables</h2>
+  <div class="card">
+    <span class="deliv-pill">Repo · Tasks-main/ex16-species-pipeline</span>
+    <span class="deliv-pill">README.md with architecture diagram</span>
+    <span class="deliv-pill">CLI · pipeline.py --input --out</span>
+    <span class="deliv-pill">Dataset · ≥ 50 species · ≥ 3 taxa classes</span>
+    <span class="deliv-pill">sources.md · per-API notes</span>
+    <span class="deliv-pill">coverage_report.md</span>
+    <span class="deliv-pill">5-min demo</span>
+  </div>
+
+  <h2>9. Constraints</h2>
+  <div class="callout red">
+    <strong>Hard rules.</strong>
+    <ul style="margin-top:8px;padding-left:18px;line-height:1.7;">
+      <li><strong>Free tier only.</strong> No paid API spend. IUCN token via free registration only.</li>
+      <li><strong>Respect rate limits.</strong> Implement backoff and retry per source. No request hammering.</li>
+      <li><strong>Pure code.</strong> No Zapier · n8n · Make · visual workflow tools.</li>
+      <li><strong>Async I/O.</strong> Fan-out must be parallel (<code class="inline">asyncio.gather</code> · <code class="inline">Promise.all</code>).</li>
+      <li><strong>Cache raw API responses.</strong> Disk cache prevents re-fetch during dev iteration.</li>
+      <li><strong>LLM spend &lt; $2</strong> for the full 50-species run. Token log mandatory.</li>
+      <li><strong>Idempotent.</strong> Re-running on same input must not duplicate or corrupt rows.</li>
+    </ul>
+  </div>
+
+  <h2>10. Stretch goals · optional</h2>
+  <div class="card">
+    <ul style="padding-left:18px;font-size:13.5px;line-height:1.75;">
+      <li><strong>Image dedup</strong> · perceptual hash (pHash) to drop near-duplicate images across sources.</li>
+      <li><strong>Conflict report</strong> · per species, list fields where sources disagree · who won the merger.</li>
+      <li><strong>React dashboard</strong> · search species · click field → see source attribution · LLM vs API badge.</li>
+      <li><strong>Semantic search</strong> · embed species descriptions into ChromaDB · query "small carnivorous mammal in Asia."</li>
+      <li><strong>Scheduled refresh</strong> · cron the conservation status check daily · diff against last snapshot.</li>
+      <li><strong>Multi-language</strong> · pull Wikipedia summary in 3 languages · store under <code class="inline">description_localized</code>.</li>
+    </ul>
+  </div>
+
+  <h2>11. Evaluation rubric</h2>
+  <table class="rubric">
+    <thead>
+      <tr><th>Category</th><th>Weight</th><th>Criteria</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="cat">Coverage</td>
+        <td class="w">25%</td>
+        <td>≥ 80% non-null on core fields (taxonomy · description · conservation_status · habitat · image) across 50 species. Verified via <code class="inline">coverage_report.md</code>.</td>
+      </tr>
+      <tr>
+        <td class="cat">Provenance</td>
+        <td class="w">15%</td>
+        <td>Every field traceable to a source or explicitly tagged LLM. <code class="inline">field_provenance</code> populated for 100% of fields. <code class="inline">llm_filled_fields[]</code> accurate.</td>
+      </tr>
+      <tr>
+        <td class="cat">Resilience</td>
+        <td class="w">15%</td>
+        <td>Pipeline survives 1 dead source without crashing. Backoff + retry implemented. Failures logged with source + species + error.</td>
+      </tr>
+      <tr>
+        <td class="cat">Code quality</td>
+        <td class="w">15%</td>
+        <td>Modular adapters · shared interface · no copy-paste between source clients. Clear separation of resolver · merger · LLM · validator · storage.</td>
+      </tr>
+      <tr>
+        <td class="cat">Cost discipline</td>
+        <td class="w">10%</td>
+        <td>LLM spend &lt; $2 for full run. Prompt caching wired. Raw API responses cached on disk. Token report present.</td>
+      </tr>
+      <tr>
+        <td class="cat">LLM discipline</td>
+        <td class="w">10%</td>
+        <td>LLM never overwrites API data. JSON-only output. Confidence scores attached. Validator catches at least 1 demonstrable hallucination.</td>
+      </tr>
+      <tr>
+        <td class="cat">Documentation</td>
+        <td class="w">10%</td>
+        <td>Fresh reader runs pipeline in &lt; 10 min from README. Architecture diagram present. <code class="inline">sources.md</code> covers all chosen APIs.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>12. Time box</h2>
+  <div class="callout">
+    <strong>Schedule.</strong> 1 full day build · 1 half-day polish + report. If blocked &gt; 30 min on any API, skip to the next source and log the blocker in <code class="inline">sources.md</code>. Pair with mentor for 30 min at midday for adapter design review.
+  </div>
+
+  <h2>13. Submission</h2>
+  <div class="callout green">
+    <strong>How to submit.</strong>
+    <ol style="margin-top:8px;padding-left:20px;line-height:1.7;">
+      <li>Push <code class="inline">Tasks-main/ex16-species-pipeline</code> to GitHub.</li>
+      <li>Post repo URL + 5-min demo link in cohort Slack channel.</li>
+      <li>Attach <code class="inline">coverage_report.md</code> and token-cost summary to the Slack post.</li>
+      <li>Open a PR titled <code class="inline">[ex16] Species data aggregation pipeline · R&amp;D</code>. Tag mentor for review.</li>
+      <li>Be ready to defend 3 design decisions in stand-up: source priority · merger rules · LLM gap strategy.</li>
+    </ol>
+  </div>
+
+  <div class="footer">
+    Groovy Technoweb Pvt Ltd · 2026–27 Cohort · Day 16 R&amp;D Brief · v1
+  </div>
+</div>
+
+<script>
+'use strict';
+const STORAGE_KEY = 'groovy_day16_species_progress_v1';
+function loadState() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { return {}; } }
+function saveState(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (e) { } }
+const state = loadState();
+document.querySelectorAll('.check-item').forEach((el, i) => {
+  const key = 'c' + i;
+  if (state[key]) el.classList.add('checked');
+  el.addEventListener('click', () => {
+    state[key] = !state[key];
+    saveState(state);
+    el.classList.toggle('checked');
+  });
+});
+</script>
+
+</body>
+</html>

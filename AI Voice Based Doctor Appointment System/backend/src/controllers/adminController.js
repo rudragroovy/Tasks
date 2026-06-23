@@ -1,5 +1,6 @@
 const prisma = require('../models/prismaClient');
 const bcrypt = require('bcryptjs');
+const { ensureDefaultWorkingHours } = require('../utils/doctorAvailability');
 
 exports.getDashboardStats = async (req, res) => {
   try {
@@ -47,6 +48,8 @@ exports.addDoctor = async (req, res) => {
         fee: parseFloat(fee)
       }
     });
+
+    await ensureDefaultWorkingHours(prisma, user.id);
 
     res.status(201).json({ message: 'Doctor added successfully', doctor });
   } catch (error) {

@@ -85,7 +85,7 @@ export default function MockCheckout() {
                 </div>
                 <div>
                   <h1 className="text-xl font-heading font-black text-white">Secure Checkout</h1>
-                  <p className="text-primary-300 text-xs font-medium mt-0.5">MyDrScripts Payments · SSL Encrypted</p>
+                  <p className="text-primary-300 text-xs font-medium mt-0.5">CareBridge Payments · SSL Encrypted</p>
                 </div>
               </div>
             </div>

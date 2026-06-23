@@ -21,6 +21,12 @@ enum AppointmentStatus {
   REJECTED
 }
 
+enum ConsultationMode {
+  VIDEO
+  AUDIO
+  IN_PERSON
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -35,6 +41,9 @@ model User {
   doctorAppointments  Appointment[]   @relation("DoctorAppointments")
   invitedAppointments InvitedDoctor[] @relation("InvitedDoctor")
   doctorNotes         DoctorNote[]    @relation("DoctorNote")
+  workingHours        DoctorWorkingHour[] @relation("DoctorWorkingHours")
+  workingHourOverrides DoctorWorkingHourOverride[] @relation("DoctorWorkingHourOverrides")
+  slots               DoctorSlot[]        @relation("DoctorSlots")
 }
 
 model FamilyMember {
@@ -63,6 +72,9 @@ model Doctor {
   specialization   Specialization @relation(fields: [specializationId], references: [id])
   fee              Decimal
   isOnline         Boolean        @default(false)
+  slotDurationMinutesVideo Int    @default(30)
+  slotDurationMinutesAudio Int    @default(20)
+  slotDurationMinutesInPerson Int @default(40)
 }
 
 model Appointment {
@@ -70,11 +82,14 @@ model Appointment {
   patientId      String
   doctorId       String
   familyMemberId String?
-  status         String // PENDING, ACCEPTED, REJECTED, COMPLETED
+  status         String // PENDING, ACCEPTED, REJECTED, COMPLETED, CANCELLED
+  declineReason  String?
 
   // Scheduling & Payment fields
   type            String    @default("ON_DEMAND") // ON_DEMAND, SCHEDULED
+  consultationMode ConsultationMode @default(VIDEO)
   scheduledFor    DateTime?
+  scheduledUntil  DateTime?
   paymentStatus   String    @default("PENDING") // PENDING, PAID, FAILED
   stripeSessionId String?
 
@@ -90,6 +105,61 @@ model Appointment {
   messages       Message[]
   invitedDoctors InvitedDoctor[]
   doctorNotes    DoctorNote[]
+  slot           DoctorSlot?
+
+  @@index([doctorId, scheduledFor])
+}
+
+model DoctorWorkingHour {
+  id           String   @id @default(uuid())
+  doctorId     String
+  consultationMode ConsultationMode @default(VIDEO)
+  dayOfWeek    Int // 0 = Sunday, 6 = Saturday
+  segmentIndex Int // order for split shifts in same day
+  startMinutes Int // minutes from midnight, e.g. 540 = 09:00
+  endMinutes   Int // minutes from midnight, e.g. 1020 = 17:00
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  doctor User @relation("DoctorWorkingHours", fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, consultationMode, dayOfWeek, segmentIndex])
+  @@index([doctorId, consultationMode])
+}
+
+model DoctorWorkingHourOverride {
+  id           String   @id @default(uuid())
+  doctorId     String
+  consultationMode ConsultationMode @default(VIDEO)
+  date         DateTime
+  segmentIndex Int
+  startMinutes Int
+  endMinutes   Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  doctor User @relation("DoctorWorkingHourOverrides", fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, consultationMode, date, segmentIndex])
+  @@index([doctorId, consultationMode, date])
+}
+
+model DoctorSlot {
+  id            String    @id @default(uuid())
+  doctorId      String
+  startAt       DateTime
+  endAt         DateTime
+  appointmentId String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  doctor      User         @relation("DoctorSlots", fields: [doctorId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@unique([doctorId, startAt])
+  @@index([doctorId, startAt])
 }
 
 model Consultation {

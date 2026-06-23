@@ -1,14 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { TopHeader } from '../components/ui/top-header';
 import { DoctorCard } from '../components/ui/doctor-card';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Clock, CreditCard, ArrowRight,
-  CheckCircle2, ShieldCheck, AlertCircle
+  CheckCircle2, ShieldCheck, AlertCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
+
+const CONSULTATION_MODE_OPTIONS = [
+  { value: 'VIDEO', label: 'Video' },
+  { value: 'AUDIO', label: 'Audio' },
+  { value: 'IN_PERSON', label: 'In Person' },
+];
 
 
 /* ── Booking Toggle ── */
@@ -41,7 +47,19 @@ function BookingToggle({ value, onChange }) {
 }
 
 /* ── Schedule Picker ── */
-function SchedulePicker({ date, time, onDateChange, onTimeChange }) {
+function SchedulePicker({
+  date,
+  slots,
+  selectedSlotStart,
+  manualTime,
+  slotsLoading,
+  slotsError,
+  onDateChange,
+  onSelectSlot,
+  onManualTimeChange,
+}) {
+  const showManualTimeFallback = Boolean(slotsError) || slots.length === 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, height: 0 }}
@@ -50,8 +68,8 @@ function SchedulePicker({ date, time, onDateChange, onTimeChange }) {
       transition={{ type: 'spring', stiffness: 350, damping: 30 }}
       className="overflow-hidden"
     >
-      <div className="pt-3 flex gap-3">
-        <div className="flex-1">
+      <div className="pt-3 space-y-3">
+        <div>
           <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Date</label>
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-500 pointer-events-none" size={14} />
@@ -64,27 +82,105 @@ function SchedulePicker({ date, time, onDateChange, onTimeChange }) {
             />
           </div>
         </div>
-        <div className="flex-1">
-          <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Time</label>
-          <div className="relative">
-            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-health-500 pointer-events-none" size={14} />
-            <input
-              type="time"
-              value={time}
-              onChange={e => onTimeChange(e.target.value)}
-              className="pl-9 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-sm focus:ring-2 focus:ring-health-500/40 outline-none transition-all cursor-pointer"
-            />
-          </div>
+
+        <div>
+          <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Slots</label>
+          {slotsLoading ? (
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
+              Loading available slots...
+            </div>
+          ) : slotsError ? (
+            <div className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-xs font-bold text-rose-600">
+              {slotsError}
+            </div>
+          ) : slots.length === 0 ? (
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
+              No slots available for the selected date.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {slots.map((slot) => {
+                const isSelected = selectedSlotStart === slot.startAt;
+                return (
+                  <button
+                    type="button"
+                    key={slot.startAt}
+                    disabled={!slot.available}
+                    onClick={() => onSelectSlot(slot.startAt)}
+                    className={`px-3 py-2 rounded-xl text-xs font-black transition-all border ${
+                      isSelected
+                        ? 'border-health-500 bg-health-500 text-white'
+                        : slot.available
+                          ? 'border-slate-200 bg-white text-slate-700 hover:border-health-400'
+                          : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {slot.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
+
+        {showManualTimeFallback && (
+          <div>
+            <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Manual Time</label>
+            <div className="relative">
+              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-health-500 pointer-events-none" size={14} />
+              <input
+                type="time"
+                value={manualTime}
+                onChange={(e) => onManualTimeChange(e.target.value)}
+                className="pl-9 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-sm focus:ring-2 focus:ring-health-500/40 outline-none transition-all cursor-pointer"
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-slate-400 font-semibold">
+              Use manual time when auto slots are unavailable.
+            </p>
+          </div>
+        )}
       </div>
     </motion.div>
   );
 }
 
+function ConsultationModePicker({ value, onChange }) {
+  return (
+    <div>
+      <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Consultation Type</label>
+      <div className="grid grid-cols-3 gap-2">
+        {CONSULTATION_MODE_OPTIONS.map((mode) => {
+          const isActive = value === mode.value;
+          return (
+            <button
+              key={mode.value}
+              type="button"
+              onClick={() => onChange(mode.value)}
+              className={`px-3 py-2 rounded-xl text-xs font-black border transition-all ${
+                isActive
+                  ? 'border-primary-600 bg-primary-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-primary-300'
+              }`}
+            >
+              {mode.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ── Payment Summary Panel ── */
-function PaymentSummary({ doctor, bookingType, scheduledDate, scheduledTime, processingId, onConfirm }) {
+function PaymentSummary({ doctor, bookingType, consultationMode, scheduledDate, selectedTimeLabel, processingId, onConfirm }) {
   const fee = parseFloat(doctor?.fee || 150);
   const isProcessing = processingId === doctor?.userId;
+  const consultationLabel = consultationMode === 'IN_PERSON'
+    ? 'In Person'
+    : consultationMode === 'AUDIO'
+      ? 'Audio'
+      : 'Video';
 
   return (
     <motion.div
@@ -103,16 +199,16 @@ function PaymentSummary({ doctor, bookingType, scheduledDate, scheduledTime, pro
         {/* Booking type indicator */}
         {bookingType === 'ON_DEMAND' ? (
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
-            <span className="text-amber-700 text-xs font-bold">Instant — connect within minutes</span>
+            <span className="text-amber-700 text-xs font-bold">Instant {consultationLabel} consultation</span>
           </div>
         ) : (
-          scheduledDate && scheduledTime ? (
+          scheduledDate && selectedTimeLabel ? (
             <div className="bg-health-50 border border-health-200 rounded-xl px-3.5 py-2.5">
-              <span className="text-health-700 text-xs font-bold">{scheduledDate} · {scheduledTime}</span>
+              <span className="text-health-700 text-xs font-bold">{scheduledDate} · {selectedTimeLabel}</span>
             </div>
           ) : (
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5">
-              <span className="text-slate-400 text-xs font-bold">Select date &amp; time above</span>
+              <span className="text-slate-400 text-xs font-bold">Select a slot above</span>
             </div>
           )
         )}
@@ -179,59 +275,160 @@ export default function Booking() {
   const socket = useSocket();
 
   const [bookingType, setBookingType] = useState('ON_DEMAND');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
+  const [consultationMode, setConsultationMode] = useState('VIDEO');
+  const [scheduledDate, setScheduledDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedSlotStart, setSelectedSlotStart] = useState('');
+  const [manualTime, setManualTime] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState('');
   const [processingId, setProcessingId] = useState(null);
   // Which doctor card is selected for booking
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [showDoctorPicker, setShowDoctorPicker] = useState(false);
 
   const specialization = searchParams.get('specialization') || '';
   const aiSummary = location.state?.aiSummary || {};
+  const preferredDoctorId =
+    searchParams.get('doctorId') ||
+    location.state?.selectedDoctorId ||
+    aiSummary?.assigned_doctor_id ||
+    '';
 
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     try {
       const { data } = await axios.get(
         `http://localhost:5000/api/appointments/doctors?specializationName=${specialization}`,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       setDoctors(data);
-      // Auto-select first doctor
-      if (data.length > 0) setSelectedDoctor(data[0]);
+      setSelectedDoctor((prev) => {
+        if (!data.length) return null;
+        if (preferredDoctorId) {
+          const preferredDoctor = data.find((doc) => doc.userId === preferredDoctorId);
+          if (preferredDoctor) return preferredDoctor;
+        }
+        if (prev && data.some((doc) => doc.userId === prev.userId)) return prev;
+        return data[0];
+      });
     } catch (err) {
       console.error('Error fetching doctors:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [specialization, preferredDoctorId]);
 
-  useEffect(() => { fetchDoctors(); }, [specialization]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchDoctors(); }, [fetchDoctors]);
 
   useEffect(() => {
     if (!socket) return;
     const handleUpdate = () => fetchDoctors();
     socket.on('doctors:updated', handleUpdate);
     return () => socket.off('doctors:updated', handleUpdate);
-  }, [socket, specialization]);
+  }, [socket, fetchDoctors]);
+
+  const handleBookingTypeChange = (nextType) => {
+    setBookingType(nextType);
+    setSelectedSlotStart('');
+    setManualTime('');
+  };
+
+  const handleConsultationModeChange = (nextMode) => {
+    setConsultationMode(nextMode);
+    setSelectedSlotStart('');
+    setManualTime('');
+  };
+
+  const handleDoctorSelect = (doctor) => {
+    setSelectedDoctor(doctor);
+    setSelectedSlotStart('');
+    setManualTime('');
+    setShowDoctorPicker(false);
+  };
+
+  const handleDateChange = (nextDate) => {
+    setScheduledDate(nextDate);
+    setSelectedSlotStart('');
+    setManualTime('');
+  };
+
+  useEffect(() => {
+    const fetchSlots = async () => {
+      if (bookingType !== 'SCHEDULED' || !selectedDoctor?.userId || !scheduledDate) {
+        setAvailableSlots([]);
+        setSlotsError('');
+        return;
+      }
+
+      setSlotsLoading(true);
+      setSlotsError('');
+
+      try {
+        const { data } = await axios.get(
+          `http://localhost:5000/api/appointments/doctors/${selectedDoctor.userId}/slots?date=${scheduledDate}&mode=${encodeURIComponent(consultationMode)}`,
+          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        );
+
+        setAvailableSlots(Array.isArray(data?.slots) ? data.slots : []);
+      } catch (err) {
+        console.error('Failed to fetch slots:', err);
+        setAvailableSlots([]);
+        setSlotsError(err?.response?.data?.error || 'Unable to load slots for selected date.');
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+
+    fetchSlots();
+  }, [bookingType, selectedDoctor?.userId, scheduledDate, consultationMode]);
+
+  const selectedSlotLabel =
+    availableSlots.find((slot) => slot.startAt === selectedSlotStart)?.label || '';
+  const selectedTimeLabel = selectedSlotLabel || manualTime;
+  const alternativeDoctors = doctors.filter((doc) => doc.userId !== selectedDoctor?.userId);
 
   const confirmBooking = async () => {
     if (!selectedDoctor) return;
-    if (bookingType === 'SCHEDULED' && (!scheduledDate || !scheduledTime)) {
-      alert('Please select a date and time for your scheduled consultation.');
+    if (bookingType === 'SCHEDULED' && (!scheduledDate || (!selectedSlotStart && !manualTime))) {
+      alert('Please select a slot or choose a manual time for your scheduled consultation.');
       return;
     }
     setProcessingId(selectedDoctor.userId);
     try {
       let scheduledFor = null;
       if (bookingType === 'SCHEDULED') {
-        scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+        if (selectedSlotStart) {
+          scheduledFor = selectedSlotStart;
+        } else {
+          const manualDateTime = new Date(`${scheduledDate}T${manualTime}`);
+          if (Number.isNaN(manualDateTime.getTime())) {
+            alert('Invalid manual date/time selected.');
+            setProcessingId(null);
+            return;
+          }
+          scheduledFor = manualDateTime.toISOString();
+        }
       }
       let familyMemberId = null;
       if (aiSummary.selectedPatientId && aiSummary.selectedPatientId !== 'self') {
         familyMemberId = aiSummary.selectedPatientId;
       }
+      const normalizedAiSummary = {
+        ...(aiSummary || {}),
+        assigned_doctor_id: selectedDoctor.userId,
+        assigned_doctor_name: selectedDoctor.user?.name || '',
+      };
       const { data: appointment } = await axios.post(
         'http://localhost:5000/api/appointments',
-        { doctorId: selectedDoctor.userId, aiSummary, type: bookingType, scheduledFor, familyMemberId },
+        {
+          doctorId: selectedDoctor.userId,
+          aiSummary: normalizedAiSummary,
+          type: bookingType,
+          consultationMode,
+          scheduledFor,
+          familyMemberId
+        },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       const { data: session } = await axios.post(
@@ -242,7 +439,7 @@ export default function Booking() {
       window.location.href = session.url;
     } catch (err) {
       console.error(err);
-      alert('Failed to initiate booking process.');
+      alert(err?.response?.data?.error || 'Failed to initiate booking process.');
       setProcessingId(null);
     }
   };
@@ -289,46 +486,55 @@ export default function Booking() {
 
             {/* Left — Doctor selector: horizontal scroll on mobile, vertical on desktop */}
             <div className="w-full lg:w-[400px] shrink-0">
-              {/* Mobile: horizontal scroll strip */}
-              <div className="flex lg:hidden gap-3 overflow-x-auto pb-3 -mx-1 px-1 snap-x snap-mandatory">
-                {doctors.map(doc => (
-                  <div
-                    key={doc.userId}
-                    onClick={() => setSelectedDoctor(doc)}
-                    className={`cursor-pointer transition-all duration-200 shrink-0 w-[260px] snap-start ${
-                      selectedDoctor.userId === doc.userId ? 'ring-2 ring-primary-500/60 rounded-3xl' : 'opacity-70 hover:opacity-90'
-                    }`}
+              <div className="space-y-3">
+                <div className="ring-2 ring-primary-500/60 rounded-3xl">
+                  <DoctorCard
+                    doctor={selectedDoctor}
+                    onBook={() => {}}
+                    enableAnimations={false}
+                    hideBookButton={true}
+                  />
+                </div>
+
+                {alternativeDoctors.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDoctorPicker((prev) => !prev)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
                   >
-                    <DoctorCard
-                      doctor={doc}
-                      onBook={() => setSelectedDoctor(doc)}
-                      enableAnimations={false}
-                      hideBookButton={true}
-                    />
-                  </div>
-                ))}
-              </div>
-              {/* Desktop: vertical stack */}
-              <div className="hidden lg:flex flex-col space-y-3">
-                {doctors.map(doc => (
-                  <motion.div
-                    key={doc.userId}
-                    onClick={() => setSelectedDoctor(doc)}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-                    className={`cursor-pointer transition-all duration-200 ${
-                      selectedDoctor.userId === doc.userId ? 'ring-2 ring-primary-500/60 rounded-3xl' : 'opacity-60 hover:opacity-80'
-                    }`}
-                  >
-                    <DoctorCard
-                      doctor={doc}
-                      onBook={() => setSelectedDoctor(doc)}
-                      enableAnimations={false}
-                      hideBookButton={true}
-                    />
-                  </motion.div>
-                ))}
+                    {showDoctorPicker ? 'Hide Other Doctors' : `Change Doctor (${alternativeDoctors.length})`}
+                    {showDoctorPicker ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                )}
+
+                <AnimatePresence>
+                  {showDoctorPicker && alternativeDoctors.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      className="space-y-3 max-h-[360px] overflow-y-auto pr-1"
+                    >
+                      {alternativeDoctors.map((doc) => (
+                        <motion.div
+                          key={doc.userId}
+                          onClick={() => handleDoctorSelect(doc)}
+                          initial={{ opacity: 0, x: -12 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+                          className="cursor-pointer opacity-85 hover:opacity-100 transition-opacity"
+                        >
+                          <DoctorCard
+                            doctor={doc}
+                            onBook={() => handleDoctorSelect(doc)}
+                            enableAnimations={false}
+                            hideBookButton={true}
+                          />
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
@@ -340,16 +546,32 @@ export default function Booking() {
               transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.1 }}
             >
               {/* Toggle */}
-              <BookingToggle value={bookingType} onChange={setBookingType} />
+              <BookingToggle value={bookingType} onChange={handleBookingTypeChange} />
+
+              <ConsultationModePicker
+                value={consultationMode}
+                onChange={handleConsultationModeChange}
+              />
 
               {/* Schedule picker */}
               <AnimatePresence>
                 {bookingType === 'SCHEDULED' && (
                   <SchedulePicker
                     date={scheduledDate}
-                    time={scheduledTime}
-                    onDateChange={setScheduledDate}
-                    onTimeChange={setScheduledTime}
+                    slots={availableSlots}
+                    selectedSlotStart={selectedSlotStart}
+                    manualTime={manualTime}
+                    slotsLoading={slotsLoading}
+                    slotsError={slotsError}
+                    onDateChange={handleDateChange}
+                    onSelectSlot={(startAt) => {
+                      setSelectedSlotStart(startAt);
+                      setManualTime('');
+                    }}
+                    onManualTimeChange={(timeValue) => {
+                      setManualTime(timeValue);
+                      setSelectedSlotStart('');
+                    }}
                   />
                 )}
               </AnimatePresence>
@@ -360,8 +582,9 @@ export default function Booking() {
                   key={selectedDoctor.userId}
                   doctor={selectedDoctor}
                   bookingType={bookingType}
+                  consultationMode={consultationMode}
                   scheduledDate={scheduledDate}
-                  scheduledTime={scheduledTime}
+                  selectedTimeLabel={selectedTimeLabel}
                   processingId={processingId}
                   onConfirm={confirmBooking}
                 />

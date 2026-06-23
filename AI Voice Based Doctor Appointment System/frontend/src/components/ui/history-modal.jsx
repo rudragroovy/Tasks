@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, FileText, MessageSquare, Bot, User, UserRound, Download, CalendarClock, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
+import { formatDoctorName } from '../../utils/doctorName';
 
 export function HistoryModal({ apt, onClose }) {
   const [activeTab, setActiveTab] = useState('ai');
@@ -9,7 +10,7 @@ export function HistoryModal({ apt, onClose }) {
 
   if (!apt) return null;
 
-  const doctorName = apt.doctor?.name?.startsWith('Dr.') ? apt.doctor?.name : `Dr. ${apt.doctor?.name}`;
+  const doctorName = formatDoctorName(apt.doctor?.name, 'Doctor');
   const appointmentDate = new Date(apt.createdAt).toLocaleDateString(undefined, {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
   });
@@ -189,7 +190,7 @@ export function HistoryModal({ apt, onClose }) {
                           )}
                         >
                           <span className="text-[10px] font-black uppercase tracking-wider mb-1 opacity-70">
-                            {msg.senderRole === 'PATIENT' ? (apt.familyMember?.name || apt.patient?.name) : `Dr. ${apt.doctor?.name}`}
+                            {msg.senderRole === 'PATIENT' ? (apt.familyMember?.name || apt.patient?.name) : formatDoctorName(apt.doctor?.name, 'Doctor')}
                           </span>
                           <span className="font-medium leading-relaxed">{msg.text}</span>
                           <span className={cn("text-[10px] self-end mt-1", msg.senderRole === 'PATIENT' ? "text-primary-200" : "text-slate-400")}>
