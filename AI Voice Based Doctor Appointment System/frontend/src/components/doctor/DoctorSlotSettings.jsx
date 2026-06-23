@@ -179,6 +179,9 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isMobileViewport, setIsMobileViewport] = useState(() => (
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 640px)').matches : false
+  ));
   const idCounter = useRef(1);
   const hasLoadedOnceRef = useRef(false);
 
@@ -189,6 +192,24 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
   const weekStart = useMemo(() => getWeekStart(calendarDate), [calendarDate]);
   const weekEnd = useMemo(() => addMinutes(new Date(weekStart.getTime() + 7 * DAY_MS), -1), [weekStart]);
   const weekAnchorDate = useMemo(() => toDateInputValue(weekStart), [weekStart]);
+  const calendarMode = isMobileViewport ? 'day' : 'week';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const mediaQuery = window.matchMedia('(max-width: 640px)');
+    const syncViewport = (event) => {
+      setIsMobileViewport(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncViewport);
+      return () => mediaQuery.removeEventListener('change', syncViewport);
+    }
+
+    mediaQuery.addListener(syncViewport);
+    return () => mediaQuery.removeListener(syncViewport);
+  }, []);
 
   const loadSettings = useCallback(async () => {
     if (!hasLoadedOnceRef.current) {
@@ -427,7 +448,7 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
         <BryntumCalendar
           className="doctor-schedule-calendar"
           date={calendarDate}
-          mode="week"
+          mode={calendarMode}
           events={calendarEvents}
           autoCreate
           enableDeleteKey

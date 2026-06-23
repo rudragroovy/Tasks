@@ -90,3 +90,19 @@ input[type="time"] {
 .doctor-schedule-calendar .b-cal-event.doctor-booked-event {
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.3);
 }
+
+.doctor-schedule-calendar .b-cal-event .b-cal-event-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .doctor-schedule-calendar .b-cal-event .b-cal-event-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.15;
+    font-size: 10px;
+  }
+}
