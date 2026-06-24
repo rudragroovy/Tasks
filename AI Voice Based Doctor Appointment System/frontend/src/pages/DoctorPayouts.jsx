@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Avatar, Button, Card, ConfigProvider, DatePicker, Empty, Select, Space, Typography } from 'antd';
+import { Avatar, Button, Card, ConfigProvider, DatePicker, Empty, Pagination, Select, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { CalendarDays, Download, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -83,6 +83,7 @@ function downloadPayoutSlip(payout) {
 }
 
 export default function DoctorPayouts() {
+  const PAGE_SIZE = 15;
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -92,6 +93,7 @@ export default function DoctorPayouts() {
   const [appointmentTypeFilter, setAppointmentTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [dateFilter, setDateFilter] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setIsOnline(Boolean(user?.doctorProfile?.isOnline));
@@ -135,6 +137,10 @@ export default function DoctorPayouts() {
     if (key === 'patients') navigate('/doctor/patients');
     if (key === 'chat') navigate('/doctor/chat');
     if (key === 'pay-out') navigate('/doctor/payouts');
+    if (key === 'medical-documents') navigate('/doctor/medical-documents');
+    if (key === 'invoices') navigate('/doctor/invoices');
+    if (key === 'my-profile') navigate('/doctor/profile');
+    if (key === 'change-password') navigate('/doctor/profile?tab=settings');
   };
 
   const handleToggleOnline = async () => {
@@ -157,8 +163,14 @@ export default function DoctorPayouts() {
   };
 
   const payoutRows = useMemo(() => {
+    const authenticatedDoctorId = user?.id;
+
     return appointments
-      .filter((appointment) => appointment?.paymentStatus === 'PAID')
+      .filter((appointment) => {
+        if (!authenticatedDoctorId) return false;
+        const appointmentDoctorId = appointment?.doctorId || appointment?.doctor?.id;
+        return appointmentDoctorId === authenticatedDoctorId && appointment?.paymentStatus === 'PAID';
+      })
       .map((appointment) => {
         const appointmentDate = getAppointmentDate(appointment);
         const payoutDate = appointment?.updatedAt || appointment?.createdAt || appointmentDate;
@@ -182,7 +194,7 @@ export default function DoctorPayouts() {
         };
       })
       .sort((a, b) => (b.appointmentDate?.getTime() || 0) - (a.appointmentDate?.getTime() || 0));
-  }, [appointments]);
+  }, [appointments, user?.id]);
 
   const filteredPayouts = useMemo(() => {
     return payoutRows.filter((payout) => {
@@ -199,6 +211,23 @@ export default function DoctorPayouts() {
       return true;
     });
   }, [payoutRows, appointmentTypeFilter, statusFilter, dateFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [appointmentTypeFilter, statusFilter, dateFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPayouts.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedPayouts = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredPayouts.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredPayouts, currentPage, PAGE_SIZE]);
 
   const pendingCount = appointments.filter((appointment) => appointment.status === 'PENDING').length;
 
@@ -271,71 +300,82 @@ export default function DoctorPayouts() {
                 <Empty description={<span className="text-base font-semibold text-slate-500">No payout records found</span>} />
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filteredPayouts.map((payout) => (
-                  <Card
-                    key={payout.id}
-                    bordered
-                    className="rounded-2xl border-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                    styles={{ body: { padding: 14 } }}
-                  >
-                    <div className="mb-3 flex items-center gap-2.5">
-                      <Avatar
-                        size={52}
-                        src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-                          payout.avatarSeed
-                        )}&backgroundColor=f1f5f9`}
-                      />
-                      <Text className="!text-lg !font-black !leading-tight !text-primary-900">{payout.patientName}</Text>
-                    </div>
+              <>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {paginatedPayouts.map((payout) => (
+                    <Card
+                      key={payout.id}
+                      bordered
+                      className="rounded-2xl border-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                      styles={{ body: { padding: 14 } }}
+                    >
+                      <div className="mb-3 flex items-center gap-2.5">
+                        <Avatar
+                          size={52}
+                          src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                            payout.avatarSeed
+                          )}&backgroundColor=f1f5f9`}
+                        />
+                        <Text className="!text-lg !font-black !leading-tight !text-primary-900">{payout.patientName}</Text>
+                      </div>
 
-                    <div className="mb-3 rounded-xl bg-slate-50 p-3">
-                      <div className="flex items-start gap-2">
-                        <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-500">
-                          <FileText size={16} />
-                        </span>
-                        <div>
-                          <p className="text-base font-black leading-tight text-primary-900">{payout.consultationLabel}</p>
-                          <p className="text-sm font-medium leading-tight text-slate-500">{formatDateTime(payout.appointmentDate)}</p>
+                      <div className="mb-3 rounded-xl bg-slate-50 p-3">
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-500">
+                            <FileText size={16} />
+                          </span>
+                          <div>
+                            <p className="text-base font-black leading-tight text-primary-900">{payout.consultationLabel}</p>
+                            <p className="text-sm font-medium leading-tight text-slate-500">{formatDateTime(payout.appointmentDate)}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="mb-3 rounded-xl bg-slate-50 p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <p className="text-sm font-semibold leading-tight text-slate-500">Status :</p>
-                        <span
-                          className={`rounded-md px-2 py-0.5 text-xs font-black ${getPayoutStatusToken(payout.status).className}`}
-                        >
-                          {getPayoutStatusToken(payout.status).label}
-                        </span>
+                      <div className="mb-3 rounded-xl bg-slate-50 p-3">
+                        <div className="mb-1 flex items-center justify-between">
+                          <p className="text-sm font-semibold leading-tight text-slate-500">Status :</p>
+                          <span
+                            className={`rounded-md px-2 py-0.5 text-xs font-black ${getPayoutStatusToken(payout.status).className}`}
+                          >
+                            {getPayoutStatusToken(payout.status).label}
+                          </span>
+                        </div>
+                        <div className="mb-1 flex items-center justify-between gap-3 leading-tight">
+                          <p className="text-sm font-semibold text-slate-500">Payout number :</p>
+                          <p className="min-w-[120px] text-right text-base font-bold text-slate-800">{payout.payoutNumber}</p>
+                        </div>
+                        <div className="mb-1 flex items-center justify-between gap-3 leading-tight">
+                          <p className="text-sm font-semibold text-slate-500">Payout Date :</p>
+                          <p className="text-base font-bold text-slate-800">{formatDateTime(payout.payoutDate)}</p>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 leading-tight">
+                          <p className="text-sm font-semibold text-slate-500">Amount :</p>
+                          <p className="text-lg font-black text-slate-900">{payout.amount.toFixed(2)}</p>
+                        </div>
                       </div>
-                      <div className="mb-1 flex items-center justify-between gap-3 leading-tight">
-                        <p className="text-sm font-semibold text-slate-500">Payout number :</p>
-                        <p className="text-base font-bold text-slate-800">{payout.payoutNumber}</p>
-                      </div>
-                      <div className="mb-1 flex items-center justify-between gap-3 leading-tight">
-                        <p className="text-sm font-semibold text-slate-500">Payout Date :</p>
-                        <p className="text-base font-bold text-slate-800">{formatDateTime(payout.payoutDate)}</p>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 leading-tight">
-                        <p className="text-sm font-semibold text-slate-500">Amount :</p>
-                        <p className="text-lg font-black text-slate-900">{payout.amount.toFixed(2)}</p>
-                      </div>
-                    </div>
 
-                    <Button
-                      block
-                      type="primary"
-                      icon={<Download size={14} />}
-                      className="!h-10 !rounded-lg !bg-primary-700 !text-sm !font-bold hover:!bg-primary-800"
-                      onClick={() => downloadPayoutSlip(payout)}
-                    >
-                      Download
-                    </Button>
-                  </Card>
-                ))}
-              </div>
+                      <Button
+                        block
+                        type="primary"
+                        icon={<Download size={14} />}
+                        className="!h-10 !rounded-lg !bg-primary-700 !text-sm !font-bold hover:!bg-primary-800"
+                        onClick={() => downloadPayoutSlip(payout)}
+                      >
+                        Download
+                      </Button>
+                    </Card>
+                  ))}
+                </div>
+                <div className="mt-6 flex justify-center">
+                  <Pagination
+                    current={currentPage}
+                    pageSize={PAGE_SIZE}
+                    total={filteredPayouts.length}
+                    onChange={setCurrentPage}
+                    showSizeChanger={false}
+                  />
+                </div>
+              </>
             )}
           </Card>
         </main>
@@ -343,3 +383,4 @@ export default function DoctorPayouts() {
     </ConfigProvider>
   );
 }
+

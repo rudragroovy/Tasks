@@ -25,6 +25,7 @@ import {
   Mic,
   Phone,
   ShieldCheck,
+  Star,
   Stethoscope,
   Users,
   Video,
@@ -58,36 +59,52 @@ const heroCards = [
   { label: 'Waiting Room', icon: Users, tone: 'amber' },
 ];
 
+const heroTagCarouselItems = [
+  { label: 'Patient Satisfaction', icon: CheckCircle, metric: '99%' },
+  { label: 'With or Without Insurance', icon: ShieldCheck },
+  { label: 'Specialties Offered', icon: Stethoscope },
+  { label: 'Choose Your Provider', icon: Users },
+  { label: 'Rating On app Store', icon: Star, metric: '4.9' },
+  { label: 'Services', icon: Activity, metric: '6' },
+  { label: 'Same Day Visits', icon: CalendarClock },
+];
+
 const serviceCards = [
   {
     title: 'Telehealth Medical Consultation',
     description: 'Book an online consultation with licensed doctors.',
     icon: Stethoscope,
+    tone: 'video',
   },
   {
     title: 'Prescription',
     description: 'Get prescriptions for medications quickly and conveniently.',
     icon: FileText,
+    tone: 'prescription',
   },
   {
     title: 'Medical Certificates',
     description: 'Request medical certificates for work or school.',
     icon: CalendarClock,
+    tone: 'certificates',
   },
   {
     title: 'Pathology Requests',
     description: 'Order blood tests without visiting a doctor in person.',
     icon: Activity,
+    tone: 'pathology',
   },
   {
     title: 'Radiology Requests',
     description: 'Request X-rays, MRI, or CT scans through telehealth.',
     icon: MessageSquare,
+    tone: 'radiology',
   },
   {
     title: 'Specialist Referral',
     description: 'Get a referral to a specialist without a clinic visit.',
     icon: Users,
+    tone: 'referral',
   },
 ];
 
@@ -340,45 +357,64 @@ export default function LandingPage() {
         <Card className="landing-hero-v2__banner" bordered={false}>
           <ShieldCheck size={18} />
           <p>
-            <strong>MyDrScripts is Australia's first truly digital GP clinic,</strong> combining personalised care, smart
-            technology, and long-term health support so every patient has a doctor who knows them.
+            MyDrScripts is Australia's first truly digital GP clinic, combining personalised care, smart technology, and
+            long-term health support so every patient has a doctor who knows them.
           </p>
         </Card>
       </section>
 
       <Content>
-        <section className="landing-logos">
-          <Text>Trusted by patients across Australia</Text>
-          <Space size={28} wrap>
-            <span>CPN</span>
-            <span>MedLab</span>
-            <span>Qlinic</span>
-            <span>PrimeCare</span>
-            <span>AusHealth</span>
-          </Space>
+        <section className="landing-tag-carousel" aria-label="MyDrScripts highlights">
+          <div className="landing-tag-carousel__track" role="list">
+            {[...heroTagCarouselItems, ...heroTagCarouselItems].map((item, index) => {
+              const Icon = item.icon;
+              const isDuplicate = index >= heroTagCarouselItems.length;
+              return (
+                <div
+                  className="landing-tag-carousel__item"
+                  role="listitem"
+                  key={`${item.label}-${index}`}
+                  aria-hidden={isDuplicate}
+                >
+                  <div className="landing-tag-carousel__head">
+                    <span className="landing-tag-carousel__icon" aria-hidden="true">
+                      <Icon size={22} />
+                    </span>
+                    {item.metric ? <span className="landing-tag-carousel__metric">{item.metric}</span> : null}
+                  </div>
+                  <span className="landing-tag-carousel__text">{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
         </section>
 
-        <section id="services" className="landing-section container">
+        <section id="services" className="landing-section container landing-services">
           <SectionHeader
             badge="Comprehensive Healthcare Solutions"
             title="Our"
             highlighted="Healthcare Services"
-            subtitle="Access professional healthcare services delivered by AHPRA verified doctors."
+            subtitle="Access professional healthcare services delivered by AHPRA verified doctors. Choose the service that best fits your needs."
           />
           <Row className="service-row" gutter={[16, 16]}>
             {serviceCards.map((service) => {
               const Icon = service.icon;
               return (
                 <Col xs={24} md={12} lg={8} key={service.title}>
-                  <Card className="service-card">
-                    <span>
+                  <Card className={`service-card service-card--${service.tone}`}>
+                    <span className="service-card__icon">
                       <Icon size={20} />
                     </span>
                     <Title level={4}>{service.title}</Title>
                     <Paragraph>{service.description}</Paragraph>
-                    <Button type="text">
-                      Learn more <ArrowRight size={14} />
-                    </Button>
+                    <div className="service-card__footer">
+                      <Button type="text">Learn more</Button>
+                      <span className="service-card__dots" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    </div>
                   </Card>
                 </Col>
               );
@@ -414,62 +450,202 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="steps" className="landing-section container">
+        <section id="steps" className="landing-section container landing-steps-v2">
           <SectionHeader
             title="4 Easy"
             highlighted="Steps"
             subtitle="Getting quality healthcare is simple with MyDrScripts."
           />
-          <Row className="step-row" gutter={[16, 16]}>
+          <div className="landing-steps-v2__grid">
             {steps.map((step, index) => (
-              <Col xs={24} sm={12} lg={6} key={step.title}>
-                <Card className="step-card" cover={<img src={step.image} alt={step.title} loading="lazy" />}>
-                  <span className="step-number">{index + 1}</span>
-                  <Title level={4}>{step.title}</Title>
-                  <Paragraph>{step.desc}</Paragraph>
-                </Card>
-              </Col>
+              <article className="landing-steps-v2__item" key={step.title}>
+                <div className="landing-steps-v2__media-wrap">
+                  <img src={step.image} alt={step.title} loading="lazy" />
+                  <span className="landing-steps-v2__number">{index + 1}</span>
+                </div>
+                <Title level={4}>{step.title}</Title>
+                <Paragraph>{step.desc}</Paragraph>
+                {index < steps.length - 1 ? (
+                  <span className="landing-steps-v2__arrow" aria-hidden="true">
+                    <ArrowRight size={18} />
+                  </span>
+                ) : null}
+              </article>
             ))}
-          </Row>
+          </div>
+          <Link to="/login" className="landing-btn landing-btn--primary landing-steps-v2__cta">
+            <CalendarClock size={16} /> Book Standard Consultation now <ArrowRight size={16} />
+          </Link>
         </section>
 
         <section id="consult-types" className="landing-section landing-consult-types">
           <div className="container">
-            <Row gutter={[20, 20]} align="top">
-              <Col xs={24} lg={12}>
-                <SectionHeader
-                  badge="Choose Your Consultation Type"
-                  title="Flexible Healthcare"
-                  highlighted="On Your Terms"
-                  leftAligned
-                />
-                <Space className="consult-chip-list" wrap>
-                  <Button>Video Consultation</Button>
-                  <Button>Telephone Consultation</Button>
-                  <Button>In-Person Doctor Visit</Button>
-                  <Button>Waiting Room</Button>
-                  <Button className="is-active">Doctor Visits Your Location</Button>
-                </Space>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Card className="consult-detail-card" bordered={false}>
-                  <Title level={4}>Doctor Visits Your Location</Title>
-                  <Paragraph>
-                    Have a qualified, AHPRA verified doctor visit your home or any preferred location. Perfect for elderly
-                    care, mobility issues, or family consultations.
-                  </Paragraph>
-                  <ul>
-                    <li>Average wait: Same/Next day</li>
-                    <li>Session duration: 45-60 mins</li>
-                    <li>Available: 7 days</li>
-                    <li>Price range: From $199</li>
+            <SectionHeader
+              badge="Choose Your Consultation Type"
+              title="Flexible Healthcare"
+              highlighted="On Your Terms"
+              subtitle="Select the consultation method that works best for you. All options connect you with verified Australian healthcare professionals."
+            />
+
+            <Space className="consult-chip-list" wrap>
+              <Button className="is-active">
+                <Video size={14} /> Video Consultation
+              </Button>
+              <Button>
+                <Phone size={14} /> Telephone Consultation
+              </Button>
+              <Button>
+                <MapPin size={14} /> In-Person Doctor Visit
+              </Button>
+              <Button>
+                <Users size={14} /> Waiting Room
+              </Button>
+              <Button>
+                <House size={14} /> Doctor Visits Your Location
+              </Button>
+            </Space>
+
+            <div className="consult-panel">
+              <div className="consult-panel__left">
+                <div className="consult-panel__title-row">
+                  <span className="consult-panel__title-icon">
+                    <Video size={20} />
+                  </span>
+                  <Title level={4}>Video Consultation</Title>
+                </div>
+                <Paragraph>
+                  Connect face-to-face with AHPRA verified doctors through secure video calls. Get medical advice,
+                  prescriptions, and referrals without leaving home.
+                </Paragraph>
+
+                <div className="consult-panel__group">
+                  <Text strong className="consult-section-head">
+                    <Activity size={14} /> Key Features
+                  </Text>
+                  <div className="consult-feature-grid">
+                    <div className="consult-feature-card">
+                      <Clock size={14} />
+                      <div>
+                        <small>Average Wait Time</small>
+                        <strong>5-10 mins</strong>
+                      </div>
+                    </div>
+                    <div className="consult-feature-card">
+                      <CalendarClock size={14} />
+                      <div>
+                        <small>Session Duration</small>
+                        <strong>15-30 mins</strong>
+                      </div>
+                    </div>
+                    <div className="consult-feature-card">
+                      <Activity size={14} />
+                      <div>
+                        <small>Available</small>
+                        <strong>24/7</strong>
+                      </div>
+                    </div>
+                    <div className="consult-feature-card">
+                      <FileText size={14} />
+                      <div>
+                        <small>Price Range</small>
+                        <strong>From $59</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="consult-panel__group">
+                  <Text strong className="consult-section-head">
+                    <CheckCircle size={14} /> What's Included
+                  </Text>
+                  <ul className="consult-include-list">
+                    <li>
+                      <CheckCircle size={16} /> HD video consultation with specialist
+                    </li>
+                    <li>
+                      <CheckCircle size={16} /> Digital prescription via email/SMS
+                    </li>
+                    <li>
+                      <CheckCircle size={16} /> Medical certificate if required
+                    </li>
+                    <li>
+                      <CheckCircle size={16} /> Follow-up notes and care plan
+                    </li>
+                    <li>
+                      <CheckCircle size={16} /> Specialist referrals when needed
+                    </li>
                   </ul>
-                  <Link to="/login" className="landing-btn landing-btn--primary">
-                    Book Home Visit <ArrowRight size={16} />
-                  </Link>
-                </Card>
-              </Col>
-            </Row>
+                </div>
+
+                <div className="consult-panel__group">
+                  <Text strong className="consult-section-head">
+                    <ShieldCheck size={14} /> Why Choose This
+                  </Text>
+                  <div className="consult-why-grid">
+                    <span>
+                      <ShieldCheck size={14} /> Fast connect in minutes
+                    </span>
+                    <span>
+                      <Mic size={14} /> Secure & private
+                    </span>
+                    <span>
+                      <Users size={14} /> AHPRA certified doctors
+                    </span>
+                    <span>
+                      <MessageSquare size={14} /> Clear communication
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="consult-panel__right">
+                <Text strong className="consult-section-head">
+                  <CalendarClock size={14} /> How It Works
+                </Text>
+                <ol className="consult-timeline">
+                  <li>
+                    <span>1</span>
+                    <div>
+                      <h5>Select Video Consultation</h5>
+                      <p>Choose your preferred time slot</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span>2</span>
+                    <div>
+                      <h5>Provide Your Details</h5>
+                      <p>Fill in medical history & symptoms</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span>3</span>
+                    <div>
+                      <h5>Join Video Call</h5>
+                      <p>Connect with your doctor via video</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span>4</span>
+                    <div>
+                      <h5>Receive Care Plan</h5>
+                      <p>Get prescriptions & follow-up advice</p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div className="consult-estimate">
+                  <CheckCircle size={16} />
+                  <div>
+                    <small>Estimated Time</small>
+                    <strong>15-30 minutes</strong>
+                  </div>
+                </div>
+
+                <Link to="/login" className="landing-btn landing-btn--primary consult-panel__cta">
+                  <CalendarClock size={16} /> Book Appointment Now <ArrowRight size={16} />
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
 

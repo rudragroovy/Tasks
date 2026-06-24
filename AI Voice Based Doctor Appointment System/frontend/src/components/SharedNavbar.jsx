@@ -3,12 +3,15 @@ import { motion } from 'framer-motion';
 import {
   AlarmClock,
   Bell,
+  ChevronDown,
   ClipboardList,
   FileBadge2,
   FileText,
+  KeyRound,
   LogOut,
   ReceiptText,
   Star,
+  User,
   Video,
   Wallet,
 } from 'lucide-react';
@@ -32,6 +35,7 @@ export default function SharedNavbar({
   className = "bg-white/85 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-40"
 }) {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const navbarRef = useRef(null);
   const displayDoctorName = doctorName || user?.name || '';
   const avatarLetter = displayDoctorName.replace('Dr. ', '').charAt(0) || (isDoctor ? 'D' : 'U');
@@ -101,17 +105,19 @@ export default function SharedNavbar({
   );
 
   useEffect(() => {
-    if (!isMoreMenuOpen) return undefined;
+    if (!isMoreMenuOpen && !isProfileMenuOpen) return undefined;
 
     const onPointerDown = (event) => {
       if (!navbarRef.current?.contains(event.target)) {
         setIsMoreMenuOpen(false);
+        setIsProfileMenuOpen(false);
       }
     };
 
     const onEscape = (event) => {
       if (event.key === 'Escape') {
         setIsMoreMenuOpen(false);
+        setIsProfileMenuOpen(false);
       }
     };
 
@@ -121,10 +127,11 @@ export default function SharedNavbar({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onEscape);
     };
-  }, [isMoreMenuOpen]);
+  }, [isMoreMenuOpen, isProfileMenuOpen]);
 
   useEffect(() => {
     setIsMoreMenuOpen(false);
+    setIsProfileMenuOpen(false);
   }, [activeTab]);
   // Handle status styling
   const statusConfig = statusOverride || {
@@ -139,15 +146,32 @@ export default function SharedNavbar({
   const handleNavItemClick = (itemKey) => {
     if (itemKey === 'more' && hasMoreOption) {
       setIsMoreMenuOpen((prev) => !prev);
+      setIsProfileMenuOpen(false);
       return;
     }
     setIsMoreMenuOpen(false);
+    setIsProfileMenuOpen(false);
     if (onTabClick) onTabClick(itemKey);
   };
 
   const handleMoreMenuItemClick = (itemKey) => {
     setIsMoreMenuOpen(false);
+    setIsProfileMenuOpen(false);
     if (onTabClick) onTabClick(itemKey);
+  };
+
+  const handleProfileMenuToggle = () => {
+    setIsProfileMenuOpen((prev) => !prev);
+    setIsMoreMenuOpen(false);
+  };
+
+  const handleProfileMenuAction = (actionKey) => {
+    setIsProfileMenuOpen(false);
+    if (actionKey === 'logout') {
+      if (onLogout) onLogout();
+      return;
+    }
+    if (onTabClick) onTabClick(actionKey);
   };
 
   return (
@@ -234,21 +258,70 @@ export default function SharedNavbar({
 
           <div className="w-px h-6 bg-slate-200 hidden sm:block" />
 
-          {/* Doctor avatar */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-sm border border-primary-200">
-              {avatarLetter}
-            </div>
-            <div className="hidden lg:block text-sm min-w-0">
-              <p className="font-bold text-slate-900 leading-none truncate max-w-[120px]">{displayDoctorName}</p>
-              <p className="text-slate-500 text-xs">{roleText}</p>
-            </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={handleProfileMenuToggle}
+              className={`group flex items-center gap-2 rounded-full border px-2.5 py-1.5 transition-all ${
+                isProfileMenuOpen
+                  ? 'border-primary-300 bg-primary-50'
+                  : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-primary-50/70'
+              }`}
+              aria-label="Open profile menu"
+              aria-haspopup="menu"
+              aria-expanded={isProfileMenuOpen}
+            >
+              <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-sm border border-primary-200">
+                {avatarLetter}
+              </div>
+              <div className="hidden lg:block text-left min-w-0">
+                <p className="font-bold text-slate-900 leading-none truncate max-w-[150px]">{displayDoctorName}</p>
+                <p className="text-slate-500 text-xs">{roleText}</p>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {isProfileMenuOpen && (
+              <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(2,6,23,0.12)]">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="truncate text-base font-black text-primary-700">Hello {displayDoctorName}</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleProfileMenuAction('my-profile')}
+                  className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-slate-800 transition-colors hover:bg-primary-50"
+                >
+                  <User className="h-5 w-5 text-slate-700" />
+                  <span className="font-semibold">My Profile</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProfileMenuAction('change-password')}
+                  className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-slate-800 transition-colors hover:bg-primary-50"
+                >
+                  <KeyRound className="h-5 w-5 text-slate-700" />
+                  <span className="font-semibold">Change Password</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProfileMenuAction('logout')}
+                  className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-3 text-left text-slate-800 transition-colors hover:bg-rose-50 hover:text-rose-700"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span className="font-semibold">Logout</span>
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* Fallback logout button for compact screens */}
           <button
             type="button"
             onClick={onLogout}
-            className="ml-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer min-h-11 min-w-11"
+            className="ml-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer min-h-11 min-w-11 lg:hidden"
             title="Sign Out"
             aria-label="Sign out"
           >

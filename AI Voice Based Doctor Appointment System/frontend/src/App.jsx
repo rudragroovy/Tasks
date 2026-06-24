@@ -17,6 +17,9 @@ const DoctorAppointments = lazy(() => import('./pages/DoctorAppointments'));
 const DoctorPatients = lazy(() => import('./pages/DoctorPatients'));
 const DoctorChat = lazy(() => import('./pages/DoctorChat'));
 const DoctorPayouts = lazy(() => import('./pages/DoctorPayouts'));
+const DoctorMedicalDocuments = lazy(() => import('./pages/DoctorMedicalDocuments'));
+const DoctorInvoices = lazy(() => import('./pages/DoctorInvoices'));
+const DoctorProfile = lazy(() => import('./pages/DoctorProfile'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const MockCheckout = lazy(() => import('./pages/MockCheckout'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -52,6 +55,9 @@ function App() {
               <Route path="/doctor/patients" element={<ProtectedRoute><DoctorPatients /></ProtectedRoute>} />
               <Route path="/doctor/chat" element={<ProtectedRoute><DoctorChat /></ProtectedRoute>} />
               <Route path="/doctor/payouts" element={<ProtectedRoute><DoctorPayouts /></ProtectedRoute>} />
+              <Route path="/doctor/medical-documents" element={<ProtectedRoute><DoctorMedicalDocuments /></ProtectedRoute>} />
+              <Route path="/doctor/invoices" element={<ProtectedRoute><DoctorInvoices /></ProtectedRoute>} />
+              <Route path="/doctor/profile" element={<ProtectedRoute><DoctorProfile /></ProtectedRoute>} />
               <Route path="/patient/in-person/:appointmentId" element={<ProtectedRoute><PatientInPersonSession /></ProtectedRoute>} />
               <Route path="/waiting-room" element={<ProtectedRoute><PatientWaitingRoom /></ProtectedRoute>} />
               <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />

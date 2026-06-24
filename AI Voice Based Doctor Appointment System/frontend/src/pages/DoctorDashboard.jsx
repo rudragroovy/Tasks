@@ -218,6 +218,10 @@ export default function DoctorDashboard() {
     if (key === 'patients') navigate('/doctor/patients');
     if (key === 'chat') navigate('/doctor/chat');
     if (key === 'pay-out') navigate('/doctor/payouts');
+    if (key === 'medical-documents') navigate('/doctor/medical-documents');
+    if (key === 'invoices') navigate('/doctor/invoices');
+    if (key === 'my-profile') navigate('/doctor/profile');
+    if (key === 'change-password') navigate('/doctor/profile?tab=settings');
   };
 
   const handleToggleOnline = async () => {
@@ -578,3 +582,4 @@ export default function DoctorDashboard() {
     </div>
   );
 }
+

@@ -5,6 +5,11 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    // Bryntum packages are large and can get stale in Vite's pre-bundle cache,
+    // causing "Outdated Optimize Dep" 504 errors during lazy route loads.
+    exclude: ['@bryntum/calendar-react', '@bryntum/calendar'],
+  },
   build: {
     rollupOptions: {
       output: {
