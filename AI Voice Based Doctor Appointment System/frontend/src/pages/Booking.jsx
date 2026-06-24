@@ -373,9 +373,17 @@ export default function Booking() {
 
   const fetchDoctors = useCallback(async () => {
     try {
+      const params = { type: bookingType };
+      if (specialization) {
+        params.specializationName = specialization;
+      }
+
       const { data } = await axios.get(
-        `http://localhost:5000/api/appointments/doctors?specializationName=${specialization}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        'http://localhost:5000/api/appointments/doctors',
+        {
+          params,
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        }
       );
       setDoctors(data);
       setSelectedDoctor((prev) => {
@@ -392,7 +400,7 @@ export default function Booking() {
     } finally {
       setLoading(false);
     }
-  }, [specialization, preferredDoctorId]);
+  }, [specialization, preferredDoctorId, bookingType]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchDoctors(); }, [fetchDoctors]);

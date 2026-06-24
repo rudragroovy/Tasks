@@ -335,6 +335,77 @@ router.put('/me/online', authenticate, async (req, res) => {
   }
 });
 
+router.get('/me/settings', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'DOCTOR') {
+      return res.status(403).json({ error: 'Only doctors can access settings' });
+    }
+
+    const settings = await prisma.doctor.findUnique({
+      where: { userId: req.user.id },
+      select: {
+        showOnlineOnLogin: true,
+        isOnline: true,
+      },
+    });
+
+    if (!settings) {
+      return res.status(404).json({ error: 'Doctor profile not found' });
+    }
+
+    res.json(settings);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch doctor settings' });
+  }
+});
+
+router.put('/me/settings', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'DOCTOR') {
+      return res.status(403).json({ error: 'Only doctors can update settings' });
+    }
+
+    const { showOnlineOnLogin } = req.body || {};
+    if (typeof showOnlineOnLogin !== 'boolean') {
+      return res.status(400).json({ error: 'showOnlineOnLogin must be a boolean' });
+    }
+
+    const existing = await prisma.doctor.findUnique({
+      where: { userId: req.user.id },
+      select: { isOnline: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Doctor profile not found' });
+    }
+
+    const updated = await prisma.doctor.update({
+      where: { userId: req.user.id },
+      data: {
+        showOnlineOnLogin,
+        isOnline: showOnlineOnLogin,
+      },
+      select: {
+        showOnlineOnLogin: true,
+        isOnline: true,
+      },
+    });
+
+    if (existing.isOnline !== updated.isOnline) {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('doctors:updated');
+      }
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update doctor settings' });
+  }
+});
+
 router.get('/me/slot-duration', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'DOCTOR') {

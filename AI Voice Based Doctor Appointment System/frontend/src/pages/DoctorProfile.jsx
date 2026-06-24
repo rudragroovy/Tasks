@@ -80,7 +80,7 @@ function buildProfileState(user) {
     accountNumber: '',
     routingNumber: '',
     autoDraftNotesEnabled: false,
-    showOnlineOnLogin: true,
+    showOnlineOnLogin: user?.doctorProfile?.showOnlineOnLogin ?? true,
     otpDeliveryChannel: 'BOTH',
   };
 }
@@ -99,6 +99,9 @@ export default function DoctorProfile() {
   const [isOnline, setIsOnline] = useState(Boolean(user?.doctorProfile?.isOnline));
   const [appointments, setAppointments] = useState([]);
   const [profile, setProfile] = useState(() => buildProfileState(user));
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState('');
 
   useEffect(() => {
     setActiveProfileTab(initialTab);
@@ -126,6 +129,50 @@ export default function DoctorProfile() {
 
     fetchAppointments();
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchDoctorSettings = async () => {
+      if (!user || user.role !== 'DOCTOR') return;
+
+      setSettingsLoading(true);
+      setSettingsMessage('');
+      try {
+        const response = await axios.get(`${API_URL}/api/doctors/me/settings`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (!isMounted) return;
+
+        if (typeof response.data?.showOnlineOnLogin === 'boolean') {
+          setProfile((prev) => ({
+            ...prev,
+            showOnlineOnLogin: response.data.showOnlineOnLogin,
+          }));
+        }
+        if (typeof response.data?.isOnline === 'boolean') {
+          setIsOnline(response.data.isOnline);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error('Failed to fetch doctor settings', error);
+        }
+      } finally {
+        if (isMounted) {
+          setSettingsLoading(false);
+        }
+      }
+    };
+
+    fetchDoctorSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   const doctorName = formatDoctorName(user?.name, 'Doctor');
   const pendingCount = appointments.filter((appointment) => appointment.status === 'PENDING').length;
@@ -181,6 +228,35 @@ export default function DoctorProfile() {
       setSearchParams({});
     } else {
       setSearchParams({ tab: tabKey });
+    }
+  };
+
+  const handleSaveGeneralSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsMessage('');
+
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/doctors/me/settings`,
+        { showOnlineOnLogin: Boolean(profile.showOnlineOnLogin) },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+
+      setProfile((prev) => ({
+        ...prev,
+        showOnlineOnLogin: Boolean(response.data?.showOnlineOnLogin),
+      }));
+      setIsOnline(Boolean(response.data?.isOnline));
+      setSettingsMessage('General settings saved successfully.');
+    } catch (error) {
+      console.error('Failed to save general settings', error);
+      setSettingsMessage(error?.response?.data?.error || 'Failed to save settings.');
+    } finally {
+      setSettingsSaving(false);
     }
   };
 
@@ -331,11 +407,21 @@ export default function DoctorProfile() {
                   <div className="mt-2 flex justify-end">
                     <button
                       type="button"
+                      onClick={handleSaveGeneralSettings}
+                      disabled={settingsSaving || settingsLoading}
                       className="rounded-md bg-primary-700 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-primary-800"
                     >
-                      Save Settings
+                      {settingsSaving ? 'Saving...' : 'Save Settings'}
                     </button>
                   </div>
+                  {settingsLoading && (
+                    <p className="mt-2 text-xs font-semibold text-slate-500">Loading settings...</p>
+                  )}
+                  {settingsMessage && (
+                    <p className={`mt-2 text-xs font-semibold ${settingsMessage.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {settingsMessage}
+                    </p>
+                  )}
                 </div>
 
                 <div>

@@ -72,6 +72,7 @@ model Doctor {
   specialization   Specialization @relation(fields: [specializationId], references: [id])
   fee              Decimal
   isOnline         Boolean        @default(false)
+  showOnlineOnLogin Boolean       @default(true)
   slotDurationMinutesVideo Int    @default(30)
   slotDurationMinutesAudio Int    @default(20)
   slotDurationMinutesInPerson Int @default(40)

@@ -79,12 +79,19 @@ async function releaseBookedSlot(tx, appointmentId) {
 exports.getDoctors = async (req, res) => {
   try {
     const { specializationName } = req.query;
+    const appointmentType = String(req.query?.type || req.query?.appointmentType || '').toUpperCase();
+    const shouldFilterOnlineOnly = appointmentType !== SCHEDULED_APPOINTMENT_TYPE;
+
+    const where = {};
+    if (specializationName) {
+      where.specialization = { name: { contains: specializationName, mode: 'insensitive' } };
+    }
+    if (shouldFilterOnlineOnly) {
+      where.isOnline = true;
+    }
 
     const doctors = await prisma.doctor.findMany({
-      where: specializationName ? {
-        specialization: { name: { contains: specializationName, mode: 'insensitive' } },
-        isOnline: true
-      } : { isOnline: true },
+      where,
       include: {
         user: { select: { name: true, email: true } },
         specialization: true
