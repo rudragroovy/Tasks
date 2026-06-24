@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { CreditCard, ShieldCheck, Lock, CheckCircle, ArrowRight, Stethoscope } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { CreditCard, ShieldCheck, Lock, CheckCircle, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { TopHeader } from '../components/ui/top-header';
 
 export default function MockCheckout() {

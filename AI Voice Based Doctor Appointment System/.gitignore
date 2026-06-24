@@ -58,3 +58,7 @@ find*.js
 /ui
 /uichanges
 /graphify-out
+.gstack/
+PRODUCT.md
+.impeccable
+

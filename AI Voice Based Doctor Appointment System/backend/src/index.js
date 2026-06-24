@@ -11,6 +11,7 @@ const paymentsRoutes = require('./routes/payments');
 const agoraRoutes = require('./routes/agora');
 const aiRoutes = require('./routes/ai');
 const adminRoutes = require('./routes/admin');
+const { ensureDefaultAdmin } = require('./utils/ensureDefaultAdmin');
 
 const path = require('path');
 
@@ -40,6 +41,11 @@ app.use('/api/admin', adminRoutes);
 require('./socket')(io);
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
+  try {
+    await ensureDefaultAdmin();
+  } catch (error) {
+    console.error('[bootstrap] Failed to ensure default admin user:', error.message);
+  }
   console.log(`Server running on port ${PORT}`);
 });

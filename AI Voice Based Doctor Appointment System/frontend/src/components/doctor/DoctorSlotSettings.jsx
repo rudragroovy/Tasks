@@ -17,6 +17,19 @@ const CONSULTATION_MODES = [
   { value: 'IN_PERSON', label: 'In Person' },
 ];
 
+const MODE_LABEL_BY_VALUE = CONSULTATION_MODES.reduce((acc, mode) => {
+  acc[mode.value] = mode.label;
+  return acc;
+}, {});
+
+function createEmptyModeEventMap() {
+  return {
+    VIDEO: [],
+    AUDIO: [],
+    IN_PERSON: [],
+  };
+}
+
 function toDateInputValue(dateLike) {
   const date = new Date(dateLike);
   if (Number.isNaN(date.getTime())) return '';
@@ -51,6 +64,11 @@ function startOfDay(dateLike) {
   return date;
 }
 
+function getDayOffset(dateLike, weekStart) {
+  const date = startOfDay(dateLike);
+  return Math.round((date.getTime() - weekStart.getTime()) / DAY_MS);
+}
+
 function snapMinutes(value, interval, mode = 'nearest') {
   if (mode === 'floor') return Math.floor(value / interval) * interval;
   if (mode === 'ceil') return Math.ceil(value / interval) * interval;
@@ -60,6 +78,22 @@ function snapMinutes(value, interval, mode = 'nearest') {
 function normalizeMode(mode) {
   const upper = String(mode || '').toUpperCase();
   return ['VIDEO', 'AUDIO', 'IN_PERSON'].includes(upper) ? upper : 'VIDEO';
+}
+
+function modeClassToken(mode) {
+  return normalizeMode(mode).toLowerCase().replace('_', '-');
+}
+
+function modeEventColor(mode) {
+  const normalized = normalizeMode(mode);
+  if (normalized === 'AUDIO') return 'green';
+  if (normalized === 'IN_PERSON') return 'orange';
+  return 'blue';
+}
+
+function buildCanonicalSlotEventId(mode, weekStart, startDate, endDate) {
+  const dayOffset = getDayOffset(startDate, weekStart);
+  return `slot-${normalizeMode(mode)}-${dayOffset}-${getMinutesSinceMidnight(startDate)}-${getMinutesSinceMidnight(endDate)}`;
 }
 
 function normalizeRange(startDate, endDate, intervalMinutes) {
@@ -89,18 +123,22 @@ function normalizeRange(startDate, endDate, intervalMinutes) {
   return { startDate: normalizedStart, endDate: normalizedEnd };
 }
 
-function buildEditableEventsFromWorkingHours(workingHours = [], weekStart) {
+function buildEditableEventsFromWorkingHours(workingHours = [], weekStart, consultationMode) {
   const events = [];
+  const mode = normalizeMode(consultationMode);
+  const modeLabel = MODE_LABEL_BY_VALUE[mode] || mode;
+  const modeToken = modeClassToken(mode);
 
   for (const day of workingHours) {
     const dayOfWeek = Number(day?.dayOfWeek);
     if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) continue;
 
     const activeSegments = (day?.segments || [])
+      .filter((segment) => segment?.source !== 'default')
       .filter((segment) => segment?.isActive && Number.isInteger(segment?.startMinutes) && Number.isInteger(segment?.endMinutes))
       .filter((segment) => segment.startMinutes < segment.endMinutes);
 
-    activeSegments.forEach((segment, index) => {
+    activeSegments.forEach((segment) => {
       const start = new Date(weekStart);
       start.setDate(weekStart.getDate() + dayOfWeek);
       start.setMinutes(segment.startMinutes, 0, 0);
@@ -110,11 +148,13 @@ function buildEditableEventsFromWorkingHours(workingHours = [], weekStart) {
       end.setMinutes(segment.endMinutes, 0, 0);
 
       events.push({
-        id: `slot-${dayOfWeek}-${index}-${segment.startMinutes}-${segment.endMinutes}`,
-        name: 'Open slot',
+        id: buildCanonicalSlotEventId(mode, weekStart, start, end),
+        name: `${modeLabel} slot`,
         startDate: start,
         endDate: end,
-        cls: 'doctor-open-slot-event',
+        consultationMode: mode,
+        eventColor: modeEventColor(mode),
+        cls: `doctor-open-slot-event doctor-open-slot-event--${modeToken}`,
         isOpenSlot: true,
       });
     });
@@ -167,12 +207,35 @@ function buildWorkingHoursPayloadFromEvents(openEvents, weekStart) {
   return workingHours;
 }
 
+function intervalsOverlap(startA, endA, startB, endB) {
+  return startA < endB && endA > startB;
+}
+
+function findConflictEvent({ candidateStart, candidateEnd, consultationMode, openSlotEventsByMode, bookedEvents, excludeEventId }) {
+  for (const mode of Object.keys(openSlotEventsByMode)) {
+    for (const event of openSlotEventsByMode[mode] || []) {
+      if (excludeEventId && event.id === excludeEventId) continue;
+      if (intervalsOverlap(candidateStart, candidateEnd, new Date(event.startDate), new Date(event.endDate))) {
+        return { kind: 'OPEN_SLOT', mode: normalizeMode(mode) };
+      }
+    }
+  }
+
+  for (const event of bookedEvents) {
+    if (intervalsOverlap(candidateStart, candidateEnd, new Date(event.startDate), new Date(event.endDate))) {
+      return { kind: 'BOOKED_APPOINTMENT', mode: normalizeMode(event.consultationMode || consultationMode) };
+    }
+  }
+
+  return null;
+}
+
 export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
   const [consultationMode, setConsultationMode] = useState('VIDEO');
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(DEFAULT_INTERVAL);
   const [allowedDurations, setAllowedDurations] = useState([10, 15, 20, 30, 45, 60]);
   const [calendarDate, setCalendarDate] = useState(() => new Date());
-  const [openSlotEvents, setOpenSlotEvents] = useState([]);
+  const [openSlotEventsByMode, setOpenSlotEventsByMode] = useState(() => createEmptyModeEventMap());
   const [loading, setLoading] = useState(true);
   const [savingWeekly, setSavingWeekly] = useState(false);
   const [savingWeekOverride, setSavingWeekOverride] = useState(false);
@@ -194,6 +257,16 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
   const weekAnchorDate = useMemo(() => toDateInputValue(weekStart), [weekStart]);
   const calendarMode = isMobileViewport ? 'day' : 'week';
 
+  const selectedModeOpenSlotEvents = useMemo(
+    () => openSlotEventsByMode[consultationMode] || [],
+    [consultationMode, openSlotEventsByMode]
+  );
+
+  const selectedOpenSlotEventIds = useMemo(
+    () => new Set(selectedModeOpenSlotEvents.map((event) => event.id)),
+    [selectedModeOpenSlotEvents]
+  );
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
@@ -211,6 +284,32 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
     return () => mediaQuery.removeListener(syncViewport);
   }, []);
 
+  const bookedEvents = useMemo(() => (
+    (scheduledAppointments || [])
+      .filter((apt) => apt?.type === 'SCHEDULED')
+      .filter((apt) => !['CANCELLED', 'REJECTED'].includes(apt?.status))
+      .map((apt) => {
+        const mode = normalizeMode(apt?.consultationMode || 'VIDEO');
+        const modeToken = modeClassToken(mode);
+        const start = new Date(apt.scheduledFor);
+        const fallbackDuration = Number(apt?.slotDurationMinutes) || DEFAULT_INTERVAL;
+        const end = apt.scheduledUntil ? new Date(apt.scheduledUntil) : addMinutes(start, fallbackDuration);
+        const patientName = apt?.familyMember?.name || apt?.patient?.name || 'Booked';
+        return {
+          id: `booked-${apt.id}`,
+          name: `Booked (${MODE_LABEL_BY_VALUE[mode]}): ${patientName}`,
+          startDate: start,
+          endDate: end,
+          consultationMode: mode,
+          eventColor: modeEventColor(mode),
+          cls: `doctor-booked-event doctor-booked-event--${modeToken}`,
+          readOnly: true,
+          isBooked: true,
+        };
+      })
+      .filter((event) => event.startDate <= weekEnd && event.endDate >= weekStart)
+  ), [scheduledAppointments, weekEnd, weekStart]);
+
   const loadSettings = useCallback(async () => {
     if (!hasLoadedOnceRef.current) {
       setLoading(true);
@@ -219,14 +318,27 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
     setSuccess('');
 
     try {
-      const [durationRes, hoursRes] = await Promise.all([
+      const modeValues = CONSULTATION_MODES.map((mode) => mode.value);
+      const [durationRes, ...hoursResponses] = await Promise.all([
         axios.get(`${API_URL}/api/doctors/me/slot-duration?mode=${consultationMode}`, { headers }),
-        axios.get(`${API_URL}/api/doctors/me/working-hours?mode=${consultationMode}&date=${weekAnchorDate}`, { headers }),
+        ...modeValues.map((modeValue) => axios.get(
+          `${API_URL}/api/doctors/me/working-hours?mode=${modeValue}&date=${weekAnchorDate}`,
+          { headers }
+        )),
       ]);
+
+      const nextOpenEvents = createEmptyModeEventMap();
+      modeValues.forEach((modeValue, index) => {
+        nextOpenEvents[modeValue] = buildEditableEventsFromWorkingHours(
+          hoursResponses[index]?.data || [],
+          weekStart,
+          modeValue
+        );
+      });
 
       setSlotDurationMinutes(durationRes.data?.slotDurationMinutes || DEFAULT_INTERVAL);
       setAllowedDurations(durationRes.data?.allowedSlotDurations || [10, 15, 20, 30, 45, 60]);
-      setOpenSlotEvents(buildEditableEventsFromWorkingHours(hoursRes.data, weekStart));
+      setOpenSlotEventsByMode(nextOpenEvents);
       idCounter.current = 1;
     } catch (err) {
       console.error('Failed to load doctor slot settings', err);
@@ -244,30 +356,15 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
     return () => clearTimeout(init);
   }, [loadSettings]);
 
-  const bookedEvents = useMemo(() => (
-    (scheduledAppointments || [])
-      .filter((apt) => apt?.type === 'SCHEDULED')
-      .filter((apt) => !['CANCELLED', 'REJECTED'].includes(apt?.status))
-      .filter((apt) => {
-        const mode = normalizeMode(apt?.consultationMode || 'VIDEO');
-        return mode === consultationMode;
-      })
-      .map((apt) => {
-        const start = new Date(apt.scheduledFor);
-        const end = apt.scheduledUntil ? new Date(apt.scheduledUntil) : addMinutes(start, slotDurationMinutes || DEFAULT_INTERVAL);
-        const patientName = apt?.familyMember?.name || apt?.patient?.name || 'Booked';
-        return {
-          id: `booked-${apt.id}`,
-          name: `Booked: ${patientName}`,
-          startDate: start,
-          endDate: end,
-          cls: 'doctor-booked-event',
-          readOnly: true,
-          isBooked: true,
-        };
-      })
-      .filter((event) => event.startDate <= weekEnd && event.endDate >= weekStart)
-  ), [consultationMode, scheduledAppointments, slotDurationMinutes, weekEnd, weekStart]);
+  const openSlotEvents = useMemo(() => (
+    Object.entries(openSlotEventsByMode).flatMap(([mode, events]) => (
+      (events || []).map((event) => ({
+        ...event,
+        consultationMode: normalizeMode(event.consultationMode || mode),
+        readOnly: normalizeMode(event.consultationMode || mode) !== consultationMode,
+      }))
+    ))
+  ), [consultationMode, openSlotEventsByMode]);
 
   const calendarEvents = useMemo(
     () => [...openSlotEvents, ...bookedEvents],
@@ -280,25 +377,61 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
     const normalized = normalizeRange(rawStart, rawEnd, Number(slotDurationMinutes) || DEFAULT_INTERVAL);
 
     if (!normalized) return;
-    const eventId = existingId || `slot-user-${Date.now()}-${idCounter.current++}`;
+    const eventId = buildCanonicalSlotEventId(
+      consultationMode,
+      weekStart,
+      normalized.startDate,
+      normalized.endDate
+    );
+    const modeToken = modeClassToken(consultationMode);
 
-    setOpenSlotEvents((prev) => {
-      const next = prev.filter((event) => event.id !== eventId);
-      next.push({
+    const conflict = findConflictEvent({
+      candidateStart: normalized.startDate,
+      candidateEnd: normalized.endDate,
+      consultationMode,
+      openSlotEventsByMode,
+      bookedEvents,
+      excludeEventId: existingId || eventId,
+    });
+
+    if (conflict) {
+      const modeLabel = MODE_LABEL_BY_VALUE[conflict.mode] || conflict.mode;
+      const conflictLabel = conflict.kind === 'BOOKED_APPOINTMENT'
+        ? `a booked ${modeLabel.toLowerCase()} appointment`
+        : `${modeLabel.toLowerCase()} slot settings`;
+      setSuccess('');
+      setError(`This slot overlaps with ${conflictLabel}. Shared calendar does not allow overlap across consultation modes.`);
+      return;
+    }
+
+    setError('');
+
+    setOpenSlotEventsByMode((prev) => {
+      const next = { ...prev };
+      const selectedModeEvents = [...(next[consultationMode] || [])].filter((event) => (
+        event.id !== eventId && (!existingId || event.id !== existingId)
+      ));
+      selectedModeEvents.push({
         id: eventId,
-        name: 'Open slot',
+        name: `${MODE_LABEL_BY_VALUE[consultationMode]} slot`,
         startDate: normalized.startDate,
         endDate: normalized.endDate,
-        cls: 'doctor-open-slot-event',
+        consultationMode,
+        eventColor: modeEventColor(consultationMode),
+        cls: `doctor-open-slot-event doctor-open-slot-event--${modeToken}`,
         isOpenSlot: true,
       });
+      next[consultationMode] = selectedModeEvents;
       return next;
     });
-  }, [slotDurationMinutes]);
+  }, [bookedEvents, consultationMode, openSlotEventsByMode, slotDurationMinutes, weekStart]);
 
   const deleteOpenSlot = useCallback((slotId) => {
-    setOpenSlotEvents((prev) => prev.filter((event) => event.id !== slotId));
-  }, []);
+    setOpenSlotEventsByMode((prev) => ({
+      ...prev,
+      [consultationMode]: (prev[consultationMode] || []).filter((event) => event.id !== slotId),
+    }));
+  }, [consultationMode]);
 
   const saveSlotDuration = async () => {
     await axios.put(
@@ -309,7 +442,7 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
   };
 
   const saveWorkingHours = async (applyScope) => {
-    const workingHours = buildWorkingHoursPayloadFromEvents(openSlotEvents, weekStart);
+    const workingHours = buildWorkingHoursPayloadFromEvents(selectedModeOpenSlotEvents, weekStart);
     await axios.put(
       `${API_URL}/api/doctors/me/working-hours`,
       {
@@ -362,12 +495,14 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
     setSuccess('');
 
     try {
-      await axios.post(
-        `${API_URL}/api/doctors/me/working-hours/defaults`,
-        { mode: consultationMode },
-        { headers }
+      await Promise.all(
+        CONSULTATION_MODES.map((mode) => axios.post(
+          `${API_URL}/api/doctors/me/working-hours/defaults`,
+          { mode: mode.value },
+          { headers }
+        ))
       );
-      setSuccess('Default working hours restored.');
+      setSuccess('Default shared schedule restored: Video 9-12, Audio 1-3, In Person 3-5.');
       await loadSettings();
     } catch (err) {
       console.error('Failed to reset working hours', err);
@@ -390,7 +525,7 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
       <div>
         <h2 className="text-lg font-heading font-bold text-slate-900 mb-2">Doctor Slot Settings</h2>
         <p className="text-sm text-slate-600">
-          Select mode and slot interval, then set availability directly on the calendar.
+          Pick one mode to edit. All modes are shown in one shared calendar and overlapping across modes is blocked.
         </p>
       </div>
 
@@ -444,41 +579,64 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 text-[11px] font-bold text-slate-700">
+        {CONSULTATION_MODES.map((mode) => (
+          <span
+            key={mode.value}
+            className={`doctor-slot-legend doctor-slot-legend--${modeClassToken(mode.value)}`}
+          >
+            {mode.label}
+          </span>
+        ))}
+      </div>
+
       <div className="doctor-schedule-calendar rounded-2xl border border-slate-200 overflow-hidden">
         <BryntumCalendar
           className="doctor-schedule-calendar"
           date={calendarDate}
           mode={calendarMode}
           events={calendarEvents}
+          overlaySidebar
           autoCreate
           enableDeleteKey
           eventEditFeature={false}
           eventTooltipFeature
           dragFeature
-          onDragCreateEnd={({ eventRecord }) => {
-            if (!eventRecord) return;
-            upsertOpenSlot(eventRecord);
+          onBeforeDragCreateEnd={({ eventRecord, newStartDate, newEndDate }) => {
+            upsertOpenSlot(
+              {
+                id: eventRecord?.id,
+                startDate: newStartDate,
+                endDate: newEndDate,
+              },
+              eventRecord?.id
+            );
+            return false;
           }}
           onDragMoveEnd={({ eventRecord }) => {
-            if (!eventRecord?.id) return;
-            const existing = openSlotEvents.find((event) => event.id === eventRecord.id);
-            if (!existing) return;
+            if (!eventRecord?.id || !eventRecord?.isOpenSlot) return;
+            if (normalizeMode(eventRecord?.consultationMode) !== consultationMode) return;
+            if (!selectedOpenSlotEventIds.has(eventRecord.id)) return;
             upsertOpenSlot(eventRecord, eventRecord.id);
           }}
           onDragResizeEnd={({ eventRecord }) => {
-            if (!eventRecord?.id) return;
-            const existing = openSlotEvents.find((event) => event.id === eventRecord.id);
-            if (!existing) return;
+            if (!eventRecord?.id || !eventRecord?.isOpenSlot) return;
+            if (normalizeMode(eventRecord?.consultationMode) !== consultationMode) return;
+            if (!selectedOpenSlotEventIds.has(eventRecord.id)) return;
             upsertOpenSlot(eventRecord, eventRecord.id);
           }}
           onEventDblClick={({ eventRecord }) => {
-            if (!eventRecord?.id) return;
-            const existing = openSlotEvents.find((event) => event.id === eventRecord.id);
-            if (!existing) return;
+            if (!eventRecord?.id || !eventRecord?.isOpenSlot) return;
+            if (normalizeMode(eventRecord?.consultationMode) !== consultationMode) return;
+            if (!selectedOpenSlotEventIds.has(eventRecord.id)) return;
             deleteOpenSlot(eventRecord.id);
           }}
           onBeforeEventDelete={({ eventRecords }) => {
-            const removable = (eventRecords || []).filter((record) => openSlotEvents.some((event) => event.id === record.id));
+            const removable = (eventRecords || []).filter((record) => (
+              record?.isOpenSlot
+              && normalizeMode(record?.consultationMode) === consultationMode
+              && selectedOpenSlotEventIds.has(record.id)
+            ));
             removable.forEach((record) => deleteOpenSlot(record.id));
             return false;
           }}
@@ -492,7 +650,7 @@ export default function DoctorSlotSettings({ scheduledAppointments = [] }) {
       </div>
 
       <p className="text-xs text-slate-500 font-semibold">
-        Drag on calendar to create slots. Drag/resize to adjust. Double-click an open slot to remove.
+        Drag on the calendar to create slots. You can edit only the selected mode, while all mode slots remain visible for conflict checking.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">

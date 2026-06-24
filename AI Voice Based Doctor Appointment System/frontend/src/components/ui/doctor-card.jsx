@@ -1,6 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Check, Video, Star, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { Check, Video, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { formatDoctorName } from "../../utils/doctorName";
 
@@ -11,7 +10,6 @@ export function DoctorCard({
   enableAnimations = true,
   hideBookButton = false,
 }) {
-  const [hovered, setHovered] = useState(false);
   const shouldReduceMotion = useReducedMotion();
   const shouldAnimate = enableAnimations && !shouldReduceMotion;
 
@@ -118,8 +116,6 @@ export function DoctorCard({
   return (
     <motion.div
       data-slot="profile-hover-card"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       initial="rest"
       whileHover="hover"
       variants={containerVariants}

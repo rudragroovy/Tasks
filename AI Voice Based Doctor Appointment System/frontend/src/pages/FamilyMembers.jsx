@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, UserPlus, Trash2, ShieldCheck, Activity } from 'lucide-react';
+import { Users, UserPlus, Trash2, ShieldCheck } from 'lucide-react';
 import { TopHeader } from '../components/ui/top-header';
 
 export default function FamilyMembers() {
@@ -29,7 +29,8 @@ export default function FamilyMembers() {
   };
 
   useEffect(() => {
-    fetchMembers();
+    const timer = setTimeout(() => { fetchMembers(); }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleAdd = async (e) => {
@@ -67,7 +68,7 @@ export default function FamilyMembers() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans">
       <TopHeader />
       
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -101,20 +102,20 @@ export default function FamilyMembers() {
                 </h3>
                 <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
-                    <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20" placeholder="e.g. Jane Doe" />
+                    <label htmlFor="family-member-name" className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
+                    <input id="family-member-name" type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20" placeholder="e.g. Jane Doe" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Relationship</label>
-                    <input type="text" required value={relation} onChange={e => setRelation(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20" placeholder="e.g. Mother, Son, Spouse" />
+                    <label htmlFor="family-member-relation" className="block text-xs font-bold text-slate-500 uppercase mb-1">Relationship</label>
+                    <input id="family-member-relation" type="text" required value={relation} onChange={e => setRelation(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20" placeholder="e.g. Mother, Son, Spouse" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Age</label>
-                    <input type="number" required min="0" max="150" value={age} onChange={e => setAge(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20" placeholder="e.g. 45" />
+                    <label htmlFor="family-member-age" className="block text-xs font-bold text-slate-500 uppercase mb-1">Age</label>
+                    <input id="family-member-age" type="number" required min="0" max="150" value={age} onChange={e => setAge(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20" placeholder="e.g. 45" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
-                    <select value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20 cursor-pointer">
+                    <label htmlFor="family-member-gender" className="block text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
+                    <select id="family-member-gender" value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary-500/20 cursor-pointer">
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
@@ -154,9 +155,11 @@ export default function FamilyMembers() {
                 className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative group hover:border-primary-200 transition-all hover:shadow-md"
               >
                 <button 
+                  type="button"
                   onClick={() => handleDelete(member.id)}
                   className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                   title="Remove Member"
+                  aria-label={`Remove ${member.name}`}
                 >
                   <Trash2 size={18} />
                 </button>

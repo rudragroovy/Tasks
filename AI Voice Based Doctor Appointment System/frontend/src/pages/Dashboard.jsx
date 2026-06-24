@@ -1,17 +1,16 @@
 import { useAuth } from '../context/AuthContext';
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import AIVoiceAssistant from '../components/AIVoiceAssistant';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import DoctorDashboard from './DoctorDashboard';
 import { useSocket } from '../context/SocketContext';
 import { HistoryModal } from '../components/ui/history-modal';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { TopHeader } from '../components/ui/top-header';
-import { Stethoscope, Mic, FileText, Video, CalendarClock, X, MessageSquare, Phone, PhoneOff, Clock, LayoutDashboard } from 'lucide-react';
+import { Stethoscope, Mic, FileText, Video, CalendarClock, X, MessageSquare, Phone, PhoneOff, Clock, LayoutDashboard, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDoctorName } from '../utils/doctorName';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const AIVoiceAssistant = lazy(() => import('../components/AIVoiceAssistant'));
+const DoctorDashboard = lazy(() => import('./DoctorDashboard'));
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -129,7 +128,15 @@ export default function Dashboard() {
   }, [incomingCall, socket]);
 
   const handleAcceptCall = () => {
+    const incomingAppointment = appointments.find((apt) => apt.id === incomingCall?.appointmentId);
+    const incomingMode = incomingAppointment?.consultationMode === 'AUDIO' || incomingAppointment?.consultationMode === 'IN_PERSON' || incomingAppointment?.consultationMode === 'VIDEO'
+      ? incomingAppointment.consultationMode
+      : 'VIDEO';
     socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: true });
+    if (incomingMode === 'IN_PERSON') {
+      navigate(`/patient/in-person/${incomingCall.appointmentId}`);
+      return;
+    }
     navigate(`/room/${incomingCall.appointmentId}`);
   };
 
@@ -249,7 +256,11 @@ export default function Dashboard() {
   };
 
   if (user?.role === 'DOCTOR') {
-    return <DoctorDashboard />;
+    return (
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm font-semibold text-slate-500">Loading dashboard...</div>}>
+        <DoctorDashboard />
+      </Suspense>
+    );
   }
 
   if (user?.role === 'ADMIN') {
@@ -284,7 +295,7 @@ export default function Dashboard() {
   const isAppointmentReady = (appointment) =>
     appointment?.status === 'ACCEPTED' || isInPersonScheduledConfirmed(appointment);
   const getWaitingRoomActionText = (mode, status, type, appointment) => {
-    if (isInPersonScheduledConfirmed(appointment)) return 'View Appointment';
+    if (isInPersonScheduledConfirmed(appointment)) return 'Open In-Person Session';
     if (status !== 'ACCEPTED') {
       if (mode === 'IN_PERSON' && type === 'SCHEDULED') return 'Scheduled Appointment';
       if (mode === 'IN_PERSON') return 'Appointment Details';
@@ -292,9 +303,13 @@ export default function Dashboard() {
     }
     if (type === 'SCHEDULED') return 'Open Scheduled Appointment';
     if (mode === 'AUDIO') return 'Join Audio Call';
-    if (mode === 'IN_PERSON') return 'View Appointment';
+    if (mode === 'IN_PERSON') return 'Open In-Person Session';
     return 'Join Video Call';
   };
+  const getAppointmentEntryRoute = (appointment) =>
+    getConsultationMode(appointment?.consultationMode) === 'IN_PERSON'
+      ? `/patient/in-person/${appointment.id}`
+      : `/waiting-room?id=${appointment.id}`;
   const incomingCallMode = getConsultationMode(
     appointments.find((apt) => apt.id === incomingCall?.appointmentId)?.consultationMode
   );
@@ -306,6 +321,32 @@ export default function Dashboard() {
     a.status !== 'CANCELLED' &&
     a.status !== 'REJECTED'
   );
+  const summaryCards = [
+    {
+      key: 'active',
+      label: 'Active Sessions',
+      value: activeAppointments.length,
+      icon: Activity,
+      iconWrap: 'bg-health-50 text-health-700 border-health-100',
+      accent: 'from-health-500/15 to-transparent',
+    },
+    {
+      key: 'scheduled',
+      label: 'Scheduled',
+      value: scheduledAppointments.length,
+      icon: CalendarClock,
+      iconWrap: 'bg-amber-50 text-amber-700 border-amber-100',
+      accent: 'from-amber-500/15 to-transparent',
+    },
+    {
+      key: 'history',
+      label: 'Completed',
+      value: pastAppointments.length,
+      icon: FileText,
+      iconWrap: 'bg-primary-50 text-primary-700 border-primary-100',
+      accent: 'from-primary-500/15 to-transparent',
+    },
+  ];
 
   return (
     <div className="patient-dashboard app-shell min-h-screen xl:h-screen bg-transparent font-sans flex flex-col xl:overflow-hidden">
@@ -318,34 +359,25 @@ export default function Dashboard() {
         <div className="flex-1 flex flex-col gap-6 min-w-0 xl:min-h-0">
           
           {/* Dashboard Header Stats */}
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 shrink-0">
-            <div className="app-panel bg-white p-3 sm:p-5 lg:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 transition-shadow group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-health-50 text-health-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-                <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6" />
-              </div>
-              <div className="text-center sm:text-left">
-                <p className="text-xl sm:text-2xl font-heading font-black text-slate-900 leading-none mb-0.5 sm:mb-1">{activeAppointments.length}</p>
-                <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Active</p>
-              </div>
-            </div>
-            <div className="app-panel bg-white p-3 sm:p-5 lg:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 transition-shadow group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-                <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6" />
-              </div>
-              <div className="text-center sm:text-left">
-                <p className="text-xl sm:text-2xl font-heading font-black text-slate-900 leading-none mb-0.5 sm:mb-1">{scheduledAppointments.length}</p>
-                <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Scheduled</p>
-              </div>
-            </div>
-            <div className="app-panel bg-white p-3 sm:p-5 lg:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 transition-shadow group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-                <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
-              </div>
-              <div className="text-center sm:text-left">
-                <p className="text-xl sm:text-2xl font-heading font-black text-slate-900 leading-none mb-0.5 sm:mb-1">{pastAppointments.length}</p>
-                <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">History</p>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 shrink-0">
+            {summaryCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={card.key}
+                  className="app-panel relative overflow-hidden bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm min-h-[94px] sm:min-h-[108px] flex items-center gap-3 sm:gap-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md group"
+                >
+                  <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r ${card.accent}`} />
+                  <div className={`relative z-10 w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex items-center justify-center shrink-0 ${card.iconWrap}`}>
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <div className="relative z-10 min-w-0">
+                    <p className="text-[11px] sm:text-xs text-slate-500 font-black uppercase tracking-wider">{card.label}</p>
+                    <p className="text-2xl sm:text-3xl font-heading font-black text-slate-900 leading-none mt-1.5">{card.value}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <AnimatePresence>
@@ -409,168 +441,147 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="flex-1 xl:overflow-y-auto pr-2 pb-4 space-y-4 xl:custom-scrollbar">
-                  {activeAppointments.map((apt, idx) => (
-                    <motion.div 
-                      key={apt.id}
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.1, type: "spring", stiffness: 300, damping: 25 }}
-                      className="group app-panel relative bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm hover:-translate-y-1 transition-all duration-300 flex flex-col sm:flex-row gap-6 items-start sm:items-center overflow-hidden"
-                    >
-                      {/* Gradient background pulse for active calls */}
-                      {isAppointmentReady(apt) && apt.type !== 'SCHEDULED' && (
-                        <div className="absolute inset-0 bg-gradient-to-r from-health-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                      )}
+                  {activeAppointments.map((apt, idx) => {
+                    const mode = getConsultationMode(apt.consultationMode);
+                    const ConsultationIcon = getConsultationIcon(mode);
+                    const isReady = isAppointmentReady(apt);
+                    const requestedTime = new Date(apt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const stateClass = isReady
+                      ? (apt.type === 'SCHEDULED'
+                        ? 'bg-primary-100 text-primary-700 border border-primary-200'
+                        : 'bg-health-100 text-health-700 border border-health-200')
+                      : apt.paymentStatus === 'PENDING_PAYMENT'
+                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200';
+                    const stateLabel = isReady
+                      ? (apt.type === 'SCHEDULED' ? 'Scheduled' : 'Ready')
+                      : apt.paymentStatus === 'PENDING_PAYMENT'
+                        ? 'Payment Due'
+                        : (apt.type === 'SCHEDULED' ? 'Pending' : 'Matching');
 
-                      {/* Status Indicator Bar (Left Side) */}
-                      <div className="hidden sm:block w-1.5 h-full min-h-[60px] rounded-full self-stretch bg-slate-100 relative overflow-hidden">
-                        <div className={`absolute bottom-0 w-full rounded-full transition-all duration-1000 ${
-                           isAppointmentReady(apt)
-                             ? (apt.type === 'SCHEDULED'
-                               ? 'h-full bg-primary-500 shadow-[0_0_10px_rgba(14,116,144,0.45)]'
-                               : 'h-full bg-health-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]')
-                             : apt.paymentStatus === 'PENDING_PAYMENT'
-                               ? 'h-1/2 bg-amber-500'
-                               : 'h-1/4 bg-primary-500'
-                        }`}></div>
-                      </div>
+                    return (
+                      <motion.div
+                        key={apt.id}
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1, type: "spring", stiffness: 300, damping: 25 }}
+                        className="group app-panel relative bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_188px_320px] md:min-h-[138px] md:items-center gap-4 md:gap-5 overflow-hidden"
+                      >
+                        {isReady && apt.type !== 'SCHEDULED' && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-health-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
 
-                      <div className="flex items-center gap-5 flex-1 z-10 min-w-0">
-                        <div className="relative shrink-0">
-                          <div className={`absolute inset-0 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity ${
-                            isAppointmentReady(apt) && apt.type !== 'SCHEDULED' ? 'bg-health-400' : 'bg-primary-200'
-                          }`}></div>
-                          <img 
-                            src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${apt.doctor?.name || 'Doctor'}&backgroundColor=f8fafc`} 
-                            alt="Doctor" 
-                            className="relative w-16 h-16 rounded-full border-4 border-white shadow-sm object-cover bg-slate-50"
-                          />
-                          {isAppointmentReady(apt) && apt.type !== 'SCHEDULED' && (
-                            <span className="absolute bottom-0 right-0 w-4 h-4 bg-health-500 border-2 border-white rounded-full flex items-center justify-center">
-                               <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
-                            </span>
-                          )}
-                        </div>
-                        
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-black text-slate-900 text-lg tracking-tight truncate">
+                        {/* Left: identity block */}
+                        <div className="z-10 flex items-start gap-4 min-w-0">
+                          <div className="hidden md:block w-1.5 min-h-[70px] self-stretch rounded-full bg-slate-100 relative overflow-hidden shrink-0">
+                            <div className={`absolute bottom-0 w-full rounded-full transition-all duration-1000 ${
+                              isReady
+                                ? (apt.type === 'SCHEDULED'
+                                  ? 'h-full bg-primary-500 shadow-[0_0_10px_rgba(14,116,144,0.45)]'
+                                  : 'h-full bg-health-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]')
+                                : apt.paymentStatus === 'PENDING_PAYMENT'
+                                  ? 'h-1/2 bg-amber-500'
+                                  : 'h-1/4 bg-primary-500'
+                            }`} />
+                          </div>
+
+                          <div className="relative shrink-0">
+                            <div className={`absolute inset-0 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity ${
+                              isReady && apt.type !== 'SCHEDULED' ? 'bg-health-400' : 'bg-primary-200'
+                            }`} />
+                            <img
+                              src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${apt.doctor?.name || 'Doctor'}&backgroundColor=0e7490`}
+                              alt="Doctor"
+                              className="relative w-14 h-14 rounded-full border-4 border-white shadow-sm object-cover bg-slate-50"
+                            />
+                            {isReady && apt.type !== 'SCHEDULED' && (
+                              <span className="absolute bottom-0 right-0 w-4 h-4 bg-health-500 border-2 border-white rounded-full flex items-center justify-center">
+                                <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <h4 className="font-black text-slate-900 text-base sm:text-lg tracking-tight truncate">
                               {formatDoctorName(apt.doctor?.name, apt.doctor?.name)}
                             </h4>
-                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md shrink-0 ${
-                               isAppointmentReady(apt)
-                                 ? (apt.type === 'SCHEDULED'
-                                   ? 'bg-primary-100 text-primary-700 border border-primary-200'
-                                   : 'bg-health-100 text-health-700 border border-health-200')
-                                 : apt.paymentStatus === 'PENDING_PAYMENT'
-                                   ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                   : 'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}>
-                              {isAppointmentReady(apt)
-                                ? (apt.type === 'SCHEDULED' ? 'Scheduled' : 'Ready')
-                                : apt.paymentStatus === 'PENDING_PAYMENT'
-                                  ? 'Payment Due'
-                                  : (apt.type === 'SCHEDULED' ? 'Pending' : 'Matching')}
-                            </span>
-                          </div>
-                          <p className="text-sm font-bold text-slate-500 truncate">
-                            {apt.doctor?.doctorProfile?.specialization?.name || apt.doctor?.specialization?.name || 'Specialist'}
-                            {apt.familyMember && <span className="ml-2 text-primary-600 text-[10px] uppercase tracking-widest bg-primary-50 px-2 py-0.5 rounded-md border border-primary-100 hidden sm:inline-block">For {apt.familyMember.name}</span>}
-                          </p>
-                          <p className="sm:hidden text-xs font-medium text-slate-400 mt-1 flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5" />
-                            Requested {new Date(apt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="hidden sm:flex flex-col items-center justify-center px-4 xl:px-8 z-10 shrink-0 border-l border-slate-100">
-                        <div className="flex items-center gap-1.5 text-slate-600 font-bold">
-                          <Clock className="w-4 h-4 text-slate-400" />
-                          <span>{new Date(apt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Requested</span>
-                      </div>
-                      
-                      <div className="w-full sm:w-auto shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-5 sm:pt-0 sm:pl-6 z-10">
-                        <div className="flex flex-col gap-2 w-full sm:w-auto">
-                          {apt.paymentStatus === 'PENDING_PAYMENT' ? (
-                            <button
-                              onClick={() => handlePayNow(apt)}
-                              disabled={payingAppointmentId === apt.id}
-                              className="w-full sm:w-auto px-6 py-3 bg-slate-900 text-white rounded-xl hover:bg-health-600 shadow-md hover:shadow-health-600/20 text-sm font-bold transition-all cursor-pointer transform-gpu active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              {payingAppointmentId === apt.id ? 'Redirecting...' : 'Pay Now'}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => { playSuccessSound(); navigate(`/waiting-room?id=${apt.id}`); }}
-                              className={`w-full sm:w-auto px-6 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 transform-gpu active:scale-95 ${
-                                isAppointmentReady(apt)
-                                  ? (apt.type === 'SCHEDULED'
-                                    ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-600/25'
-                                    : 'bg-health-500 text-white hover:bg-health-600 shadow-lg shadow-health-500/30')
-                                  : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 shadow-sm'
-                              }`}
-                            >
-                              {(() => {
-                                const mode = getConsultationMode(apt.consultationMode);
-                                const ConsultationIcon = getConsultationIcon(mode);
-                                return (
-                                  <ConsultationIcon className={`w-4 h-4 ${isAppointmentReady(apt) && apt.type !== 'SCHEDULED' ? 'animate-pulse' : ''}`} />
-                                );
-                              })()}
-                              {getWaitingRoomActionText(getConsultationMode(apt.consultationMode), apt.status, apt.type, apt)}
-                            </button>
-                          )}
+                            <p className="text-sm font-bold text-slate-500 truncate mt-0.5">
+                              {apt.doctor?.doctorProfile?.specialization?.name || apt.doctor?.specialization?.name || 'Specialist'}
+                            </p>
 
-                          {getConsultationMode(apt.consultationMode) === 'IN_PERSON' && isAppointmentReady(apt) && apt.paymentStatus !== 'PENDING_PAYMENT' && (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => navigate(`/room/${apt.id}`)}
-                                title="Open Chat"
-                                aria-label="Open Chat"
-                                className="w-10 h-10 rounded-xl border border-primary-200 text-primary-700 bg-primary-50 hover:bg-primary-100 transition-all cursor-pointer flex items-center justify-center"
-                              >
-                                <MessageSquare className="w-4 h-4" />
-                              </button>
-                              {apt.consultation?.prescriptionUrl ? (
-                                <a
-                                  href={`${API_URL}${apt.consultation.prescriptionUrl}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="View Prescription"
-                                  aria-label="View Prescription"
-                                  className="w-10 h-10 rounded-xl border border-health-200 text-health-700 bg-health-50 hover:bg-health-100 transition-all cursor-pointer flex items-center justify-center"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                </a>
-                              ) : (
-                                <button
-                                  disabled
-                                  title="Prescription Pending"
-                                  aria-label="Prescription Pending"
-                                  className="w-10 h-10 rounded-xl border border-slate-200 text-slate-500 bg-slate-100 cursor-not-allowed flex items-center justify-center"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                </button>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md">
+                                {getConsultationLabel(mode)} / {apt.type === 'SCHEDULED' ? 'Scheduled' : 'Consult'}
+                              </span>
+                              {apt.familyMember && (
+                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-primary-600 bg-primary-50 border border-primary-100 px-2 py-0.5 rounded-md">
+                                  For {apt.familyMember.name}
+                                </span>
                               )}
                             </div>
-                          )}
 
-                          {apt.type === 'SCHEDULED' && (
-                            <button
-                              onClick={() => setCancelTargetAppointmentId(apt.id)}
-                              disabled={cancelingAppointmentId === apt.id}
-                              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              {cancelingAppointmentId === apt.id ? 'Cancelling...' : 'Cancel Scheduled Call'}
-                            </button>
-                          )}
+                            <div className="mt-2 md:hidden flex items-center gap-2">
+                              <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md ${stateClass}`}>
+                                {stateLabel}
+                              </span>
+                              <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5" />
+                                {requestedTime}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  ))}
+
+                        {/* Middle: timing/status block */}
+                        <div className="hidden md:flex z-10 flex-col justify-center gap-1 border-l border-slate-100 pl-4 w-[188px]">
+                          <p className="text-3xl font-heading font-black text-slate-800 leading-none tabular-nums">{requestedTime}</p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Requested</p>
+                          <span className={`w-fit mt-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md ${stateClass}`}>
+                            {stateLabel}
+                          </span>
+                        </div>
+
+                        {/* Right: action rail */}
+                        <div className="z-10 w-full md:w-[320px] border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-5 md:h-full md:flex md:items-center">
+                          <div className="flex flex-col gap-2 w-full">
+                            {apt.paymentStatus === 'PENDING_PAYMENT' ? (
+                              <button
+                                onClick={() => handlePayNow(apt)}
+                                disabled={payingAppointmentId === apt.id}
+                                className="w-full h-11 px-6 bg-slate-900 text-white rounded-xl hover:bg-health-600 shadow-md hover:shadow-health-600/20 text-sm font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                {payingAppointmentId === apt.id ? 'Redirecting...' : 'Pay Now'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => { playSuccessSound(); navigate(getAppointmentEntryRoute(apt)); }}
+                                className={`w-full h-11 px-6 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95 ${
+                                  isReady
+                                    ? (apt.type === 'SCHEDULED'
+                                      ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-600/25'
+                                      : 'bg-health-500 text-white hover:bg-health-600 shadow-lg shadow-health-500/30')
+                                    : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 shadow-sm'
+                                }`}
+                              >
+                                <ConsultationIcon className={`w-4 h-4 ${isReady && apt.type !== 'SCHEDULED' ? 'animate-pulse' : ''}`} />
+                                {getWaitingRoomActionText(mode, apt.status, apt.type, apt)}
+                              </button>
+                            )}
+
+                            {apt.type === 'SCHEDULED' && (
+                              <button
+                                onClick={() => setCancelTargetAppointmentId(apt.id)}
+                                disabled={cancelingAppointmentId === apt.id}
+                                className="w-full h-11 px-6 rounded-xl text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                {cancelingAppointmentId === apt.id ? 'Cancelling...' : 'Cancel Scheduled Call'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -579,7 +590,7 @@ export default function Dashboard() {
 
         {/* Right Column: Past History Sidebar */}
         <aside className="w-full xl:w-[370px] 2xl:w-[410px] shrink-0 xl:overflow-hidden">
-          <div className="app-panel bg-white border border-slate-200 rounded-3xl shadow-sm p-4 sm:p-5 xl:p-6 h-full flex flex-col gap-4 xl:min-h-0">
+          <div className="app-panel bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 xl:p-6 h-full flex flex-col gap-4 xl:min-h-0">
             <div className="flex items-start justify-between gap-3 shrink-0">
               <div>
                 <h2 className="text-lg font-black text-slate-900 tracking-tight">Medical History</h2>
@@ -614,9 +625,9 @@ export default function Dashboard() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1, type: "spring", stiffness: 300, damping: 25 }}
                     onClick={() => setSelectedHistoryApt(apt)}
-                    className="group bg-slate-50 border border-slate-200 rounded-2xl p-4 hover:bg-white hover:-translate-y-0.5 hover:shadow-sm transition-all duration-300 cursor-pointer relative overflow-hidden"
+                    className="group bg-white border border-slate-200 rounded-2xl p-4 hover:border-primary-200 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-300 cursor-pointer relative overflow-hidden"
                   >
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-200 group-hover:bg-primary-400 transition-colors duration-300"></div>
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-200 group-hover:bg-primary-500 transition-colors duration-300"></div>
 
                     <div className="flex justify-between items-start mb-3 pl-2">
                       <div className="flex items-center gap-3 min-w-0">
@@ -646,7 +657,7 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    <div className="ml-2 bg-white group-hover:bg-primary-50/50 p-2.5 rounded-xl border border-slate-100 transition-colors">
+                    <div className="ml-2 bg-slate-50 group-hover:bg-primary-50/50 p-3 rounded-xl border border-slate-100 transition-colors">
                       <p className="text-xs text-slate-600 line-clamp-2 font-medium leading-relaxed">
                         {apt.aiSummary?.primary_symptom || 'General consultation regarding health concerns.'}
                       </p>
@@ -796,10 +807,12 @@ export default function Dashboard() {
               exit={{ opacity: 0 }}
               className="h-full w-full"
             >
-              <AIVoiceAssistant
-                onComplete={handleTriageComplete}
-                onClose={() => setIsAIModalOpen(false)}
-              />
+              <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white">Loading AI triage...</div>}>
+                <AIVoiceAssistant
+                  onComplete={handleTriageComplete}
+                  onClose={() => setIsAIModalOpen(false)}
+                />
+              </Suspense>
             </motion.div>
           </motion.div>
         )}

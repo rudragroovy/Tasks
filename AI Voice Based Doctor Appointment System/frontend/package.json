@@ -17,6 +17,7 @@
     "@google/generative-ai": "^0.24.1",
     "agora-rtc-sdk-ng": "^4.23.0",
     "agora-rtm-sdk": "^2.2.4",
+    "antd": "^6.4.5",
     "axios": "^1.18.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",

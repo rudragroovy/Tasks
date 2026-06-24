@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useConversation, ConversationProvider } from '@elevenlabs/react';
 import { Mic, MicOff, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import AppIcon from './branding/AppIcon';
 
 async function safeEndSession(conversation) {
   try {
@@ -213,7 +214,7 @@ function AIVoiceAssistantInner({ onComplete, onClose }) {
       <div className="relative z-10 flex h-full flex-col items-center">
         <div className="pt-4 sm:pt-5">
           <div className="flex items-center gap-3">
-            <div className="grid h-8 w-8 place-items-center rounded-[0.7rem] border border-white/30 bg-white/10 text-[0.95rem] font-black text-white shadow-[0_0_16px_rgba(255,255,255,0.12)]">+</div>
+            <AppIcon size={32} className="border border-white/30 shadow-[0_0_16px_rgba(255,255,255,0.22)]" />
             <span className="font-heading text-[1.68rem] font-black tracking-tight text-white sm:text-[1.82rem]">CareBridge</span>
           </div>
         </div>

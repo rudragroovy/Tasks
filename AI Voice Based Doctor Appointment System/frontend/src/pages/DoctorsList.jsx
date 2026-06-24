@@ -1,20 +1,14 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { NavBar } from '../components/ui/tubelight-navbar';
 import { DoctorCard } from '../components/ui/doctor-card';
-import { ArrowLeft, User, Search, LayoutDashboard, Mic, LogOut } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, User, Search } from 'lucide-react';
 import { TopHeader } from '../components/ui/top-header';
-import AIVoiceAssistant from '../components/AIVoiceAssistant';
-import { AnimatePresence } from 'framer-motion';
 
 export default function DoctorsList() {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchDoctors = async () => {
@@ -31,7 +25,8 @@ export default function DoctorsList() {
   };
 
   useEffect(() => {
-    fetchDoctors();
+    const timer = setTimeout(() => { fetchDoctors(); }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const filteredDoctors = doctors.filter(doc => {
@@ -42,7 +37,7 @@ export default function DoctorsList() {
 
   return (
     <div className="h-screen bg-slate-50 font-sans flex flex-col overflow-hidden">
-      <TopHeader onAITriageClick={() => setIsAIModalOpen(true)} />
+      <TopHeader />
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col overflow-hidden">
         <button 
@@ -84,9 +79,9 @@ export default function DoctorsList() {
         ) : (
           <div className="flex-1 overflow-y-auto pr-2 pb-4 custom-scrollbar">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredDoctors.map(doc => (
+            {filteredDoctors.map((doc, idx) => (
               <DoctorCard 
-                key={doc.userId || Math.random()} 
+                key={doc.userId || `${doc.user?.name || 'doctor'}-${idx}`}
                 doctor={doc} 
                 onBook={() => navigate(
                   `/booking?specialization=${encodeURIComponent(doc.specialization?.name || '')}&doctorId=${encodeURIComponent(doc.userId || '')}`,

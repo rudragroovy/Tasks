@@ -1,21 +1,11 @@
-import React, { useEffect, useState } from "react"
+import { useState } from "react"
 import { motion } from "framer-motion"
 import { Link } from "react-router-dom"
 import { cn } from "../../lib/utils"
+import AppIcon from "../branding/AppIcon"
 
 export function NavBar({ items, className }) {
   const [activeTab, setActiveTab] = useState(items[0].name)
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-
-    handleResize()
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
 
   return (
     <div
@@ -27,10 +17,7 @@ export function NavBar({ items, className }) {
       <div className="flex items-center gap-3 bg-white/50 border border-slate-200 backdrop-blur-lg py-1 px-1 pr-2 pl-3 rounded-full shadow-lg">
         {/* Logo */}
         <div className="flex items-center gap-2 mr-2">
-          <div className="w-8 h-8 bg-primary-900 rounded-full sm:rounded-md flex items-center justify-center relative overflow-hidden shadow-sm">
-             <div className="absolute w-4 h-4 bg-white top-0 left-0 rounded-br-md" />
-             <div className="absolute w-4 h-4 bg-health-500 bottom-0 right-0 rounded-tl-md" />
-          </div>
+          <AppIcon size={32} />
           <span className="font-heading font-black text-primary-900 text-lg tracking-tight hidden md:block">CareBridge</span>
         </div>
 

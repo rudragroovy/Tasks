@@ -12,14 +12,8 @@ import {
 } from 'lucide-react';
 
 /* ── Animated pulsing ring ── */
-function PulseRing({ color = 'border-health-400', delay = 0 }) {
-  return (
-    <motion.div
-      className={`absolute inset-0 rounded-full border-2 ${color}`}
-      animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
-      transition={{ duration: 2, delay, repeat: Infinity, ease: 'easeOut' }}
-    />
-  );
+function PulseRing({ color = 'border-health-400' }) {
+  return <div className={`absolute inset-0 rounded-full border-2 opacity-40 ${color}`} />;
 }
 
 /* ── Step indicator ── */
@@ -34,7 +28,7 @@ function StepRow({ icon: Icon, label, sub, active, done }) {
             'bg-slate-100 text-slate-400'
         }`}>
         {done ? <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" /> :
-          active ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}><Loader2 className="w-4 h-4 sm:w-5 sm:h-5" /></motion.div> :
+          active ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5" /> :
             <Icon className="w-4 h-4 sm:w-5 sm:h-5" />}
       </div>
       <div className="min-w-0">
@@ -43,20 +37,8 @@ function StepRow({ icon: Icon, label, sub, active, done }) {
         <p className={`text-[10px] sm:text-xs font-medium transition-colors duration-300 ${active ? 'text-primary-500' : done ? 'text-health-500' : 'text-slate-300'
           }`}>{sub}</p>
       </div>
-      {active && (
-        <motion.div
-          className="ml-auto w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary-500"
-          animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
-          transition={{ duration: 1.2, repeat: Infinity }}
-        />
-      )}
-      {done && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="ml-auto w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-health-500"
-        />
-      )}
+      {active && <div className="ml-auto w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary-500" />}
+      {done && <div className="ml-auto w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-health-500" />}
     </div>
   );
 }
@@ -152,9 +134,23 @@ export default function PatientWaitingRoom() {
     return () => clearInterval(timer);
   }, [incomingCall, timeLeft, handleDecline]);
 
+  useEffect(() => {
+    if (!incomingCall) return undefined;
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      handleDecline();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [incomingCall, handleDecline]);
+
+  const readySessionRoute = consultationMode === 'IN_PERSON'
+    ? `/patient/in-person/${appointmentId}`
+    : `/room/${appointmentId}`;
+
   const handleAccept = () => {
     socket.emit('call:response', { appointmentId, doctorId: appointment?.doctorId, accepted: true });
-    navigate(`/room/${appointmentId}`);
+    navigate(readySessionRoute);
   };
 
   const handleCancelScheduledCall = async () => {
@@ -275,14 +271,12 @@ export default function PatientWaitingRoom() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <motion.div
-                    animate={{ scale: step >= 2 ? [1, 1.15, 1] : 1 }}
-                    transition={{ duration: 1.1, repeat: step >= 2 ? Infinity : 0 }}
+                  <div
                     className={`absolute bottom-1 right-1 w-10 h-10 rounded-full border-4 border-primary-900 flex items-center justify-center z-20 shadow-lg ${step >= 2 ? 'bg-health-500' : 'bg-primary-600'
                       }`}
                   >
                     <Video className="w-4 h-4 text-white" />
-                  </motion.div>
+                  </div>
                 </div>
 
                 <p className="mt-4 text-white font-heading font-black text-xl text-center">
@@ -322,14 +316,12 @@ export default function PatientWaitingRoom() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <motion.div
-                    animate={{ scale: step >= 2 ? [1, 1.15, 1] : 1 }}
-                    transition={{ duration: 1, repeat: step >= 2 ? Infinity : 0 }}
+                  <div
                     className={`absolute bottom-1 right-1 w-9 h-9 rounded-full border-4 border-white flex items-center justify-center z-20 shadow-md ${step >= 2 ? 'bg-health-500' : 'bg-primary-600'
                       }`}
                   >
                     <Video className="w-4 h-4 text-white" />
-                  </motion.div>
+                  </div>
                 </div>
               </div>
 
@@ -374,16 +366,16 @@ export default function PatientWaitingRoom() {
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
                     >
-                      <button
-                        onClick={() => navigate(`/room/${appointmentId}`)}
+                      <button type="button"
+                        onClick={() => navigate(readySessionRoute)}
                         className="w-full py-3 sm:py-4 rounded-2xl font-heading font-black text-white text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all shadow-lg shadow-health-500/25 hover:shadow-health-500/40 hover:scale-[1.01] active:scale-[0.98]"
                         style={{ background: 'linear-gradient(135deg, #059669 0%, #06B6D4 100%)' }}
                       >
                         {consultationMode === 'AUDIO'
-                          ? <Phone className="w-4 h-4 animate-pulse" />
+                          ? <Phone className="w-4 h-4" />
                           : (consultationMode === 'IN_PERSON'
-                            ? <MessageSquare className="w-4 h-4 animate-pulse" />
-                            : <Video className="w-4 h-4 animate-pulse" />)}
+                            ? <MessageSquare className="w-4 h-4" />
+                            : <Video className="w-4 h-4" />)}
                         {consultationMode === 'IN_PERSON'
                           ? 'Open In-Person Chat'
                           : `${isScheduledAppointment ? 'Open' : 'Join'} ${consultationLabel} Session`}
@@ -392,7 +384,7 @@ export default function PatientWaitingRoom() {
                   )}
                 </AnimatePresence>
 
-                <button
+                <button type="button"
                   onClick={() => navigate('/dashboard')}
                   className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl border-2 border-slate-100 text-slate-500 font-bold text-sm hover:bg-slate-50 hover:text-slate-700 hover:border-slate-200 transition-all cursor-pointer"
                 >
@@ -401,7 +393,7 @@ export default function PatientWaitingRoom() {
                 </button>
 
                 {canCancelScheduledCall && (
-                  <button
+                  <button type="button"
                     onClick={() => setShowCancelConfirm(true)}
                     disabled={isCancelling}
                     className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl border-2 border-red-100 bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 hover:border-red-200 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
@@ -474,6 +466,9 @@ export default function PatientWaitingRoom() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
             style={{ background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(16px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Incoming consultation call"
           >
             {/* Card-style call UI */}
             <motion.div
@@ -500,13 +495,9 @@ export default function PatientWaitingRoom() {
               </div>
 
               {/* Call info */}
-              <motion.p
-                animate={{ opacity: [1, 0.5, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                className="text-health-400 text-xs font-black uppercase tracking-widest mb-3"
-              >
+              <p className="text-health-400 text-xs font-black uppercase tracking-widest mb-3">
                 Incoming {consultationLabel} Call
-              </motion.p>
+              </p>
               <h2 className="text-white font-heading font-black text-2xl sm:text-3xl text-center mb-1">
                 {formatDoctorName(incomingCall.doctorName, incomingCall.doctorName)}
               </h2>
@@ -540,33 +531,23 @@ export default function PatientWaitingRoom() {
 
               {/* Accept / Decline */}
               <div className="flex items-center gap-8 sm:gap-12">
-                <button
+                <button type="button"
                   onClick={handleDecline}
                   className="flex flex-col items-center gap-3 group cursor-pointer"
                 >
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 group-hover:bg-red-600 transition-colors"
-                  >
+                  <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 group-hover:bg-red-600 transition-colors">
                     <PhoneOff className="w-7 h-7 text-white" />
-                  </motion.div>
+                  </div>
                   <span className="text-white/60 font-bold tracking-wider uppercase text-xs">Decline</span>
                 </button>
 
-                <button
+                <button type="button"
                   onClick={handleAccept}
                   className="flex flex-col items-center gap-3 group cursor-pointer"
                 >
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    animate={{ boxShadow: ['0 0 0 0 rgba(16,185,129,0.4)', '0 0 0 20px rgba(16,185,129,0)', '0 0 0 0 rgba(16,185,129,0)'] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="w-16 h-16 bg-health-500 rounded-full flex items-center justify-center shadow-lg shadow-health-500/30 group-hover:bg-health-600 transition-colors"
-                  >
+                  <div className="w-16 h-16 bg-health-500 rounded-full flex items-center justify-center shadow-lg shadow-health-500/30 group-hover:bg-health-600 transition-colors">
                     <Phone className="w-7 h-7 text-white" />
-                  </motion.div>
+                  </div>
                   <span className="text-white font-bold tracking-wider uppercase text-xs">Accept</span>
                 </button>
               </div>

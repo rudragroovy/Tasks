@@ -17,6 +17,7 @@ const {
 const router = express.Router();
 const DAY_COUNT = 7;
 const MINUTES_PER_DAY = 24 * 60;
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function getStartOfWeek(dateLike) {
   const date = new Date(dateLike);
@@ -25,7 +26,20 @@ function getStartOfWeek(dateLike) {
   return date;
 }
 
-function buildWorkingWeekResponse(configuredHours) {
+function getDayOffsetFromWeekStart(dateLike, weekStart) {
+  const date = new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return -1;
+  const normalizedDate = new Date(date);
+  normalizedDate.setHours(0, 0, 0, 0);
+
+  const normalizedWeekStart = new Date(weekStart);
+  normalizedWeekStart.setHours(0, 0, 0, 0);
+
+  const offset = Math.round((normalizedDate.getTime() - normalizedWeekStart.getTime()) / (24 * 60 * 60 * 1000));
+  return offset >= 0 && offset < DAY_COUNT ? offset : -1;
+}
+
+function buildWorkingWeekResponse(configuredHours, consultationMode = DEFAULT_CONSULTATION_MODE) {
   const byDay = new Map();
   for (const hour of configuredHours || []) {
     if (!byDay.has(hour.dayOfWeek)) {
@@ -42,7 +56,7 @@ function buildWorkingWeekResponse(configuredHours) {
       if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
       return a.endMinutes - b.endMinutes;
     });
-    const fallbackSegment = getDefaultWorkingHourForDay(dayOfWeek);
+    const fallbackSegment = getDefaultWorkingHourForDay(dayOfWeek, consultationMode);
     const source = configuredSegments.length > 0 ? 'configured' : 'default';
     const baseSegments = configuredSegments.length > 0
       ? configuredSegments
@@ -169,6 +183,83 @@ function normalizeIncomingSegments(dayOfWeek, dayIsActive, rawSegments) {
   });
 
   return { segments: sortedSegments };
+}
+
+function intervalsOverlap(startA, endA, startB, endB) {
+  return startA < endB && endA > startB;
+}
+
+function createEmptyDayMap() {
+  const map = new Map();
+  for (let day = 0; day < DAY_COUNT; day += 1) {
+    map.set(day, []);
+  }
+  return map;
+}
+
+function buildActiveSegmentsByDay(rows = []) {
+  const byDay = createEmptyDayMap();
+
+  for (const row of rows) {
+    const dayOfWeek = Number(row?.dayOfWeek);
+    const startMinutes = Number(row?.startMinutes);
+    const endMinutes = Number(row?.endMinutes);
+    const isActive = Boolean(row?.isActive);
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) continue;
+    if (!isActive) continue;
+    if (!Number.isInteger(startMinutes) || !Number.isInteger(endMinutes)) continue;
+    if (startMinutes >= endMinutes) continue;
+    byDay.get(dayOfWeek).push({ startMinutes, endMinutes });
+  }
+
+  for (let day = 0; day < DAY_COUNT; day += 1) {
+    byDay.get(day).sort((a, b) => (
+      (a.startMinutes - b.startMinutes) || (a.endMinutes - b.endMinutes)
+    ));
+  }
+
+  return byDay;
+}
+
+function getCrossModeConflict(selectedMode, selectedByDay, otherModeDayGroups) {
+  for (let day = 0; day < DAY_COUNT; day += 1) {
+    const selectedSegments = selectedByDay.get(day) || [];
+    if (selectedSegments.length === 0) continue;
+
+    for (const group of otherModeDayGroups) {
+      const otherSegments = group.byDay.get(day) || [];
+      if (otherSegments.length === 0) continue;
+
+      for (const selectedSegment of selectedSegments) {
+        for (const otherSegment of otherSegments) {
+          if (intervalsOverlap(
+            selectedSegment.startMinutes,
+            selectedSegment.endMinutes,
+            otherSegment.startMinutes,
+            otherSegment.endMinutes
+          )) {
+            return {
+              selectedMode,
+              otherMode: group.mode,
+              dayOfWeek: day,
+              selectedSegment,
+              otherSegment,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildCrossModeConflictMessage(conflict) {
+  const selectedLabel = String(conflict.selectedMode || '').replace('_', ' ');
+  const otherLabel = String(conflict.otherMode || '').replace('_', ' ');
+  const dayLabel = DAY_NAMES[conflict.dayOfWeek] || `day ${conflict.dayOfWeek}`;
+
+  return `${selectedLabel} slot ${minutesToHHMM(conflict.selectedSegment.startMinutes)}-${minutesToHHMM(conflict.selectedSegment.endMinutes)} on ${dayLabel} overlaps with ${otherLabel} slot ${minutesToHHMM(conflict.otherSegment.startMinutes)}-${minutesToHHMM(conflict.otherSegment.endMinutes)}. Shared calendar does not allow overlap across consultation modes.`;
 }
 
 router.get('/specializations', async (req, res) => {
@@ -342,7 +433,7 @@ router.get('/me/working-hours', authenticate, async (req, res) => {
         where: { doctorId: req.user.id, consultationMode },
         orderBy: [{ dayOfWeek: 'asc' }, { segmentIndex: 'asc' }],
       });
-      return res.json(buildWorkingWeekResponse(configuredHours));
+      return res.json(buildWorkingWeekResponse(configuredHours, consultationMode));
     }
 
     if (!requestedDate) {
@@ -378,7 +469,8 @@ router.get('/me/working-hours', authenticate, async (req, res) => {
 
     const overridesByDay = new Map();
     for (const row of overrides) {
-      const dayOfWeek = new Date(row.date).getDay();
+      const dayOfWeek = getDayOffsetFromWeekStart(row.date, weekStart);
+      if (dayOfWeek < 0) continue;
       if (!overridesByDay.has(dayOfWeek)) overridesByDay.set(dayOfWeek, []);
       overridesByDay.get(dayOfWeek).push({ ...row, dayOfWeek });
     }
@@ -393,7 +485,7 @@ router.get('/me/working-hours', authenticate, async (req, res) => {
       })));
     }
 
-    return res.json(buildWorkingWeekResponse(merged));
+    return res.json(buildWorkingWeekResponse(merged, consultationMode));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch working hours' });
@@ -466,15 +558,111 @@ router.put('/me/working-hours', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'workingHours must include each day exactly once' });
     }
 
+    let weekStart = null;
+    let weekEnd = null;
+
     if (applyScope === 'selected_week') {
       const parsedDate = parseDateOnly(effectiveDate);
       if (!parsedDate) {
         return res.status(400).json({ error: 'effectiveDate is required for selected_week (YYYY-MM-DD)' });
       }
 
-      const weekStart = getStartOfWeek(parsedDate);
-      const weekEnd = new Date(weekStart);
+      weekStart = getStartOfWeek(parsedDate);
+      weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + DAY_COUNT);
+    }
+
+    const selectedByDay = buildActiveSegmentsByDay(nextRows);
+    const otherModes = CONSULTATION_MODES.filter((mode) => mode !== consultationMode);
+    const otherModeDayGroups = [];
+
+    if (otherModes.length > 0) {
+      if (applyScope === 'selected_week') {
+        const [otherRecurringRows, otherOverrideRows] = await Promise.all([
+          prisma.doctorWorkingHour.findMany({
+            where: {
+              doctorId: req.user.id,
+              consultationMode: { in: otherModes },
+            },
+            orderBy: [{ consultationMode: 'asc' }, { dayOfWeek: 'asc' }, { segmentIndex: 'asc' }],
+          }),
+          prisma.doctorWorkingHourOverride.findMany({
+            where: {
+              doctorId: req.user.id,
+              consultationMode: { in: otherModes },
+              date: {
+                gte: weekStart,
+                lt: weekEnd,
+              },
+            },
+            orderBy: [{ consultationMode: 'asc' }, { date: 'asc' }, { segmentIndex: 'asc' }],
+          }),
+        ]);
+
+        const recurringByModeDay = new Map();
+        const overrideByModeDay = new Map();
+        const makeModeDayKey = (mode, dayOfWeek) => `${mode}:${dayOfWeek}`;
+
+        for (const row of otherRecurringRows) {
+          const key = makeModeDayKey(row.consultationMode, row.dayOfWeek);
+          if (!recurringByModeDay.has(key)) recurringByModeDay.set(key, []);
+          recurringByModeDay.get(key).push(row);
+        }
+
+        for (const row of otherOverrideRows) {
+          const dayOfWeek = getDayOffsetFromWeekStart(row.date, weekStart);
+          if (dayOfWeek < 0) continue;
+          const key = makeModeDayKey(row.consultationMode, dayOfWeek);
+          if (!overrideByModeDay.has(key)) overrideByModeDay.set(key, []);
+          overrideByModeDay.get(key).push({ ...row, dayOfWeek });
+        }
+
+        for (const otherMode of otherModes) {
+          const mergedRows = [];
+          for (let dayOfWeek = 0; dayOfWeek < DAY_COUNT; dayOfWeek += 1) {
+            const key = makeModeDayKey(otherMode, dayOfWeek);
+            const sourceRows = overrideByModeDay.has(key)
+              ? (overrideByModeDay.get(key) || [])
+              : (recurringByModeDay.get(key) || []);
+            mergedRows.push(...sourceRows.map((row) => ({ ...row, dayOfWeek })));
+          }
+
+          otherModeDayGroups.push({
+            mode: otherMode,
+            byDay: buildActiveSegmentsByDay(mergedRows),
+          });
+        }
+      } else {
+        const otherRows = await prisma.doctorWorkingHour.findMany({
+          where: {
+            doctorId: req.user.id,
+            consultationMode: { in: otherModes },
+          },
+          orderBy: [{ consultationMode: 'asc' }, { dayOfWeek: 'asc' }, { segmentIndex: 'asc' }],
+        });
+
+        const rowsByMode = new Map();
+        for (const mode of otherModes) rowsByMode.set(mode, []);
+        for (const row of otherRows) {
+          if (!rowsByMode.has(row.consultationMode)) continue;
+          rowsByMode.get(row.consultationMode).push(row);
+        }
+
+        for (const otherMode of otherModes) {
+          otherModeDayGroups.push({
+            mode: otherMode,
+            byDay: buildActiveSegmentsByDay(rowsByMode.get(otherMode) || []),
+          });
+        }
+      }
+    }
+
+    const conflict = getCrossModeConflict(consultationMode, selectedByDay, otherModeDayGroups);
+    if (conflict) {
+      return res.status(400).json({ error: buildCrossModeConflictMessage(conflict) });
+    }
+
+    if (applyScope === 'selected_week') {
 
       const overrideRows = [];
       for (const row of nextRows) {
@@ -507,7 +695,7 @@ router.put('/me/working-hours', authenticate, async (req, res) => {
         }),
       ]);
 
-      return res.json(buildWorkingWeekResponse(nextRows));
+      return res.json(buildWorkingWeekResponse(nextRows, consultationMode));
     }
 
     await prisma.$transaction([
@@ -524,7 +712,7 @@ router.put('/me/working-hours', authenticate, async (req, res) => {
       orderBy: [{ dayOfWeek: 'asc' }, { segmentIndex: 'asc' }],
     });
 
-    res.json(buildWorkingWeekResponse(refreshed));
+    res.json(buildWorkingWeekResponse(refreshed, consultationMode));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update working hours' });

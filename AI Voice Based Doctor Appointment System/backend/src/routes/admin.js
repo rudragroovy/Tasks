@@ -10,5 +10,8 @@ router.get('/doctors', adminController.getAllDoctors);
 router.post('/doctors', adminController.addDoctor);
 router.get('/patients', adminController.getAllPatients);
 router.get('/appointments', adminController.getAllAppointments);
+router.get('/appointments/:id/audit', adminController.getAppointmentAuditLog);
+router.patch('/appointments/:id/cancel', adminController.cancelAppointment);
+router.patch('/appointments/:id/reassign', adminController.reassignAppointmentDoctor);
 
 module.exports = router;

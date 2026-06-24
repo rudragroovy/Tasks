@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { TopHeader } from '../components/ui/top-header';
 import { HistoryModal } from '../components/ui/history-modal';
 import { Search, FileText, Calendar, Clock, Stethoscope, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -8,7 +7,6 @@ import { motion } from 'framer-motion';
 import { formatDoctorName } from '../utils/doctorName';
 
 export default function MedicalHistory() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,11 +49,6 @@ export default function MedicalHistory() {
   const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
   const currentItems = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Reset to page 1 on search
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
       <TopHeader />
@@ -78,7 +71,10 @@ export default function MedicalHistory() {
               type="text" 
               placeholder="Search history..." 
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all"
             />
             <Search className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400" />

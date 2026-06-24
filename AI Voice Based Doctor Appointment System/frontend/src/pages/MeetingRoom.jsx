@@ -1,11 +1,11 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import {
   Video, VideoOff, Mic, MicOff, Phone, PhoneOff, Send, FileText,
   Pill, Plus, Activity, MessageSquare, ChevronRight, CheckCircle2,
-  Wifi, Shield, Clock, UserPlus, Search, X, Check, LogOut,
-  LayoutDashboard, Calendar, Settings, Bell
+  Shield, Clock, UserPlus, Search, X, Check,
+  LayoutDashboard, Calendar
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -51,12 +51,8 @@ export default function MeetingRoom() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
-  const clientRef = useRef(null);
+  const client = useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), []);
   const initRef = useRef(false);
-  if (!clientRef.current) {
-    clientRef.current = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-  }
-  const client = clientRef.current;
 
   // Chat
   const [messages, setMessages] = useState([]);
@@ -107,7 +103,8 @@ export default function MeetingRoom() {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (incomingCall && timeLeft === 0) {
-      setIncomingCall(null);
+      const timer = setTimeout(() => setIncomingCall(null), 0);
+      return () => clearTimeout(timer);
     }
   }, [incomingCall, timeLeft]);
 
@@ -132,11 +129,10 @@ export default function MeetingRoom() {
     } catch (err) { console.error('Failed to fetch doctors', err); }
   };
 
-  useEffect(() => {
-    if (showInviteModal) {
-      fetchDoctorsForInvite();
-    }
-  }, [showInviteModal, appointment]);
+  const openInviteModal = () => {
+    setShowInviteModal(true);
+    fetchDoctorsForInvite();
+  };
 
   const handleInviteDoctor = async (doctorId) => {
     try {
@@ -166,6 +162,9 @@ export default function MeetingRoom() {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setAppointment(data);
+        if (data.consultationMode === 'IN_PERSON') {
+          setActiveTab((prev) => prev || 'chat');
+        }
         if (data.messages) {
           setMessages(data.messages.map(m => ({
             ...m,
@@ -178,11 +177,28 @@ export default function MeetingRoom() {
   }, [appointmentId]);
 
   useEffect(() => {
-    if (!appointment) return;
-    if (appointment.consultationMode === 'IN_PERSON') {
-      setActiveTab((prev) => prev || 'chat');
-    }
-  }, [appointment]);
+    if (!showInviteModal && !showPatientEndConfirm && !waitingForPatientConfirmation && !activeTab) return undefined;
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      if (showInviteModal) {
+        setShowInviteModal(false);
+        return;
+      }
+      if (showPatientEndConfirm) {
+        setShowPatientEndConfirm(false);
+        return;
+      }
+      if (waitingForPatientConfirmation) {
+        setWaitingForPatientConfirmation(false);
+        return;
+      }
+      if (activeTab) {
+        setActiveTab(null);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showInviteModal, showPatientEndConfirm, waitingForPatientConfirmation, activeTab]);
 
   // â”€â”€ Socket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
@@ -282,7 +298,7 @@ export default function MeetingRoom() {
       socket.off('call:incoming', handleIncomingCall);
       socket.off('agora:user_joined', handleAgoraUserJoined);
     };
-  }, [socket, appointmentId, appointment, user, navigate, isRtcMode]);
+  }, [socket, appointmentId, appointment, user, navigate, isRtcMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Guarantee that we broadcast our name to the room as soon as we are in the call 
   // and the socket is fully available. This covers the edge case where the socket 
@@ -297,12 +313,15 @@ export default function MeetingRoom() {
   useEffect(() => {
     if (!appointment) return;
     if (!isRtcMode) {
-      setJoining(false);
-      setInCall(true);
+      const stateSyncTimer = setTimeout(() => {
+        setJoining(false);
+        setInCall(true);
+      }, 0);
       if (!timerRef.current) {
         timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
       }
       return () => {
+        clearTimeout(stateSyncTimer);
         clearInterval(timerRef.current);
         timerRef.current = null;
       };
@@ -405,7 +424,7 @@ export default function MeetingRoom() {
     return () => {
       mounted = false;
       client.removeAllListeners();
-      try { client.leave(); } catch (e) { }
+      try { client.leave(); } catch { /* no-op */ }
       clearInterval(timerRef.current);
       timerRef.current = null;
       initRef.current = false;
@@ -466,9 +485,11 @@ export default function MeetingRoom() {
   // Patient view: prefer primary doctor in center.
   useEffect(() => {
     if (remoteUsers.length === 0) {
-      setActiveRemoteUid(null);
-      setIsManualFocus(false);
-      return;
+      const resetTimer = setTimeout(() => {
+        setActiveRemoteUid(null);
+        setIsManualFocus(false);
+      }, 0);
+      return () => clearTimeout(resetTimer);
     }
 
     const normalizeName = (name = '') => name.toLowerCase().replace(/^dr\.?\s+/, '').replace(/[^a-z0-9]/g, '');
@@ -483,25 +504,27 @@ export default function MeetingRoom() {
     // Doctors should always keep the patient on the main screen.
     if (roleIsDoctor) {
       if (preferredUid) {
-        setActiveRemoteUid(preferredUid);
+        queueMicrotask(() => setActiveRemoteUid(preferredUid));
       }
       if (isManualFocus) {
-        setIsManualFocus(false);
+        queueMicrotask(() => setIsManualFocus(false));
       }
       return;
     }
 
-    setActiveRemoteUid((prev) => {
-      const prevStillPresent = prev && remoteUsers.some((u) => u.uid === prev);
-      if (isManualFocus && prevStillPresent) return prev;
-      if (preferredMatch?.uid) return preferredMatch.uid;
-      if (prevStillPresent) return prev;
-      return preferredUid;
+    queueMicrotask(() => {
+      setActiveRemoteUid((prev) => {
+        const prevStillPresent = prev && remoteUsers.some((u) => u.uid === prev);
+        if (isManualFocus && prevStillPresent) return prev;
+        if (preferredMatch?.uid) return preferredMatch.uid;
+        if (prevStillPresent) return prev;
+        return preferredUid;
+      });
     });
 
     const prevStillPresent = activeRemoteUid && remoteUsers.some((u) => u.uid === activeRemoteUid);
     if (isManualFocus && !prevStillPresent) {
-      setIsManualFocus(false);
+      queueMicrotask(() => setIsManualFocus(false));
     }
   }, [remoteUsers, appointment, userNames, isManualFocus, activeRemoteUid, user?.role]);
 
@@ -515,7 +538,7 @@ export default function MeetingRoom() {
   // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  const leaveCall = async (skipNavigate = false) => {
+  async function leaveCall(skipNavigate = false) {
     localTracks.forEach(t => { if (t) { t.stop(); t.close(); } });
     setLocalTracks([]);
     clearInterval(timerRef.current);
@@ -527,7 +550,7 @@ export default function MeetingRoom() {
     if (skipNavigate !== true) {
       navigate('/dashboard');
     }
-  };
+  }
 
   const toggleMic = async () => {
     if (localTracks[0]) { await localTracks[0].setMuted(!micMuted); setMicMuted(!micMuted); }
@@ -608,7 +631,6 @@ export default function MeetingRoom() {
 
   const isDoctor = user?.role === 'DOCTOR';
   const isPrimaryDoctor = isDoctor && appointment?.doctorId === user?.id;
-  const isInvitedDoctor = isDoctor && appointment?.invitedDoctors?.some(inv => inv.doctorId === user?.id);
 
   const otherName = isDoctor
     ? (appointment?.familyMember?.name || appointment?.patient?.name)
@@ -645,7 +667,7 @@ export default function MeetingRoom() {
   const roomTitle = isInPersonMode ? `${consultationModeLabel} Consultation Room` : `${consultationModeLabel} Consultation`;
   // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div className="flex flex-col font-sans select-none overflow-hidden" style={{ height: '100dvh', background: '#f8fafc' }}>
+    <div className="min-h-[100dvh] bg-slate-50 flex flex-col font-sans select-none overflow-hidden">
 
       {/* â”€â”€ Top Nav â€” matches patient TopHeader exactly â”€â”€ */}
       <SharedNavbar
@@ -715,7 +737,7 @@ export default function MeetingRoom() {
             <p className="text-slate-600 mb-6 text-sm font-medium">You have been requested to join another consultation.</p>
             <div className="flex flex-col gap-2">
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => {
                     socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: false });
                     setIncomingCall(null);
@@ -724,7 +746,7 @@ export default function MeetingRoom() {
                 >
                   Decline
                 </button>
-                <button
+                <button type="button"
                   onClick={() => {
                     socket.emit('call:tentative_join', {
                       appointmentId: incomingCall.appointmentId,
@@ -736,7 +758,7 @@ export default function MeetingRoom() {
                       const invites = saved ? JSON.parse(saved) : [];
                       invites.push(incomingCall);
                       localStorage.setItem('deferredInvites', JSON.stringify(invites));
-                    } catch (e) { }
+                    } catch { /* no-op */ }
                     setIncomingCall(null);
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-orange-100 text-orange-600 font-bold text-sm hover:bg-orange-200 transition-colors cursor-pointer"
@@ -744,7 +766,7 @@ export default function MeetingRoom() {
                   +5 Mins
                 </button>
               </div>
-              <button
+              <button type="button"
                 onClick={() => {
                   socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: true });
                   leaveCall(true).then(() => {
@@ -776,6 +798,9 @@ export default function MeetingRoom() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Patient end consultation confirmation"
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
@@ -789,7 +814,7 @@ export default function MeetingRoom() {
                 The doctor has requested to end the consultation. Do you agree to end the meeting now?
               </p>
               <div className="flex gap-4 w-full">
-                <button
+                <button type="button"
                   onClick={() => {
                     socket.emit('call:decline_complete', { appointmentId });
                     setShowPatientEndConfirm(false);
@@ -798,7 +823,7 @@ export default function MeetingRoom() {
                 >
                   Continue Call
                 </button>
-                <button
+                <button type="button"
                   onClick={() => {
                     socket.emit('call:accept_complete', { appointmentId });
                     setShowPatientEndConfirm(false);
@@ -821,6 +846,9 @@ export default function MeetingRoom() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Waiting for patient confirmation"
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
@@ -833,7 +861,7 @@ export default function MeetingRoom() {
               <p className="text-slate-500 font-medium leading-relaxed mb-8">
                 We have asked the patient to confirm they are ready to end the consultation.
               </p>
-              <button
+              <button type="button"
                 onClick={() => {
                   setWaitingForPatientConfirmation(false);
                   completeConsultation();
@@ -854,6 +882,9 @@ export default function MeetingRoom() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Invite doctor"
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
@@ -866,8 +897,10 @@ export default function MeetingRoom() {
                   Invite Doctor
                 </h2>
                 <button
+                  type="button"
                   onClick={() => setShowInviteModal(false)}
                   className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  aria-label="Close invite doctor dialog"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -908,7 +941,7 @@ export default function MeetingRoom() {
                             <p className="text-xs text-slate-500 font-medium">{d.specialization.name}</p>
                           </div>
                         </div>
-                        <button
+                        <button type="button"
                           onClick={() => handleInviteDoctor(d.userId)}
                           disabled={invitingDoctorId === d.userId}
                           className="px-4 py-2 rounded-xl text-sm font-bold text-slate-900 transition-all hover:scale-105 disabled:opacity-50"
@@ -950,7 +983,7 @@ export default function MeetingRoom() {
                   ? "The patient has confirmed and ended this consultation. You will now be redirected to your dashboard."
                   : "The doctor has ended this consultation. You will now be redirected to your dashboard."}
               </p>
-              <button
+              <button type="button"
                 onClick={leaveCall}
                 className="w-full py-4 bg-health-500 hover:bg-health-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-health-500/20 relative z-10 active:scale-95"
               >
@@ -1170,7 +1203,7 @@ export default function MeetingRoom() {
                       const remoteHasVideo = Boolean(u.videoTrack || u.hasVideo);
                       const remoteHasAudio = Boolean(u.audioTrack || u.hasAudio);
                       return (
-                        <button
+                        <button type="button"
                           key={u.uid}
                           onClick={() => {
                             if (isDoctor) return;
@@ -1243,7 +1276,7 @@ export default function MeetingRoom() {
                       danger={videoMuted}
                     />
                   )}
-                  <button
+                  <button type="button"
                     onClick={() => leaveCall()}
                     className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-lg"
                     style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.45)' }}
@@ -1267,7 +1300,7 @@ export default function MeetingRoom() {
                 <TabBtn icon={<FileText className="w-5 h-5" />} label="Prescription" active={activeTab === 'notes'} onClick={() => setActiveTab(activeTab === 'notes' ? null : 'notes')} />
                 <TabBtn icon={<Activity className="w-5 h-5" />} label="AI Triage" active={activeTab === 'triage'} onClick={() => setActiveTab(activeTab === 'triage' ? null : 'triage')} />
                 {isPrimaryDoctor && (
-                  <TabBtn icon={<UserPlus className="w-5 h-5" />} label="Invite Doctor" active={showInviteModal} onClick={() => setShowInviteModal(true)} />
+                  <TabBtn icon={<UserPlus className="w-5 h-5" />} label="Invite Doctor" active={showInviteModal} onClick={openInviteModal} />
                 )}
                 {isPrimaryDoctor ? (
                   <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Complete" active={false} onClick={requestCompleteConsultation} accent />
@@ -1287,7 +1320,7 @@ export default function MeetingRoom() {
               exit={{ x: 380, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="absolute top-0 right-0 z-40 h-full w-[min(92vw,360px)] flex flex-col overflow-hidden min-h-0"
-              style={{ background: '#f8fafc', borderLeft: '1px solid rgba(0,0,0,0.05)' }}
+              style={{ background: '#f8fafc', borderLeft: '1px solid rgba(0,0,0,0.05)' }} role="dialog" aria-label="Consultation sidebar"
             >
               {/* Sidebar header */}
               <div className="shrink-0 flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
@@ -1297,8 +1330,10 @@ export default function MeetingRoom() {
                   {activeTab === 'notes' && <><FileText className="w-4 h-4 text-health-600" /> Clinical Notes</>}
                 </h3>
                 <button
+                  type="button"
                   onClick={() => setActiveTab(null)}
                   className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white/10 transition-all cursor-pointer"
+                  aria-label="Close side panel"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -1379,6 +1414,7 @@ export default function MeetingRoom() {
                   >
                     <input
                       type="text"
+                      aria-label="Type a chat message"
                       value={newMessage}
                       onChange={e => setNewMessage(e.target.value)}
                       placeholder="Type a message..."
@@ -1387,8 +1423,6 @@ export default function MeetingRoom() {
                         background: 'rgba(0,0,0,0.05)',
                         border: '1px solid rgba(0,0,0,0.1)',
                       }}
-                      onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.6)'}
-                      onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                     />
                     <button
                       type="submit"
@@ -1532,18 +1566,17 @@ export default function MeetingRoom() {
                   <div className="flex-1 p-5 space-y-5">
                     {/* Observations */}
                     <div>
-                      <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+                      <label htmlFor="clinical-notes" className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
                         <FileText className="w-3 h-3" /> Clinical Observations
                       </label>
                       <textarea
+                        id="clinical-notes"
                         value={notes}
                         onChange={e => setNotes(e.target.value)}
                         placeholder="Enter your clinical observations, diagnosis, and recommendations..."
                         rows={5}
                         className="w-full text-sm font-medium px-4 py-3 rounded-2xl outline-none text-slate-900 placeholder-slate-600 resize-none transition-all leading-relaxed"
                         style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.08)' }}
-                        onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                        onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.08)'}
                       />
                     </div>
 
@@ -1572,7 +1605,7 @@ export default function MeetingRoom() {
                                   {med.duration && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#059669' }}>{med.duration}</span>}
                                 </div>
                               </div>
-                              <button
+                              <button type="button"
                                 onClick={() => setPrescription(p => p.filter((_, j) => j !== i))}
                                 className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer mt-0.5"
                               >
@@ -1593,8 +1626,6 @@ export default function MeetingRoom() {
                           onChange={e => setMedInput({ ...medInput, name: e.target.value })}
                           className="w-full text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
                           style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                          onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                          onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                         />
                         <div className="grid grid-cols-2 gap-2">
                           <input
@@ -1604,8 +1635,6 @@ export default function MeetingRoom() {
                             onChange={e => setMedInput({ ...medInput, dosage: e.target.value })}
                             className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
                             style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                            onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                            onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                           />
                           <input
                             type="text"
@@ -1614,8 +1643,6 @@ export default function MeetingRoom() {
                             onChange={e => setMedInput({ ...medInput, frequency: e.target.value })}
                             className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
                             style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                            onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                            onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                           />
                         </div>
                         <div className="flex gap-2">
@@ -1626,10 +1653,8 @@ export default function MeetingRoom() {
                             onChange={e => setMedInput({ ...medInput, duration: e.target.value })}
                             className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
                             style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                            onFocus={e => e.target.style.borderColor = 'rgba(14,116,144,0.5)'}
-                            onBlur={e => e.target.style.borderColor = 'rgba(0,0,0,0.1)'}
                           />
-                          <button
+                          <button type="button"
                             onClick={addMedicine}
                             disabled={!medInput.name.trim()}
                             className="px-4 rounded-xl text-slate-900 cursor-pointer hover:scale-105 transition-all disabled:opacity-30 flex items-center gap-1.5 font-bold text-xs shrink-0"
@@ -1645,7 +1670,7 @@ export default function MeetingRoom() {
                   {/* Sign & Complete â€” sticky bottom */}
                   <div className="shrink-0 p-4" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                     {isPrimaryDoctor ? (
-                      <button
+                      <button type="button"
                         onClick={requestCompleteConsultation}
                         className="w-full py-3.5 rounded-2xl font-heading font-black text-slate-900 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
                         style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
@@ -1653,7 +1678,7 @@ export default function MeetingRoom() {
                         <CheckCircle2 className="w-5 h-5" /> Sign & Complete Consultation
                       </button>
                     ) : (
-                      <button
+                      <button type="button"
                         onClick={submitInvitedDoctorNotes}
                         className="w-full py-3.5 rounded-2xl font-heading font-black text-slate-900 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
                         style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
@@ -1678,7 +1703,7 @@ export default function MeetingRoom() {
 /* Small round button INSIDE the video overlay */
 function VideoOverlayBtn({ icon, label, onClick, danger }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       title={label}
       className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105"
@@ -1696,7 +1721,7 @@ function VideoOverlayBtn({ icon, label, onClick, danger }) {
 /* Tab button in the bottom row below the video */
 function TabBtn({ icon, label, active, onClick, badge, accent }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className="relative w-28 sm:w-32 flex flex-col items-center justify-center gap-1.5 py-3 shrink-0 cursor-pointer transition-all group hover:scale-100 hover:overflow-hidden"
       style={{
@@ -1717,44 +1742,4 @@ function TabBtn({ icon, label, active, onClick, badge, accent }) {
   );
 }
 
-function RoundBtn({ icon, onClick, muted, label }) {
-  return (
-    <button onClick={onClick} className="flex flex-col items-center gap-1 cursor-pointer group">
-      <div
-        className="w-12 h-12 rounded-full flex items-center justify-center transition-all group-hover:scale-105"
-        style={{
-          background: muted ? 'rgba(234,67,53,0.2)' : 'rgba(0,0,0,0.1)',
-          border: muted ? '1px solid rgba(234,67,53,0.4)' : '1px solid rgba(255,255,255,0.12)',
-          color: muted ? '#f87171' : 'white'
-        }}
-      >
-        {icon}
-      </div>
-      <span className="text-[10px] font-bold text-slate-500">{label}</span>
-    </button>
-  );
-}
-
-function ControlBtn({ icon, label, active, onClick, badge }) {
-  return (
-    <button onClick={onClick} className="relative flex flex-col items-center gap-1 cursor-pointer group">
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:scale-105"
-        style={{
-          background: active ? 'rgba(14,116,144,0.25)' : 'rgba(0,0,0,0.05)',
-          border: active ? '1px solid rgba(14,116,144,0.5)' : '1px solid rgba(0,0,0,0.08)',
-          color: active ? '#0e7490' : '#94a3b8'
-        }}
-      >
-        {icon}
-      </div>
-      <span className="text-[10px] font-bold" style={{ color: active ? '#0e7490' : '#64748b' }}>{label}</span>
-      {badge && (
-        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-slate-900 text-[9px] font-black flex items-center justify-center">
-          {badge > 9 ? '9+' : badge}
-        </div>
-      )}
-    </button>
-  );
-}
 

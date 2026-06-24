@@ -1,12 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileText, MessageSquare, Bot, User, UserRound, Download, CalendarClock, ChevronDown } from 'lucide-react';
+import { X, FileText, MessageSquare, Bot, Download } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { formatDoctorName } from '../../utils/doctorName';
 
 export function HistoryModal({ apt, onClose }) {
   const [activeTab, setActiveTab] = useState('ai');
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
   if (!apt) return null;
 

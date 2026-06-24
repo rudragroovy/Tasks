@@ -3,12 +3,28 @@ const ALLOWED_SLOT_DURATIONS = [10, 15, 20, 30, 45, 60];
 const CONSULTATION_MODES = ['VIDEO', 'AUDIO', 'IN_PERSON'];
 const DEFAULT_CONSULTATION_MODE = 'VIDEO';
 
-const DEFAULT_WORKING_HOURS_BY_DAY = {
-  1: { startMinutes: 9 * 60, endMinutes: 17 * 60 }, // Monday
-  2: { startMinutes: 9 * 60, endMinutes: 17 * 60 }, // Tuesday
-  3: { startMinutes: 9 * 60, endMinutes: 17 * 60 }, // Wednesday
-  4: { startMinutes: 9 * 60, endMinutes: 17 * 60 }, // Thursday
-  5: { startMinutes: 9 * 60, endMinutes: 17 * 60 }, // Friday
+const DEFAULT_WORKING_HOURS_BY_MODE_AND_DAY = {
+  VIDEO: {
+    1: { startMinutes: 9 * 60, endMinutes: 12 * 60 }, // Monday
+    2: { startMinutes: 9 * 60, endMinutes: 12 * 60 }, // Tuesday
+    3: { startMinutes: 9 * 60, endMinutes: 12 * 60 }, // Wednesday
+    4: { startMinutes: 9 * 60, endMinutes: 12 * 60 }, // Thursday
+    5: { startMinutes: 9 * 60, endMinutes: 12 * 60 }, // Friday
+  },
+  AUDIO: {
+    1: { startMinutes: 13 * 60, endMinutes: 15 * 60 }, // Monday
+    2: { startMinutes: 13 * 60, endMinutes: 15 * 60 }, // Tuesday
+    3: { startMinutes: 13 * 60, endMinutes: 15 * 60 }, // Wednesday
+    4: { startMinutes: 13 * 60, endMinutes: 15 * 60 }, // Thursday
+    5: { startMinutes: 13 * 60, endMinutes: 15 * 60 }, // Friday
+  },
+  IN_PERSON: {
+    1: { startMinutes: 15 * 60, endMinutes: 17 * 60 }, // Monday
+    2: { startMinutes: 15 * 60, endMinutes: 17 * 60 }, // Tuesday
+    3: { startMinutes: 15 * 60, endMinutes: 17 * 60 }, // Wednesday
+    4: { startMinutes: 15 * 60, endMinutes: 17 * 60 }, // Thursday
+    5: { startMinutes: 15 * 60, endMinutes: 17 * 60 }, // Friday
+  },
 };
 
 function minutesToHHMM(totalMinutes) {
@@ -56,8 +72,10 @@ function getSlotDurationForMode(doctorRecord, consultationMode) {
   return normalizeSlotDurationMinutes(doctorRecord.slotDurationMinutesVideo);
 }
 
-function getDefaultWorkingHourForDay(dayOfWeek) {
-  const fallback = DEFAULT_WORKING_HOURS_BY_DAY[dayOfWeek];
+function getDefaultWorkingHourForDay(dayOfWeek, consultationMode = DEFAULT_CONSULTATION_MODE) {
+  const mode = normalizeConsultationMode(consultationMode);
+  const modeDefaults = DEFAULT_WORKING_HOURS_BY_MODE_AND_DAY[mode] || {};
+  const fallback = modeDefaults[dayOfWeek];
   if (!fallback) return null;
   return {
     dayOfWeek,
@@ -69,8 +87,8 @@ function getDefaultWorkingHourForDay(dayOfWeek) {
   };
 }
 
-function getDefaultWorkingHoursForDay(dayOfWeek) {
-  const fallback = getDefaultWorkingHourForDay(dayOfWeek);
+function getDefaultWorkingHoursForDay(dayOfWeek, consultationMode = DEFAULT_CONSULTATION_MODE) {
+  const fallback = getDefaultWorkingHourForDay(dayOfWeek, consultationMode);
   return fallback ? [fallback] : [];
 }
 
@@ -87,7 +105,7 @@ async function getWorkingHoursForDay(prismaClient, doctorId, dayOfWeek, consulta
       .map((segment) => ({ ...segment, source: 'configured' }));
   }
 
-  return getDefaultWorkingHoursForDay(dayOfWeek);
+  return getDefaultWorkingHoursForDay(dayOfWeek, mode);
 }
 
 function getDayRange(dateLike) {
@@ -128,7 +146,7 @@ async function ensureDefaultWorkingHours(prismaClient, doctorId, consultationMod
   const defaults = [];
 
   for (let dayOfWeek = 0; dayOfWeek <= 6; dayOfWeek += 1) {
-    const defaultHour = getDefaultWorkingHourForDay(dayOfWeek);
+    const defaultHour = getDefaultWorkingHourForDay(dayOfWeek, mode);
     defaults.push(
       defaultHour
         ? {

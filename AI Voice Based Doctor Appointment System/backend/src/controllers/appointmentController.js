@@ -542,8 +542,8 @@ exports.getUserAppointments = async (req, res) => {
     const appointments = await prisma.appointment.findMany({
       where: whereClause,
       include: {
-        doctor: { select: { name: true, email: true, doctorProfile: { include: { specialization: true } } } },
-        patient: { select: { name: true, email: true } },
+        doctor: { select: { id: true, name: true, email: true, doctorProfile: { include: { specialization: true } } } },
+        patient: { select: { id: true, name: true, email: true } },
         familyMember: true,
         consultation: true,
         invitedDoctors: true,
@@ -698,8 +698,8 @@ exports.getAppointmentById = async (req, res) => {
     const appointment = await prisma.appointment.findUnique({
       where: { id },
       include: {
-        doctor: { select: { name: true, email: true, doctorProfile: { include: { specialization: true } } } },
-        patient: { select: { name: true, email: true } },
+        doctor: { select: { id: true, name: true, email: true, doctorProfile: { include: { specialization: true } } } },
+        patient: { select: { id: true, name: true, email: true } },
         familyMember: true,
         consultation: true,
         invitedDoctors: true,

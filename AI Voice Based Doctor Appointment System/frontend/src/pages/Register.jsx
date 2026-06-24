@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Activity, ShieldCheck, ArrowRight } from 'lucide-react';
 import axios from 'axios';
+import AppIcon from '../components/branding/AppIcon';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -87,9 +88,9 @@ export default function Register() {
           <div className="flex items-center gap-4 text-primary-200 text-sm font-medium pt-8 border-t border-white/10">
             <span>© 2026 CareBridge</span>
             <span className="w-1 h-1 bg-primary-400 rounded-full"></span>
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+            <button type="button" className="hover:text-white transition-colors cursor-pointer">Privacy Policy</button>
             <span className="w-1 h-1 bg-primary-400 rounded-full"></span>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+            <button type="button" className="hover:text-white transition-colors cursor-pointer">Terms of Service</button>
           </div>
         </div>
       </div>
@@ -102,10 +103,7 @@ export default function Register() {
         <div className="w-full max-w-md relative z-10 py-10">
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-8">
-              <div className="w-10 h-10 bg-primary-900 rounded-lg flex items-center justify-center relative overflow-hidden shadow-md">
-                 <div className="absolute w-5 h-5 bg-white top-0 left-0 rounded-br-lg" />
-                 <div className="absolute w-5 h-5 bg-health-500 bottom-0 right-0 rounded-tl-lg" />
-              </div>
+              <AppIcon size={40} />
               <span className="font-heading font-black text-primary-900 text-2xl tracking-tight">CareBridge</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-heading font-bold text-primary-900 tracking-tight">
@@ -117,7 +115,7 @@ export default function Register() {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded-r-lg text-sm font-medium shadow-sm flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm font-medium shadow-sm flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
               <span className="text-red-500 font-bold text-lg">!</span>
               <p>{error}</p>
             </div>
@@ -125,8 +123,9 @@ export default function Register() {
 
           <form onSubmit={handleRegister} className="space-y-5">
             <div>
-              <label className="block text-sm font-bold font-heading text-primary-900 mb-2">Full Name</label>
+              <label htmlFor="register-name" className="block text-sm font-bold font-heading text-primary-900 mb-2">Full Name</label>
               <input
+                id="register-name"
                 type="text"
                 name="name"
                 className="w-full px-5 py-4 bg-gray-50/50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-primary-900 font-medium placeholder-gray-400 hover:bg-gray-50"
@@ -139,8 +138,9 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold font-heading text-primary-900 mb-2">Email Address</label>
+              <label htmlFor="register-email" className="block text-sm font-bold font-heading text-primary-900 mb-2">Email Address</label>
               <input
+                id="register-email"
                 type="email"
                 name="email"
                 className="w-full px-5 py-4 bg-gray-50/50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-primary-900 font-medium placeholder-gray-400 hover:bg-gray-50"
@@ -153,8 +153,9 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold font-heading text-primary-900 mb-2">Password</label>
+              <label htmlFor="register-password" className="block text-sm font-bold font-heading text-primary-900 mb-2">Password</label>
               <input
+                id="register-password"
                 type="password"
                 name="password"
                 className="w-full px-5 py-4 bg-gray-50/50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-primary-900 font-medium placeholder-gray-400 hover:bg-gray-50"

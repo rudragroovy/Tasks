@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
 import { TopHeader } from '../components/ui/top-header';
 import { DoctorCard } from '../components/ui/doctor-card';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Calendar, Clock, CreditCard, ArrowRight,
+  Calendar, Clock, CreditCard, ArrowRight, User, Users,
   CheckCircle2, ShieldCheck, AlertCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
 
@@ -31,12 +32,14 @@ function BookingToggle({ value, onChange }) {
         <div className={`absolute inset-0 rounded-xl ${isOnDemand ? 'bg-gradient-to-r from-primary-600 to-primary-500' : 'bg-gradient-to-r from-health-600 to-health-500'}`} />
       </motion.div>
       <button
+        type="button"
         onClick={() => onChange('ON_DEMAND')}
         className={`relative z-10 flex items-center justify-center gap-2 flex-1 py-3 rounded-xl font-heading font-bold text-sm transition-all cursor-pointer ${isOnDemand ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
       >
         Consult Now
       </button>
       <button
+        type="button"
         onClick={() => onChange('SCHEDULED')}
         className={`relative z-10 flex items-center justify-center gap-2 flex-1 py-3 rounded-xl font-heading font-bold text-sm transition-all cursor-pointer ${!isOnDemand ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
       >
@@ -70,11 +73,12 @@ function SchedulePicker({
     >
       <div className="pt-3 space-y-3">
         <div>
-          <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Date</label>
+          <label htmlFor="booking-date" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Date</label>
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-500 pointer-events-none" size={14} />
-            <input
-              type="date"
+              <input
+                id="booking-date"
+                type="date"
               value={date}
               onChange={e => onDateChange(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
@@ -84,7 +88,7 @@ function SchedulePicker({
         </div>
 
         <div>
-          <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Slots</label>
+          <label htmlFor="booking-slot-grid" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Slots</label>
           {slotsLoading ? (
             <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
               Loading available slots...
@@ -98,7 +102,7 @@ function SchedulePicker({
               No slots available for the selected date.
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div id="booking-slot-grid" className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {slots.map((slot) => {
                 const isSelected = selectedSlotStart === slot.startAt;
                 return (
@@ -125,10 +129,11 @@ function SchedulePicker({
 
         {showManualTimeFallback && (
           <div>
-            <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Manual Time</label>
+            <label htmlFor="booking-manual-time" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Manual Time</label>
             <div className="relative">
               <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-health-500 pointer-events-none" size={14} />
               <input
+                id="booking-manual-time"
                 type="time"
                 value={manualTime}
                 onChange={(e) => onManualTimeChange(e.target.value)}
@@ -148,7 +153,7 @@ function SchedulePicker({
 function ConsultationModePicker({ value, onChange }) {
   return (
     <div>
-      <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Consultation Type</label>
+      <label htmlFor="booking-consultation-type" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Consultation Type</label>
       <div className="grid grid-cols-3 gap-2">
         {CONSULTATION_MODE_OPTIONS.map((mode) => {
           const isActive = value === mode.value;
@@ -156,6 +161,7 @@ function ConsultationModePicker({ value, onChange }) {
             <button
               key={mode.value}
               type="button"
+              id={mode.value === 'VIDEO' ? 'booking-consultation-type' : undefined}
               onClick={() => onChange(mode.value)}
               className={`px-3 py-2 rounded-xl text-xs font-black border transition-all ${
                 isActive
@@ -173,6 +179,69 @@ function ConsultationModePicker({ value, onChange }) {
 }
 
 /* ── Payment Summary Panel ── */
+function PatientSelector({ loadingMembers, familyMembers, selectedPatientId, onSelect, selfName }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3 shadow-sm">
+      <div>
+        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Patient Profile</p>
+        <h3 className="text-slate-900 font-heading font-black text-base mt-1">Who Is This Consultation For?</h3>
+      </div>
+
+      {loadingMembers ? (
+        <div className="space-y-2">
+          <div className="h-12 rounded-xl bg-slate-100 border border-slate-200 animate-pulse" />
+          <div className="h-12 rounded-xl bg-slate-100 border border-slate-200 animate-pulse" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => onSelect('self')}
+            className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
+              selectedPatientId === 'self'
+                ? 'border-primary-600 bg-primary-600 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-primary-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4" />
+              <div>
+                <p className="text-sm font-black leading-tight">Myself</p>
+                <p className={`text-[11px] font-semibold ${selectedPatientId === 'self' ? 'text-primary-100' : 'text-slate-400'}`}>
+                  {selfName || 'Current account'}
+                </p>
+              </div>
+            </div>
+          </button>
+
+          {familyMembers.map((member) => (
+            <button
+              key={member.id}
+              type="button"
+              onClick={() => onSelect(member.id)}
+              className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
+                selectedPatientId === member.id
+                  ? 'border-health-600 bg-health-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-health-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                <div>
+                  <p className="text-sm font-black leading-tight">{member.name}</p>
+                  <p className={`text-[11px] font-semibold ${selectedPatientId === member.id ? 'text-health-100' : 'text-slate-400'}`}>
+                    {member.relation || 'Family member'}
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PaymentSummary({ doctor, bookingType, consultationMode, scheduledDate, selectedTimeLabel, processingId, onConfirm }) {
   const fee = parseFloat(doctor?.fee || 150);
   const isProcessing = processingId === doctor?.userId;
@@ -268,11 +337,14 @@ function PaymentSummary({ doctor, bookingType, consultationMode, scheduledDate, 
 
 /* ── Main Page ── */
 export default function Booking() {
+  const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const socket = useSocket();
+  const [familyMembers, setFamilyMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   const [bookingType, setBookingType] = useState('ON_DEMAND');
   const [consultationMode, setConsultationMode] = useState('VIDEO');
@@ -283,6 +355,10 @@ export default function Booking() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState('');
   const [processingId, setProcessingId] = useState(null);
+  const [selectedPatientId, setSelectedPatientId] = useState(() => {
+    const fromAiSummary = location.state?.aiSummary?.selectedPatientId;
+    return fromAiSummary && typeof fromAiSummary === 'string' ? fromAiSummary : 'self';
+  });
   // Which doctor card is selected for booking
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [showDoctorPicker, setShowDoctorPicker] = useState(false);
@@ -320,6 +396,38 @@ export default function Booking() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchDoctors(); }, [fetchDoctors]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchFamilyMembers = async () => {
+      setLoadingMembers(true);
+      try {
+        const { data } = await axios.get('http://localhost:5000/api/family-members', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (cancelled) return;
+        const members = Array.isArray(data) ? data : [];
+        setFamilyMembers(members);
+        setSelectedPatientId((prev) => {
+          if (prev === 'self') return 'self';
+          return members.some((member) => member.id === prev) ? prev : 'self';
+        });
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Failed to fetch family members:', err);
+        setFamilyMembers([]);
+        setSelectedPatientId('self');
+      } finally {
+        if (!cancelled) setLoadingMembers(false);
+      }
+    };
+
+    fetchFamilyMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -410,12 +518,10 @@ export default function Booking() {
           scheduledFor = manualDateTime.toISOString();
         }
       }
-      let familyMemberId = null;
-      if (aiSummary.selectedPatientId && aiSummary.selectedPatientId !== 'self') {
-        familyMemberId = aiSummary.selectedPatientId;
-      }
+      const familyMemberId = selectedPatientId !== 'self' ? selectedPatientId : null;
       const normalizedAiSummary = {
         ...(aiSummary || {}),
+        selectedPatientId,
         assigned_doctor_id: selectedDoctor.userId,
         assigned_doctor_name: selectedDoctor.user?.name || '',
       };
@@ -545,6 +651,14 @@ export default function Booking() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.1 }}
             >
+              <PatientSelector
+                loadingMembers={loadingMembers}
+                familyMembers={familyMembers}
+                selectedPatientId={selectedPatientId}
+                onSelect={setSelectedPatientId}
+                selfName={user?.name}
+              />
+
               {/* Toggle */}
               <BookingToggle value={bookingType} onChange={handleBookingTypeChange} />
 

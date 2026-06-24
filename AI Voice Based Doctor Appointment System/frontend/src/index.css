@@ -38,6 +38,10 @@
   --shadow-soft-hover: 0 14px 34px rgba(15, 23, 42, 0.1);
 }
 
+html {
+  scrollbar-gutter: stable both-edges;
+}
+
 body {
   background:
     radial-gradient(circle at 8% -10%, rgba(20, 184, 166, 0.08), transparent 40%),
@@ -45,6 +49,25 @@ body {
     var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  overflow-y: scroll;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin,
+  .animate-ping,
+  .animate-pulse,
+  .animate-bounce {
+    animation: none !important;
+  }
 }
 
 /* Dashboard shell utilities */
@@ -89,6 +112,174 @@ input[type="time"] {
 
 .doctor-schedule-calendar .b-cal-event.doctor-booked-event {
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.3);
+}
+
+.doctor-slot-legend {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  padding: 4px 10px;
+}
+
+.doctor-slot-legend--video {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: rgb(30, 64, 175);
+}
+
+.doctor-slot-legend--audio {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(5, 150, 105, 0.35);
+  color: rgb(6, 95, 70);
+}
+
+.doctor-slot-legend--in-person {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(217, 119, 6, 0.35);
+  color: rgb(146, 64, 14);
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--video {
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px dashed rgba(37, 99, 235, 0.7);
+  color: rgb(30, 64, 175);
+  opacity: 1;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--audio {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px dashed rgba(5, 150, 105, 0.7);
+  color: rgb(6, 95, 70);
+  opacity: 1;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--in-person {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px dashed rgba(217, 119, 6, 0.75);
+  color: rgb(146, 64, 14);
+  opacity: 1;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--video {
+  background: rgba(37, 99, 235, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.4);
+  color: rgb(30, 64, 175);
+  opacity: 1;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--audio {
+  background: rgba(5, 150, 105, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(5, 150, 105, 0.4);
+  color: rgb(6, 95, 70);
+  opacity: 1;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--in-person {
+  background: rgba(217, 119, 6, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.45);
+  color: rgb(146, 64, 14);
+  opacity: 1;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--video .b-cal-event-name,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--video .b-cal-event-name {
+  color: rgb(30, 64, 175);
+  font-weight: 700;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--audio .b-cal-event-name,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--audio .b-cal-event-name {
+  color: rgb(6, 95, 70);
+  font-weight: 700;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--in-person .b-cal-event-name,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--in-person .b-cal-event-name {
+  color: rgb(146, 64, 14);
+  font-weight: 700;
+}
+
+/* Override Bryntum readonly/faded styling so shared-mode slots remain clearly color-coded */
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--video,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--video,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-open-slot-event--video,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-booked-event--video {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: rgba(37, 99, 235, 0.8) !important;
+  color: rgb(30, 64, 175) !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--audio,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--audio,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-open-slot-event--audio,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-booked-event--audio {
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(5, 150, 105, 0.8) !important;
+  color: rgb(6, 95, 70) !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--in-person,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--in-person,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-open-slot-event--in-person,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-booked-event--in-person {
+  background: rgba(245, 158, 11, 0.24) !important;
+  border-color: rgba(217, 119, 6, 0.82) !important;
+  color: rgb(146, 64, 14) !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--video .b-cal-event-name,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--video .b-cal-event-name,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-open-slot-event--video .b-cal-event-name,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-booked-event--video .b-cal-event-name {
+  color: rgb(30, 64, 175) !important;
+  opacity: 1 !important;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--audio .b-cal-event-name,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--audio .b-cal-event-name,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-open-slot-event--audio .b-cal-event-name,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-booked-event--audio .b-cal-event-name {
+  color: rgb(6, 95, 70) !important;
+  opacity: 1 !important;
+}
+
+.doctor-schedule-calendar .b-cal-event.doctor-open-slot-event--in-person .b-cal-event-name,
+.doctor-schedule-calendar .b-cal-event.doctor-booked-event--in-person .b-cal-event-name,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-open-slot-event--in-person .b-cal-event-name,
+.doctor-schedule-calendar .b-readonly .b-cal-event.doctor-booked-event--in-person .b-cal-event-name {
+  color: rgb(146, 64, 14) !important;
+  opacity: 1 !important;
+}
+
+/* Catch wrapper-level classes used by Bryntum and force per-mode tint variables */
+.doctor-schedule-calendar [class*="doctor-open-slot-event--video"],
+.doctor-schedule-calendar [class*="doctor-booked-event--video"] {
+  --b-primary: #1d4ed8 !important;
+}
+
+.doctor-schedule-calendar [class*="doctor-open-slot-event--audio"],
+.doctor-schedule-calendar [class*="doctor-booked-event--audio"] {
+  --b-primary: #059669 !important;
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(5, 150, 105, 0.8) !important;
+  color: rgb(6, 95, 70) !important;
+  opacity: 1 !important;
+}
+
+.doctor-schedule-calendar [class*="doctor-open-slot-event--in-person"],
+.doctor-schedule-calendar [class*="doctor-booked-event--in-person"] {
+  --b-primary: #d97706 !important;
+  background: rgba(245, 158, 11, 0.24) !important;
+  border-color: rgba(217, 119, 6, 0.82) !important;
+  color: rgb(146, 64, 14) !important;
+  opacity: 1 !important;
 }
 
 .doctor-schedule-calendar .b-cal-event .b-cal-event-name {
