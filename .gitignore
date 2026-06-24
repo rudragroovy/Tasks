@@ -1,0 +1,16 @@
+# Local environment variables
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+**/*.env
+
+# Cache directories
+cache/
+**/cache/
+new/cache/
+
+# Tool configurations/logs
+.gstack/
+.impeccable/
