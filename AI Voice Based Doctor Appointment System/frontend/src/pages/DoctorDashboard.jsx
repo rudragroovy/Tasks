@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
+import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const WINDOW_OPTIONS = ['All', 'Today', 'This Week'];
@@ -151,6 +152,21 @@ export default function DoctorDashboard() {
     const fee = Number.parseFloat(appointment?.doctor?.doctorProfile?.fee ?? 0);
     return sum + (Number.isFinite(fee) ? fee : 0);
   }, 0);
+  const prescriptionsCount = filteredAppointments.filter(
+    (appointment) => Boolean(appointment?.consultation?.prescriptionUrl)
+  ).length;
+  const medicalCertificatesCount = filteredAppointments.filter(
+    (appointment) => Boolean(appointment?.consultation?.medicalCertificateUrl)
+  ).length;
+  const specialistReferralsCount = filteredAppointments.filter(
+    (appointment) => Boolean(appointment?.consultation?.specialistReferralUrl)
+  ).length;
+  const pathologyLettersCount = filteredAppointments.filter(
+    (appointment) => Boolean(appointment?.consultation?.pathologyLetterUrl)
+  ).length;
+  const radiologyLettersCount = filteredAppointments.filter(
+    (appointment) => Boolean(appointment?.consultation?.radiologyLetterUrl)
+  ).length;
   const completionRate = filteredAppointments.length
     ? Math.round((completedCount / filteredAppointments.length) * 100)
     : 0;
@@ -170,10 +186,10 @@ export default function DoctorDashboard() {
     const totalModes = totals.VIDEO + totals.AUDIO + totals.IN_PERSON;
     if (totalModes === 0) {
       return {
-        VIDEO: 95,
-        AUDIO: 3,
-        IN_PERSON: 2,
-        total: 100,
+        VIDEO: 0,
+        AUDIO: 0,
+        IN_PERSON: 0,
+        total: 0,
       };
     }
 
@@ -184,8 +200,8 @@ export default function DoctorDashboard() {
   }, [filteredAppointments]);
 
   const modePercentages = useMemo(() => {
-    if (modeCounts.total === 100 && appointments.length === 0) {
-      return modeCounts;
+    if (modeCounts.total === 0) {
+      return { VIDEO: 0, AUDIO: 0, IN_PERSON: 0 };
     }
 
     return {
@@ -198,30 +214,14 @@ export default function DoctorDashboard() {
           Math.round((modeCounts.AUDIO / modeCounts.total) * 100)
       ),
     };
-  }, [modeCounts, appointments.length]);
+  }, [modeCounts]);
 
   const doctorDisplayName = formatDoctorName(user?.name, 'Doctor');
 
-  const doctorNavItems = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'waiting-room', label: 'Waiting Room' },
-    { key: 'appointments', label: 'My Appointment' },
-    { key: 'patients', label: 'My Patients' },
-    { key: 'chat', label: 'Chat' },
-    { key: 'more', label: 'More Options' },
-  ];
+  const doctorNavItems = DOCTOR_NAV_ITEMS;
 
   const handleDoctorNavClick = (key) => {
-    if (key === 'dashboard') navigate('/dashboard');
-    if (key === 'waiting-room') navigate('/doctor/waiting-room');
-    if (key === 'appointments') navigate('/doctor/appointments');
-    if (key === 'patients') navigate('/doctor/patients');
-    if (key === 'chat') navigate('/doctor/chat');
-    if (key === 'pay-out') navigate('/doctor/payouts');
-    if (key === 'medical-documents') navigate('/doctor/medical-documents');
-    if (key === 'invoices') navigate('/doctor/invoices');
-    if (key === 'my-profile') navigate('/doctor/profile');
-    if (key === 'change-password') navigate('/doctor/profile?tab=settings');
+    navigateDoctorNavClick(key, navigate);
   };
 
   const handleToggleOnline = async () => {
@@ -252,46 +252,89 @@ export default function DoctorDashboard() {
       value: `$${revenue}`,
       icon: Activity,
       iconClass: 'bg-violet-100 text-violet-700',
+      route: '/doctor/payouts',
     },
     {
       label: 'Appointments',
       value: filteredAppointments.length,
       icon: Calendar,
       iconClass: 'bg-lime-100 text-lime-700',
+      route: '/doctor/appointments',
     },
     {
-      label: 'Completed',
-      value: completedCount,
+      label: 'Pathology Letters',
+      value: pathologyLettersCount,
       icon: FileText,
       iconClass: 'bg-amber-100 text-amber-700',
+      route: '/doctor/medical-documents?type=PATHOLOGY_LETTER',
     },
     {
-      label: 'Upcoming',
-      value: upcomingCount,
-      icon: Calendar,
+      label: 'Specialist Referral',
+      value: specialistReferralsCount,
+      icon: FileText,
       iconClass: 'bg-cyan-100 text-cyan-700',
+      route: '/doctor/medical-documents?type=SPECIALIST_REFERRAL',
     },
     {
-      label: 'In Progress',
-      value: inProgressCount,
-      icon: Clock,
+      label: 'Radiology Letters',
+      value: radiologyLettersCount,
+      icon: FileText,
       iconClass: 'bg-green-100 text-green-700',
+      route: '/doctor/medical-documents?type=RADIOLOGY_LETTER',
+    },
+    {
+      label: 'Prescriptions',
+      value: prescriptionsCount,
+      icon: FileText,
+      iconClass: 'bg-rose-100 text-rose-700',
+      route: '/doctor/medical-documents?type=PRESCRIPTION',
     },
     {
       label: 'Total Patients',
       value: uniquePatients,
       icon: Users,
       iconClass: 'bg-blue-100 text-blue-700',
+      route: '/doctor/patients',
+    },
+    {
+      label: 'Medical Certificates',
+      value: medicalCertificatesCount,
+      icon: FileText,
+      iconClass: 'bg-indigo-100 text-indigo-700',
+      route: '/doctor/medical-documents?type=MEDICAL_CERTIFICATE',
     },
   ];
 
-  const serviceBarHeight = Math.max(30, Math.min(100, modePercentages.VIDEO + modePercentages.AUDIO + modePercentages.IN_PERSON));
+  const hasServiceData = modeCounts.total > 0;
+  const serviceChartData = [
+    {
+      key: 'VIDEO',
+      label: 'Video',
+      value: modeCounts.VIDEO,
+      percentage: modePercentages.VIDEO,
+      barClass: 'bg-blue-500',
+    },
+    {
+      key: 'AUDIO',
+      label: 'Audio',
+      value: modeCounts.AUDIO,
+      percentage: modePercentages.AUDIO,
+      barClass: 'bg-emerald-500',
+    },
+    {
+      key: 'IN_PERSON',
+      label: 'In-Person',
+      value: modeCounts.IN_PERSON,
+      percentage: modePercentages.IN_PERSON,
+      barClass: 'bg-amber-500',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
       <SharedNavbar
         user={user}
-        brandLabel="MyDrScripts"
+        brandLabel="CareBridge"
         onLogoClick={() => navigate('/dashboard')}
         navItems={doctorNavItems}
         activeTab="dashboard"
@@ -325,7 +368,7 @@ export default function DoctorDashboard() {
           </label>
         </div>
 
-        <section className="grid gap-5 xl:grid-cols-2">
+        <section className="grid gap-5 xl:grid-cols-[2fr_3fr]">
           <article className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-cyan-100/50" />
             <div className="pointer-events-none absolute -bottom-10 right-14 h-28 w-28 rounded-full bg-blue-100/40" />
@@ -357,11 +400,13 @@ export default function DoctorDashboard() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {overviewCards.map((card) => (
-                <div
+                <button
+                  type="button"
                   key={card.label}
-                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 p-3"
+                  onClick={() => navigate(card.route)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-left transition-colors hover:bg-slate-100"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.iconClass}`}>
@@ -373,7 +418,7 @@ export default function DoctorDashboard() {
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-slate-300" />
-                </div>
+                </button>
               ))}
             </div>
           </article>
@@ -423,38 +468,41 @@ export default function DoctorDashboard() {
           <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="text-xl font-extrabold text-slate-900">Services Chart</h3>
             <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
-              <div className="mb-4 grid grid-cols-[repeat(6,minmax(0,1fr))] gap-2 text-[11px] font-semibold text-slate-400">
-                <span>0</span>
-                <span>50</span>
-                <span>100</span>
-                <span>150</span>
-                <span>200</span>
-                <span>250</span>
-              </div>
-
-              <div className="relative mx-auto h-56 w-full max-w-xl rounded-2xl border border-dashed border-slate-200 bg-white px-8 py-5">
-                <div className="absolute inset-x-8 bottom-5 top-5 grid grid-rows-5 gap-6">
-                  {[0, 1, 2, 3, 4].map((row) => (
-                    <div key={row} className="border-b border-slate-100" />
-                  ))}
+              <div className="grid grid-cols-[36px_1fr] gap-3">
+                <div className="flex h-56 flex-col justify-between pb-8 text-[11px] font-semibold text-slate-400">
+                  <span>100%</span>
+                  <span>75%</span>
+                  <span>50%</span>
+                  <span>25%</span>
+                  <span>0%</span>
                 </div>
 
-                <div className="relative z-10 mx-auto flex h-full w-[65%] items-end justify-center">
-                  <div className="w-full rounded-t-2xl bg-blue-500/90" style={{ height: `${serviceBarHeight}%` }}>
-                    <div
-                      className="w-full rounded-t-2xl bg-teal-400"
-                      style={{ height: `${Math.max(4, modePercentages.AUDIO / 2)}%` }}
-                    >
-                      <div
-                        className="w-full rounded-t-2xl bg-amber-400"
-                        style={{ height: `${Math.max(3, modePercentages.IN_PERSON / 2)}%` }}
-                      />
-                    </div>
+                <div className="relative h-56 rounded-2xl border border-dashed border-slate-200 bg-white px-4 pt-4">
+                  <div className="absolute inset-x-4 top-4 bottom-8 grid grid-rows-4">
+                    {[0, 1, 2, 3].map((row) => (
+                      <div key={row} className="border-b border-slate-100" />
+                    ))}
+                  </div>
+
+                  <div className="relative z-10 flex h-full items-end justify-around gap-3 pb-8">
+                    {serviceChartData.map((service) => (
+                      <div key={service.key} className="flex h-full w-full max-w-[96px] flex-col items-center justify-end">
+                        <p className="mb-1 text-[11px] font-black text-slate-600">{service.percentage}%</p>
+                        <div
+                          className={`w-12 rounded-t-xl ${service.barClass} transition-all`}
+                          style={{ height: `${service.percentage}%` }}
+                        />
+                        <p className="mt-2 text-[11px] font-black text-slate-600">{service.label}</p>
+                        <p className="text-[10px] font-semibold text-slate-400">{service.value} appts</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                <p className="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs font-semibold text-slate-400">2025-2026</p>
               </div>
+
+              {!hasServiceData && (
+                <p className="mt-3 text-xs font-semibold text-slate-500">No service data available for the selected window.</p>
+              )}
             </div>
           </article>
         </section>
@@ -466,13 +514,17 @@ export default function DoctorDashboard() {
               <div
                 className="relative h-52 w-52 rounded-full"
                 style={{
-                  background: `conic-gradient(#1e90ff 0 ${modePercentages.VIDEO}%, #10b981 ${modePercentages.VIDEO}% ${
-                    modePercentages.VIDEO + modePercentages.AUDIO
-                  }%, #f59e0b ${modePercentages.VIDEO + modePercentages.AUDIO}% 100%)`,
+                  background: hasServiceData
+                    ? `conic-gradient(#1e90ff 0 ${modePercentages.VIDEO}%, #10b981 ${modePercentages.VIDEO}% ${
+                        modePercentages.VIDEO + modePercentages.AUDIO
+                      }%, #f59e0b ${modePercentages.VIDEO + modePercentages.AUDIO}% 100%)`
+                    : 'conic-gradient(#e2e8f0 0 100%)',
                 }}
               >
                 <div className="absolute inset-7 rounded-full bg-white shadow-inner" />
-                <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-600">Total</div>
+                <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-600">
+                  {hasServiceData ? 'Total' : 'No Data'}
+                </div>
               </div>
 
               <div className="w-full space-y-2">

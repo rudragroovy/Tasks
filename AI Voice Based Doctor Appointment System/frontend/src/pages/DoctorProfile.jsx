@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import DoctorSlotSettings from '../components/doctor/DoctorSlotSettings';
 import { formatDoctorName } from '../utils/doctorName';
+import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -48,41 +49,68 @@ function splitUserName(fullName) {
 }
 
 function buildProfileState(user) {
-  const { givenName, familyName } = splitUserName(user?.name);
+  const profile = user?.doctorProfile || {};
+  const { givenName: fallbackGivenName, familyName: fallbackFamilyName } = splitUserName(user?.name);
   return {
-    givenName,
-    secondaryName: '',
-    familyName,
-    noFamilyName: false,
-    gender: 'Male',
-    dateOfBirth: '',
-    phoneCode: '+91',
-    phoneNumber: user?.doctorProfile?.phone || '',
+    givenName: profile.givenName || fallbackGivenName,
+    secondaryName: profile.secondaryName || '',
+    familyName: profile.familyName || fallbackFamilyName,
+    noFamilyName: profile.noFamilyName ?? false,
+    gender: profile.gender || 'Male',
+    dateOfBirth: profile.dateOfBirth || '',
+    phoneCode: profile.phoneCode || '+91',
+    phoneNumber: profile.phone || '',
     email: user?.email || '',
-    address: user?.doctorProfile?.address || '',
-    experience: user?.doctorProfile?.experienceYears ? String(user.doctorProfile.experienceYears) : '0-1',
-    qualification: user?.doctorProfile?.qualification || 'MBBS',
-    practitionerType: user?.doctorProfile?.practitionerType || 'General Practitioner (GP)',
-    services: '',
-    about: '',
-    ahpraNumber: 'TES0000002683',
-    prescriberNumber: '6544877',
-    providerNumber: '272114AB',
-    hpiIndividualNumber: '8003-6185-6871-9558',
-    hpioNumber: '8003-6299-0004-1324',
-    saveMyHINumber: true,
-    mimsUserId: '9b99-39c2-b9f1-4a81-bec8-c349-1e73-0c25',
-    mimsEulaAccepted: true,
-    mimsTermsAccepted: true,
-    prescriptionEntityId: '4TF4T',
-    prescriptionAccessEnabled: true,
-    accountHolderName: '',
-    accountNumber: '',
-    routingNumber: '',
-    autoDraftNotesEnabled: false,
-    showOnlineOnLogin: user?.doctorProfile?.showOnlineOnLogin ?? true,
-    otpDeliveryChannel: 'BOTH',
+    address: profile.address || '',
+    experience: profile.experienceRange || (profile.experienceYears ? String(profile.experienceYears) : '0-1'),
+    qualification: profile.qualification || 'MBBS',
+    practitionerType: profile.practitionerType || 'General Practitioner (GP)',
+    services: profile.services || '',
+    about: profile.about || '',
+    ahpraNumber: profile.ahpraNumber || '',
+    prescriberNumber: profile.prescriberNumber || '',
+    providerNumber: profile.providerNumber || '',
+    hpiIndividualNumber: profile.hpiIndividualNumber || '',
+    hpioNumber: profile.hpioNumber || '',
+    saveMyHINumber: profile.saveMyHINumber ?? true,
+    mimsUserId: profile.mimsUserId || '',
+    mimsEulaAccepted: profile.mimsEulaAccepted ?? false,
+    mimsTermsAccepted: profile.mimsTermsAccepted ?? false,
+    prescriptionEntityId: profile.prescriptionEntityId || '',
+    prescriptionAccessEnabled: profile.prescriptionAccessEnabled ?? true,
+    accountHolderName: profile.accountHolderName || '',
+    accountNumber: profile.accountNumber || '',
+    routingNumber: profile.routingNumber || '',
+    autoDraftNotesEnabled: profile.autoDraftNotesEnabled ?? false,
+    showOnlineOnLogin: profile.showOnlineOnLogin ?? true,
+    otpDeliveryChannel: profile.otpDeliveryChannel || 'BOTH',
+    emailChannelConfigured: Boolean(String(user?.email || '').trim()),
+    phoneChannelConfigured: Boolean(String(profile.phone || '').trim()),
+    hiStatusLabel: profile.hpiIndividualNumber ? 'Configured' : 'Not Set',
+    mimsStatusLabel: profile.mimsUserId ? 'Configured' : 'Not Set',
+    otpDeliveryDescription:
+      'Choose where you receive your one-time login code based on your configured contact details.',
+    phoneChannelHint: profile.phone ? '' : 'Add a phone number in profile to use SMS OTP.',
+    otpSecurityNote: profile.phone
+      ? 'Your login code is delivered only to configured channels.'
+      : 'Phone channel is missing. OTP will be delivered using email only.',
+    otpSecurityActionText:
+      'Update your email and phone details from your Profile to enable additional options.',
+    hiInfoUrl: 'https://www.servicesaustralia.gov.au/health-identifiers-for-health-professionals',
+    hiInfoText: 'Learn more about Health Identifiers.',
   };
+}
+
+function composeProfileName(profile, fallbackName) {
+  const parts = [
+    profile?.givenName,
+    profile?.secondaryName,
+    profile?.noFamilyName ? '' : profile?.familyName,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  return parts.join(' ').trim() || fallbackName;
 }
 
 export default function DoctorProfile() {
@@ -99,6 +127,10 @@ export default function DoctorProfile() {
   const [isOnline, setIsOnline] = useState(Boolean(user?.doctorProfile?.isOnline));
   const [appointments, setAppointments] = useState([]);
   const [profile, setProfile] = useState(() => buildProfileState(user));
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [bankSaving, setBankSaving] = useState(false);
+  const [bankMessage, setBankMessage] = useState('');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState('');
@@ -133,6 +165,38 @@ export default function DoctorProfile() {
   useEffect(() => {
     let isMounted = true;
 
+    const fetchDoctorProfile = async () => {
+      if (!user || user.role !== 'DOCTOR') return;
+
+      try {
+        const response = await axios.get(`${API_URL}/api/doctors/me/profile`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (!isMounted) return;
+        setProfile((prev) => ({ ...prev, ...(response.data || {}) }));
+        if (typeof response.data?.isOnline === 'boolean') {
+          setIsOnline(response.data.isOnline);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error('Failed to fetch doctor profile', error);
+        }
+      }
+    };
+
+    fetchDoctorProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+
     const fetchDoctorSettings = async () => {
       if (!user || user.role !== 'DOCTOR') return;
 
@@ -151,6 +215,11 @@ export default function DoctorProfile() {
           setProfile((prev) => ({
             ...prev,
             showOnlineOnLogin: response.data.showOnlineOnLogin,
+            autoDraftNotesEnabled:
+              typeof response.data?.autoDraftNotesEnabled === 'boolean'
+                ? response.data.autoDraftNotesEnabled
+                : prev.autoDraftNotesEnabled,
+            otpDeliveryChannel: response.data?.otpDeliveryChannel || prev.otpDeliveryChannel,
           }));
         }
         if (typeof response.data?.isOnline === 'boolean') {
@@ -174,29 +243,18 @@ export default function DoctorProfile() {
     };
   }, [user]);
 
-  const doctorName = formatDoctorName(user?.name, 'Doctor');
+  const profileDisplayName = composeProfileName(profile, user?.name || 'Doctor');
+  const doctorName = formatDoctorName(profileDisplayName, 'Doctor');
   const pendingCount = appointments.filter((appointment) => appointment.status === 'PENDING').length;
+  const hasEmailChannel = Boolean(String(profile.email || '').trim());
+  const hasPhoneChannel = Boolean(String(profile.phoneNumber || '').trim());
+  const hiStatusLabel = Boolean(String(profile.hpiIndividualNumber || '').trim()) ? 'Configured' : 'Not Set';
+  const mimsStatusLabel = Boolean(String(profile.mimsUserId || '').trim()) ? 'Configured' : 'Not Set';
 
-  const doctorNavItems = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'waiting-room', label: 'Waiting Room' },
-    { key: 'appointments', label: 'My Appointment' },
-    { key: 'patients', label: 'My Patients' },
-    { key: 'chat', label: 'Chat' },
-    { key: 'more', label: 'More Options' },
-  ];
+  const doctorNavItems = DOCTOR_NAV_ITEMS;
 
   const handleDoctorNavClick = (key) => {
-    if (key === 'dashboard') navigate('/dashboard');
-    if (key === 'waiting-room') navigate('/doctor/waiting-room');
-    if (key === 'appointments') navigate('/doctor/appointments');
-    if (key === 'patients') navigate('/doctor/patients');
-    if (key === 'chat') navigate('/doctor/chat');
-    if (key === 'pay-out') navigate('/doctor/payouts');
-    if (key === 'medical-documents') navigate('/doctor/medical-documents');
-    if (key === 'invoices') navigate('/doctor/invoices');
-    if (key === 'my-profile') navigate('/doctor/profile');
-    if (key === 'change-password') navigate('/doctor/profile?tab=settings');
+    navigateDoctorNavClick(key, navigate);
   };
 
   const handleToggleOnline = async () => {
@@ -238,7 +296,11 @@ export default function DoctorProfile() {
     try {
       const response = await axios.put(
         `${API_URL}/api/doctors/me/settings`,
-        { showOnlineOnLogin: Boolean(profile.showOnlineOnLogin) },
+        {
+          showOnlineOnLogin: Boolean(profile.showOnlineOnLogin),
+          autoDraftNotesEnabled: Boolean(profile.autoDraftNotesEnabled),
+          otpDeliveryChannel: profile.otpDeliveryChannel,
+        },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -249,6 +311,8 @@ export default function DoctorProfile() {
       setProfile((prev) => ({
         ...prev,
         showOnlineOnLogin: Boolean(response.data?.showOnlineOnLogin),
+        autoDraftNotesEnabled: Boolean(response.data?.autoDraftNotesEnabled),
+        otpDeliveryChannel: response.data?.otpDeliveryChannel || prev.otpDeliveryChannel,
       }));
       setIsOnline(Boolean(response.data?.isOnline));
       setSettingsMessage('General settings saved successfully.');
@@ -260,11 +324,100 @@ export default function DoctorProfile() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    setProfileMessage('');
+
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/doctors/me/profile`,
+        {
+          givenName: profile.givenName,
+          secondaryName: profile.secondaryName,
+          familyName: profile.familyName,
+          noFamilyName: profile.noFamilyName,
+          gender: profile.gender,
+          dateOfBirth: profile.dateOfBirth,
+          phoneCode: profile.phoneCode,
+          phoneNumber: profile.phoneNumber,
+          email: profile.email,
+          address: profile.address,
+          experience: profile.experience,
+          qualification: profile.qualification,
+          practitionerType: profile.practitionerType,
+          services: profile.services,
+          about: profile.about,
+          ahpraNumber: profile.ahpraNumber,
+          prescriberNumber: profile.prescriberNumber,
+          providerNumber: profile.providerNumber,
+          hpiIndividualNumber: profile.hpiIndividualNumber,
+          hpioNumber: profile.hpioNumber,
+          saveMyHINumber: profile.saveMyHINumber,
+          mimsUserId: profile.mimsUserId,
+          mimsEulaAccepted: profile.mimsEulaAccepted,
+          mimsTermsAccepted: profile.mimsTermsAccepted,
+          prescriptionEntityId: profile.prescriptionEntityId,
+          prescriptionAccessEnabled: profile.prescriptionAccessEnabled,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+
+      setProfile((prev) => ({ ...prev, ...(response.data || {}) }));
+      if (typeof response.data?.isOnline === 'boolean') {
+        setIsOnline(response.data.isOnline);
+      }
+      setProfileMessage('Profile updated successfully.');
+    } catch (error) {
+      console.error('Failed to save doctor profile', error);
+      setProfileMessage(error?.response?.data?.error || 'Failed to save profile.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleSaveBankDetails = async () => {
+    setBankSaving(true);
+    setBankMessage('');
+
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/doctors/me/bank-details`,
+        {
+          accountHolderName: profile.accountHolderName,
+          accountNumber: profile.accountNumber,
+          routingNumber: profile.routingNumber,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+
+      setProfile((prev) => ({
+        ...prev,
+        accountHolderName: response.data?.accountHolderName || '',
+        accountNumber: response.data?.accountNumber || '',
+        routingNumber: response.data?.routingNumber || '',
+      }));
+      setBankMessage('Bank details updated successfully.');
+    } catch (error) {
+      console.error('Failed to save bank details', error);
+      setBankMessage(error?.response?.data?.error || 'Failed to save bank details.');
+    } finally {
+      setBankSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
       <SharedNavbar
         user={user}
-        brandLabel="MyDrScripts"
+        brandLabel="CareBridge"
         onLogoClick={() => navigate('/dashboard')}
         navItems={doctorNavItems}
         activeTab=""
@@ -356,10 +509,17 @@ export default function DoctorProfile() {
 
                 <button
                   type="button"
+                  onClick={handleSaveBankDetails}
+                  disabled={bankSaving}
                   className="mt-5 h-12 w-full rounded-lg bg-primary-700 text-xl font-black tracking-tight text-white transition-colors hover:bg-primary-800"
                 >
-                  Add Details
+                  {bankSaving ? 'Saving...' : 'Add Details'}
                 </button>
+                {bankMessage && (
+                  <p className={`mt-2 text-center text-xs font-semibold ${bankMessage.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {bankMessage}
+                  </p>
+                )}
               </div>
             </div>
           ) : activeProfileTab === 'settings' ? (
@@ -427,7 +587,7 @@ export default function DoctorProfile() {
                 <div>
                   <h3 className="text-lg font-black tracking-tight text-slate-900">Login OTP Delivery</h3>
                   <p className="mt-1 text-sm font-medium text-slate-500">
-                    Choose where you receive your one-time login code. You can only select a channel that has been verified.
+                    {profile.otpDeliveryDescription}
                   </p>
 
                   <div className="mt-3 space-y-2">
@@ -443,8 +603,14 @@ export default function DoctorProfile() {
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-primary-700" />
                           <p className="text-sm font-bold text-slate-900">Email</p>
-                          <span className="rounded border border-lime-300 bg-lime-50 px-1.5 py-0.5 text-[10px] font-black uppercase text-lime-700">
-                            Verified
+                          <span
+                            className={`rounded border px-1.5 py-0.5 text-[10px] font-black uppercase ${
+                              hasEmailChannel
+                                ? 'border-lime-300 bg-lime-50 text-lime-700'
+                                : 'border-slate-300 bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {hasEmailChannel ? 'Configured' : 'Missing'}
                           </span>
                         </div>
                         <p className="mt-1 text-sm font-medium text-slate-500">{profile.email || 'No email available'}</p>
@@ -463,12 +629,18 @@ export default function DoctorProfile() {
                         <div className="flex items-center gap-2">
                           <Smartphone className="h-4 w-4 text-primary-700" />
                           <p className="text-sm font-bold text-slate-900">Phone (SMS)</p>
-                          <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-700">
-                            Not verified
+                          <span
+                            className={`rounded border px-1.5 py-0.5 text-[10px] font-black uppercase ${
+                              hasPhoneChannel
+                                ? 'border-lime-300 bg-lime-50 text-lime-700'
+                                : 'border-amber-300 bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {hasPhoneChannel ? 'Configured' : 'Missing'}
                           </span>
                         </div>
                         <p className="mt-1 text-sm font-medium text-slate-500">{`${profile.phoneCode} ${profile.phoneNumber}`.trim()}</p>
-                        <p className="mt-1 text-xs font-semibold text-amber-600">Verify your phone to enable this option.</p>
+                        {!hasPhoneChannel && <p className="mt-1 text-xs font-semibold text-amber-600">{profile.phoneChannelHint}</p>}
                       </div>
                     </label>
 
@@ -485,28 +657,31 @@ export default function DoctorProfile() {
                           <Mail className="h-4 w-4 text-primary-700" />
                           <p className="text-sm font-bold text-slate-900">Both email &amp; phone</p>
                         </div>
-                        <p className="mt-1 text-sm font-medium text-slate-500">Code is sent to every channel you have verified.</p>
+                        <p className="mt-1 text-sm font-medium text-slate-500">Code is sent to every configured channel.</p>
                       </div>
                     </label>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-2 rounded-md border border-primary-200 bg-primary-100/50 px-3 py-2 text-sm font-semibold text-slate-700">
-                    <TriangleAlert className="h-4 w-4 text-primary-700" />
-                    Your phone is not verified yet - codes will go to email only until you verify it.
-                  </div>
+                  {!hasPhoneChannel && (
+                    <div className="mt-3 flex items-center gap-2 rounded-md border border-primary-200 bg-primary-100/50 px-3 py-2 text-sm font-semibold text-slate-700">
+                      <TriangleAlert className="h-4 w-4 text-primary-700" />
+                      {profile.otpSecurityNote}
+                    </div>
+                  )}
 
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
+                      onClick={handleSaveGeneralSettings}
+                      disabled={settingsSaving || settingsLoading}
                       className="rounded-md bg-primary-700 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-primary-800"
                     >
-                      Save Preference
+                      {settingsSaving ? 'Saving...' : 'Save Preference'}
                     </button>
                   </div>
 
                   <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
-                    <span className="font-black text-slate-700">Security:</span> Your login code is only ever delivered to the channels you have verified.
-                    Verify your email or phone from your <span className="font-black">Profile</span> to unlock more options.
+                    <span className="font-black text-slate-700">Security:</span> {profile.otpSecurityNote} {profile.otpSecurityActionText}
                   </div>
                 </div>
               </div>
@@ -622,7 +797,7 @@ export default function DoctorProfile() {
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-slate-800">
                           <span className="mr-1 text-rose-500">*</span>Phone number{' '}
-                          <span className="text-primary-700">Verify</span>
+                          <span className="text-primary-700">(Configured)</span>
                         </label>
                         <div className="flex gap-2">
                           <input
@@ -790,7 +965,7 @@ export default function DoctorProfile() {
                       className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[15px] font-semibold text-slate-900 outline-none focus:border-primary-400"
                     />
                     <p className="mt-1 text-xs font-medium text-primary-700">
-                      Provider number needs to be associated with either a MyDrScripts organization or a residence address.
+                      Provider number needs to be associated with either a CareBridge organization or a residence address.
                     </p>
                   </div>
 
@@ -827,8 +1002,14 @@ export default function DoctorProfile() {
                       <p className="text-slate-500">HPI-I (Healthcare Provider Identifier - Individual) Number :</p>
                       <p className="text-base font-black text-primary-700">{profile.hpiIndividualNumber}</p>
                       <p className="text-slate-500">HPI-I (Healthcare Provider Identifier - Individual) Number Status :</p>
-                      <span className="inline-flex rounded-md border border-lime-300 bg-lime-50 px-2 py-0.5 text-xs font-black uppercase text-lime-700">
-                        Active
+                      <span
+                        className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-black uppercase ${
+                          hiStatusLabel === 'Configured'
+                            ? 'border-lime-300 bg-lime-50 text-lime-700'
+                            : 'border-slate-300 bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {hiStatusLabel}
                       </span>
                     </div>
 
@@ -841,7 +1022,14 @@ export default function DoctorProfile() {
                       Save My HI (Health Identifier) number for e-Prescription <Info className="h-4 w-4 text-primary-700" />
                     </label>
                     <p className="mt-1 text-sm font-semibold text-slate-700">
-                      Please go here for additional information about HI.
+                      <a
+                        href={profile.hiInfoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-700 underline"
+                      >
+                        {profile.hiInfoText}
+                      </a>
                     </p>
                   </div>
 
@@ -851,8 +1039,14 @@ export default function DoctorProfile() {
                       <p className="text-slate-500">MIMS User Id :</p>
                       <p className="break-all text-sm font-black text-primary-700">{profile.mimsUserId}</p>
                       <p className="text-slate-500">MIMS Status</p>
-                      <span className="inline-flex rounded-md border border-lime-300 bg-lime-50 px-2 py-0.5 text-xs font-black uppercase text-lime-700">
-                        Active
+                      <span
+                        className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-black uppercase ${
+                          mimsStatusLabel === 'Configured'
+                            ? 'border-lime-300 bg-lime-50 text-lime-700'
+                            : 'border-slate-300 bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {mimsStatusLabel}
                       </span>
                     </div>
 
@@ -908,11 +1102,18 @@ export default function DoctorProfile() {
               <div className="flex justify-end">
                 <button
                   type="button"
+                  onClick={handleSaveProfile}
+                  disabled={profileSaving}
                   className="rounded-lg bg-primary-700 px-10 py-3 text-sm font-black uppercase tracking-wide text-white transition-colors hover:bg-primary-800"
                 >
-                  Save
+                  {profileSaving ? 'Saving...' : 'Save'}
                 </button>
               </div>
+              {profileMessage && (
+                <p className={`text-right text-xs font-semibold ${profileMessage.includes('successfully') ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {profileMessage}
+                </p>
+              )}
             </div>
           )}
         </section>

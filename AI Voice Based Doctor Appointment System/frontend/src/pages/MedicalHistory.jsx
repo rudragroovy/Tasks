@@ -1,196 +1,458 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { TopHeader } from '../components/ui/top-header';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Calendar,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Search,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
+import LandingNavbar from '../components/LandingNavbar';
 import { HistoryModal } from '../components/ui/history-modal';
-import { Search, FileText, Calendar, Clock, Stethoscope, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { formatDoctorName } from '../utils/doctorName';
+import AppointmentReviewModal from '../components/reviews/AppointmentReviewModal';
+import { useAuth } from '../context/AuthContext';
+import AppIcon from '../components/branding/AppIcon';
+import './medical-history.css';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const EMPTY_STATE_IMAGE =
+  'https://cdn-icons-png.flaticon.com/512/4076/4076432.png';
+const ITEMS_PER_PAGE = 9;
+
+function safeDate(value) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseSummary(summary) {
+  if (!summary) return {};
+  if (typeof summary === 'object') return summary;
+  if (typeof summary === 'string') {
+    try {
+      return JSON.parse(summary);
+    } catch {
+      return { notes: summary };
+    }
+  }
+  return {};
+}
+
+function getModeLabel(appointment) {
+  const mode = String(appointment?.consultationMode || '').toUpperCase();
+  if (mode === 'VIDEO') return 'Televideo';
+  if (mode === 'AUDIO') return 'Telephone';
+  if (mode === 'IN_PERSON') return 'In Person';
+  return 'Televideo';
+}
+
+function getServiceLabel(appointment) {
+  const summary = parseSummary(appointment?.aiSummary);
+  return (
+    summary?.service ||
+    summary?.service_name ||
+    summary?.consultation_type ||
+    summary?.primary_symptom ||
+    'Standard Consultation'
+  );
+}
+
+function getRelationLabel(appointment) {
+  return appointment?.familyMember?.relation || 'Self';
+}
+
+function getPrimaryDate(appointment) {
+  return safeDate(appointment?.scheduledFor) || safeDate(appointment?.createdAt);
+}
+
+function isPastAppointment(appointment) {
+  const status = String(appointment?.status || '').toUpperCase();
+  return ['COMPLETED', 'CANCELLED', 'REJECTED'].includes(status);
+}
+
+function filterByTab(appointment, activeTab) {
+  const status = String(appointment?.status || '').toUpperCase();
+  const now = new Date();
+  const scheduledAt = safeDate(appointment?.scheduledFor);
+
+  if (activeTab === 'current') {
+    if (status !== 'ACCEPTED') return false;
+    if (!scheduledAt) return true;
+    return scheduledAt <= now;
+  }
+
+  if (activeTab === 'upcoming') {
+    if (!['PENDING', 'ACCEPTED'].includes(status)) return false;
+    if (!scheduledAt) return status === 'PENDING';
+    return scheduledAt > now;
+  }
+
+  return isPastAppointment(appointment);
+}
 
 export default function MedicalHistory() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('past');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedHistoryApt, setSelectedHistoryApt] = useState(null);
-  const itemsPerPage = 5;
+  const [reviewTargetAppointment, setReviewTargetAppointment] = useState(null);
 
   useEffect(() => {
-    const fetchHistory = async () => {
+    const fetchAppointments = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/appointments', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        const response = await fetch(`${API_URL}/api/appointments`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         });
-        if (!res.ok) throw new Error('Failed to fetch');
-        const data = await res.json();
-        // Only COMPLETED appointments
-        setAppointments(data.filter(a => a.status === 'COMPLETED').sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
-      } catch (err) {
-        console.error(err);
+        if (!response.ok) throw new Error('Failed to fetch appointments');
+        const payload = await response.json();
+        setAppointments(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        console.error(error);
+        setAppointments([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchHistory();
+
+    fetchAppointments();
   }, []);
 
-  const filteredHistory = useMemo(() => {
-    if (!searchQuery.trim()) return appointments;
-    const query = searchQuery.toLowerCase();
-    return appointments.filter(apt => {
-      const docName = apt.doctor?.name?.toLowerCase() || '';
-      const docSpec = apt.doctor?.specialization?.toLowerCase() || '';
-      const summary1 = apt.aiSummary?.primary_symptom?.toLowerCase() || '';
-      const summary2 = (typeof apt.consultation?.aiSummary === 'string' ? apt.consultation.aiSummary : '').toLowerCase();
-      return docName.includes(query) || docSpec.includes(query) || summary1.includes(query) || summary2.includes(query);
-    });
-  }, [appointments, searchQuery]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, statusFilter, startDate, endDate]);
 
-  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
-  const currentItems = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const statusOptions = useMemo(() => {
+    if (activeTab === 'current') return ['ALL', 'ACCEPTED'];
+    if (activeTab === 'upcoming') return ['ALL', 'PENDING', 'ACCEPTED'];
+    return ['ALL', 'COMPLETED', 'CANCELLED', 'REJECTED'];
+  }, [activeTab]);
+
+  const filteredAppointments = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const start = startDate ? safeDate(`${startDate}T00:00:00`) : null;
+    const end = endDate ? safeDate(`${endDate}T23:59:59`) : null;
+
+    return appointments
+      .filter((appointment) => filterByTab(appointment, activeTab))
+      .filter((appointment) => {
+        if (!query) return true;
+        const doctorName = String(appointment?.doctor?.name || '').toLowerCase();
+        const serviceName = String(getServiceLabel(appointment)).toLowerCase();
+        return doctorName.includes(query) || serviceName.includes(query);
+      })
+      .filter((appointment) => {
+        if (statusFilter === 'ALL') return true;
+        const status = String(appointment?.status || '').toUpperCase();
+        return status === statusFilter;
+      })
+      .filter((appointment) => {
+        if (!start && !end) return true;
+        const date = getPrimaryDate(appointment);
+        if (!date) return false;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const left = getPrimaryDate(a)?.getTime() || 0;
+        const right = getPrimaryDate(b)?.getTime() || 0;
+        return right - left;
+      });
+  }, [activeTab, appointments, endDate, searchQuery, startDate, statusFilter]);
+
+  const totalItems = filteredAppointments.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const paginatedAppointments = filteredAppointments.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  const pageStart = totalItems === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  const pageEnd = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+
+  const handleReviewSubmitted = (review) => {
+    if (!review?.appointmentId) return;
+    setAppointments((previous) =>
+      previous.map((appointment) =>
+        appointment.id === review.appointmentId ? { ...appointment, review } : appointment
+      )
+    );
+  };
+
+  const userName = String(user?.name || 'Patient').trim() || 'Patient';
+  const userFirstName = userName.split(/\s+/)[0] || 'Patient';
+  const userEmail = String(user?.email || '').trim();
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
-      <TopHeader />
-      
-      <main className="flex-1 max-w-[1000px] w-full mx-auto p-4 sm:p-6 lg:p-8 pb-8 flex flex-col">
-        <button 
-          onClick={() => navigate('/dashboard')} 
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-900 font-bold mb-6 transition-colors self-start"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-        </button>
+    <div className="appointments-page">
+      <LandingNavbar />
 
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 sm:mb-8 shrink-0">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-heading font-black text-slate-900 mb-1 sm:mb-2">Medical History</h1>
-            <p className="text-slate-500 font-medium text-sm sm:text-base lg:text-lg">Review your past consultations and prescriptions.</p>
-          </div>
-          <div className="relative w-full sm:w-72">
-            <input 
-              type="text" 
-              placeholder="Search history..." 
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all"
+      <main className="appointments-shell">
+        <aside className="appointments-sidebar">
+          <div className="appointments-profile">
+            <img
+              src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                userName
+              )}&backgroundColor=e2e8f0`}
+              alt={userName}
             />
-            <Search className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400" />
+            <h2>{userName.toUpperCase()}</h2>
+            <p>{userEmail || 'patient@carebridge.com'}</p>
           </div>
-        </div>
 
-        {loading ? (
-          <div className="flex justify-center p-12">
-            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="appointments-nav-group">
+            <h3>My Profile</h3>
+            <button type="button" onClick={() => navigate('/patient/account?tab=profile')}>
+              My Information
+            </button>
+            <button type="button" onClick={() => navigate('/patient/account?tab=family')}>
+              Family Members
+            </button>
+            <button type="button" onClick={() => navigate('/patient/account?tab=wallet')}>
+              My Wallet
+            </button>
           </div>
-        ) : filteredHistory.length === 0 ? (
-          <div className="bg-white border border-slate-200 border-dashed rounded-3xl p-12 text-center flex flex-col items-center shadow-sm">
-             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-               <FileText className="w-8 h-8 text-slate-300" />
-             </div>
-             <h3 className="text-xl font-bold text-slate-900 mb-2">No records found</h3>
-             <p className="text-slate-500 font-medium">Try adjusting your search or check back later.</p>
+
+          <div className="appointments-nav-group">
+            <h3>My Healthcare</h3>
+            <button type="button" className="is-active">
+              My Appointments
+            </button>
+            <button type="button" onClick={() => navigate('/doctors')}>
+              My Doctors
+            </button>
+            <button type="button" onClick={() => navigate('/patient/account?tab=medical-history')}>
+              Medical Documents
+            </button>
+            <button type="button" onClick={() => navigate('/dashboard')}>
+              Invoice
+            </button>
           </div>
-        ) : (
-          <div className="space-y-4 flex-1">
-            {currentItems.map((apt, idx) => (
-              <motion.div 
-                key={apt.id} 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                onClick={() => setSelectedHistoryApt(apt)}
-                className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 lg:p-6 shadow-sm hover:shadow-md hover:border-primary-200 transition-all flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center relative overflow-hidden cursor-pointer group"
+        </aside>
+
+        <section className="appointments-content">
+          <header className="appointments-content__header">
+            <h1>Consultation</h1>
+            <div className="appointments-tabs" role="tablist" aria-label="Appointment tabs">
+              <button
+                type="button"
+                className={activeTab === 'current' ? 'is-active' : ''}
+                onClick={() => setActiveTab('current')}
               >
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-100 group-hover:bg-primary-400 transition-colors duration-300"></div>
-                <div className="flex items-center gap-3 sm:gap-4 shrink-0 pl-2">
-                  <img 
-                    src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${apt.doctor?.name || 'Doctor'}&backgroundColor=f1f5f9`} 
-                    alt="Doctor" 
-                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-slate-100 object-cover"
-                  />
-                  <div className="min-w-0">
-                    <h4 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
-                      {formatDoctorName(apt.doctor?.name, apt.doctor?.name)}
-                    </h4>
-                    <p className="text-xs sm:text-sm font-bold text-slate-500 flex items-center gap-1.5 mt-0.5">
-                      <Stethoscope className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                      <span className="truncate">{apt.doctor?.specialization || 'General'}</span>
-                    </p>
-                  </div>
-                </div>
+                Current Appointments
+              </button>
+              <button
+                type="button"
+                className={activeTab === 'upcoming' ? 'is-active' : ''}
+                onClick={() => setActiveTab('upcoming')}
+              >
+                Upcoming Appointments
+              </button>
+              <button
+                type="button"
+                className={activeTab === 'past' ? 'is-active' : ''}
+                onClick={() => setActiveTab('past')}
+              >
+                Past Appointments
+              </button>
+            </div>
+          </header>
 
-                <div className="flex-1 border-t sm:border-t-0 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-6 min-w-0 w-full">
-                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                     <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {new Date(apt.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                     <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {new Date(apt.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                   </div>
-                   <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed line-clamp-2">
-                     {apt.aiSummary?.primary_symptom || (typeof apt.consultation?.aiSummary === 'string' ? apt.consultation.aiSummary : '') || 'General consultation regarding health concerns.'}
-                   </p>
-                </div>
+          <div className="appointments-filters">
+            <label className="appointments-filter appointments-filter--search">
+              <Search size={14} />
+              <input
+                type="text"
+                placeholder="Search By Name"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </label>
 
-                {apt.consultation?.prescriptionUrl && (
-                  <div className="shrink-0 ml-4" onClick={(e) => e.stopPropagation()}>
-                    <button 
-                       onClick={() => window.open(`http://localhost:5000${apt.consultation.prescriptionUrl}`, '_blank')}
-                       title="View Prescription"
-                       className="w-10 h-10 bg-health-50 text-health-600 hover:bg-health-100 hover:text-health-700 rounded-full flex items-center justify-center transition-colors shadow-sm"
-                    >
-                      <FileText className="w-5 h-5" />
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            ))}
+            <label className="appointments-filter">
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'ALL' ? 'Appointment Status' : option}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between pt-6 mt-8 border-t border-slate-200 gap-4">
-                <p className="text-sm font-medium text-slate-500">
-                  Showing <span className="font-bold text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredHistory.length)}</span> of <span className="font-bold text-slate-900">{filteredHistory.length}</span> records
-                </p>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            <label className="appointments-filter appointments-filter--date">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
+              <Calendar size={14} />
+            </label>
+
+            <label className="appointments-filter appointments-filter--date">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+              <Calendar size={14} />
+            </label>
+          </div>
+
+          <div className="appointments-divider" />
+
+          {loading ? (
+            <div className="appointments-empty">
+              <div className="appointments-spinner" />
+              <p>Loading appointments...</p>
+            </div>
+          ) : paginatedAppointments.length === 0 ? (
+            <div className="appointments-empty">
+              <img src={EMPTY_STATE_IMAGE} alt="No appointments found" />
+              <p>No appointments found</p>
+            </div>
+          ) : (
+            <>
+              <div className="appointments-grid">
+                {paginatedAppointments.map((appointment) => {
+                  const modeLabel = getModeLabel(appointment);
+                  const serviceLabel = getServiceLabel(appointment);
+                  const relationLabel = getRelationLabel(appointment);
+                  const appointmentDate = getPrimaryDate(appointment);
+                  const isRated = Boolean(appointment?.review);
+
+                  return (
+                    <article key={appointment.id} className="appointment-card">
+                      <div className="appointment-card__head">
+                        <img
+                          src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${encodeURIComponent(
+                            appointment?.doctor?.name || 'Doctor'
+                          )}&backgroundColor=f1f5f9`}
+                          alt={appointment?.doctor?.name || 'Doctor'}
+                        />
+                        <div>
+                          <h2>{String(appointment?.doctor?.name || 'Doctor').toUpperCase()}</h2>
+                          <span className="appointment-card__mode">{modeLabel}</span>
+                        </div>
+                      </div>
+
+                      <div className="appointment-card__body">
+                        <h3>{serviceLabel}</h3>
+                        <p>{`Consult For - ${userFirstName}`}</p>
+                        <p>{`Relation - ${relationLabel}`}</p>
+                        <small>
+                          {appointmentDate
+                            ? `${appointmentDate.toLocaleDateString()} ${appointmentDate.toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}`
+                            : '-'}
+                        </small>
+                        <strong className={`status-${String(appointment?.status || '').toLowerCase()}`}>
+                          {String(appointment?.status || '').toUpperCase() || 'UNKNOWN'}
+                        </strong>
+                      </div>
+
+                      <div className="appointment-card__actions">
+                        <button type="button" onClick={() => setSelectedHistoryApt(appointment)}>
+                          View More
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReviewTargetAppointment(appointment)}
+                        >
+                          {isRated ? 'View Review' : 'Report Doctor'}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="appointments-pagination">
+                <span>{`${pageStart}-${pageEnd} of ${totalItems}`}</span>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                     disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Previous page"
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    <ChevronLeft size={16} />
                   </button>
-                  <div className="flex items-center gap-1">
-                    {Array.from({length: totalPages}, (_, i) => i + 1).map(page => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${currentPage === page ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-                  <button 
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                     disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Next page"
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight size={16} />
                   </button>
                 </div>
               </div>
-            )}
-          </div>
-        )}
+            </>
+          )}
+        </section>
       </main>
 
-      {selectedHistoryApt && (
-        <HistoryModal 
-          apt={selectedHistoryApt} 
-          onClose={() => setSelectedHistoryApt(null)} 
-        />
-      )}
+      <footer className="landing-footer appointments-footer">
+        <div className="container landing-footer__grid">
+          <div>
+            <div className="landing-footer__brand">
+              <AppIcon size={30} />
+              <span>CareBridge</span>
+            </div>
+            <p>
+              CareBridge helps patients manage consultations, prescriptions, referrals, and medical workflows from one
+              place.
+            </p>
+          </div>
+          <div>
+            <h4>Patient</h4>
+            <Link to="/services/standard-consultation">Telehealth Medical Consultation</Link>
+            <Link to="/category/prescription">Prescription</Link>
+            <Link to="/category/medical-certificate">Medical Certificates</Link>
+            <Link to="/category/popular-blood-tests">Blood Test Requests</Link>
+            <Link to="/category/specialist-referral">Specialist Referrals</Link>
+          </div>
+          <div>
+            <h4>Quick Links</h4>
+            <Link to="/">About Us</Link>
+            <Link to="/">Our Team</Link>
+            <Link to="/">Blog</Link>
+            <Link to="/">Career</Link>
+          </div>
+          <div>
+            <h4>Help &amp; Support</h4>
+            <Link to="/">Contact Us</Link>
+            <Link to="/">Help Center</Link>
+            <Link to="/">Privacy Policy</Link>
+            <Link to="/">Terms &amp; Conditions</Link>
+          </div>
+        </div>
+        <div className="landing-footer__bar">Copyright &copy; 2026 CareBridge. All rights reserved.</div>
+      </footer>
+
+      {selectedHistoryApt ? (
+        <HistoryModal apt={selectedHistoryApt} onClose={() => setSelectedHistoryApt(null)} />
+      ) : null}
+
+      <AppointmentReviewModal
+        open={Boolean(reviewTargetAppointment)}
+        appointment={reviewTargetAppointment}
+        onClose={() => setReviewTargetAppointment(null)}
+        onSubmitted={handleReviewSubmitted}
+      />
     </div>
   );
 }

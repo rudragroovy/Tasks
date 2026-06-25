@@ -1,720 +1,796 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { useSearchParams, useLocation } from 'react-router-dom';
-import { useSocket } from '../context/SocketContext';
-import { useAuth } from '../context/AuthContext';
-import { TopHeader } from '../components/ui/top-header';
-import { DoctorCard } from '../components/ui/doctor-card';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Calendar, Clock, CreditCard, ArrowRight, User, Users,
-  CheckCircle2, ShieldCheck, AlertCircle, ChevronDown, ChevronUp
+  CalendarDays,
+  Search,
+  Share2,
+  ShieldCheck,
+  Star,
+  CheckCircle2,
+  SlidersHorizontal,
 } from 'lucide-react';
+import LandingNavbar from '../components/LandingNavbar';
+import AppIcon from '../components/branding/AppIcon';
+import { formatDoctorName } from '../utils/doctorName';
+import { useSocket } from '../context/SocketContext';
+import './booking-page.css';
 
-const CONSULTATION_MODE_OPTIONS = [
-  { value: 'VIDEO', label: 'Video' },
-  { value: 'AUDIO', label: 'Audio' },
-  { value: 'IN_PERSON', label: 'In Person' },
+const MODE_OPTIONS = [
+  { value: 'VIDEO', label: 'Televideo' },
+  { value: 'AUDIO', label: 'Telephone' },
+  { value: 'IN_PERSON', label: 'In-Person Doctor Visit' },
+  { value: 'HOME_VISIT', label: 'Home Visit', disabled: true },
 ];
 
+const toIsoDate = (date) => date.toISOString().split('T')[0];
 
-/* ── Booking Toggle ── */
-function BookingToggle({ value, onChange }) {
-  const isOnDemand = value === 'ON_DEMAND';
-  return (
-    <div className="relative p-1.5 rounded-2xl border border-slate-200 bg-white inline-flex gap-1 w-full shadow-sm">
-      <motion.div
-        className="absolute inset-1.5 rounded-xl"
-        style={{ width: 'calc(50% - 6px)' }}
-        animate={{ x: isOnDemand ? 0 : 'calc(100% + 4px)' }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      >
-        <div className={`absolute inset-0 rounded-xl ${isOnDemand ? 'bg-gradient-to-r from-primary-600 to-primary-500' : 'bg-gradient-to-r from-health-600 to-health-500'}`} />
-      </motion.div>
-      <button
-        type="button"
-        onClick={() => onChange('ON_DEMAND')}
-        className={`relative z-10 flex items-center justify-center gap-2 flex-1 py-3 rounded-xl font-heading font-bold text-sm transition-all cursor-pointer ${isOnDemand ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
-      >
-        Consult Now
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange('SCHEDULED')}
-        className={`relative z-10 flex items-center justify-center gap-2 flex-1 py-3 rounded-xl font-heading font-bold text-sm transition-all cursor-pointer ${!isOnDemand ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
-      >
-        Schedule Later
-      </button>
-    </div>
-  );
-}
+const getDateWithOffset = (offsetDays = 0) => {
+  const next = new Date();
+  next.setHours(0, 0, 0, 0);
+  next.setDate(next.getDate() + offsetDays);
+  return toIsoDate(next);
+};
 
-/* ── Schedule Picker ── */
-function SchedulePicker({
-  date,
-  slots,
-  selectedSlotStart,
-  manualTime,
-  slotsLoading,
-  slotsError,
-  onDateChange,
-  onSelectSlot,
-  onManualTimeChange,
-}) {
-  const showManualTimeFallback = Boolean(slotsError) || slots.length === 0;
+const parseTimeTo12Hour = (value) => {
+  if (!value) return '';
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-      className="overflow-hidden"
-    >
-      <div className="pt-3 space-y-3">
-        <div>
-          <label htmlFor="booking-date" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Date</label>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-500 pointer-events-none" size={14} />
-              <input
-                id="booking-date"
-                type="date"
-              value={date}
-              onChange={e => onDateChange(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
-              className="pl-9 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-sm focus:ring-2 focus:ring-primary-500/40 outline-none transition-all cursor-pointer"
-            />
-          </div>
-        </div>
+  const input = String(value).trim();
+  if (/[aApP][mM]/.test(input)) return input.toUpperCase();
 
-        <div>
-          <label htmlFor="booking-slot-grid" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Slots</label>
-          {slotsLoading ? (
-            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
-              Loading available slots...
-            </div>
-          ) : slotsError ? (
-            <div className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-xs font-bold text-rose-600">
-              {slotsError}
-            </div>
-          ) : slots.length === 0 ? (
-            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
-              No slots available for the selected date.
-            </div>
-          ) : (
-            <div id="booking-slot-grid" className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {slots.map((slot) => {
-                const isSelected = selectedSlotStart === slot.startAt;
-                return (
-                  <button
-                    type="button"
-                    key={slot.startAt}
-                    disabled={!slot.available}
-                    onClick={() => onSelectSlot(slot.startAt)}
-                    className={`px-3 py-2 rounded-xl text-xs font-black transition-all border ${
-                      isSelected
-                        ? 'border-health-500 bg-health-500 text-white'
-                        : slot.available
-                          ? 'border-slate-200 bg-white text-slate-700 hover:border-health-400'
-                          : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {slot.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+  const timePart = input.includes('T')
+    ? new Date(input).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
+    : input;
 
-        {showManualTimeFallback && (
-          <div>
-            <label htmlFor="booking-manual-time" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-1.5">Manual Time</label>
-            <div className="relative">
-              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-health-500 pointer-events-none" size={14} />
-              <input
-                id="booking-manual-time"
-                type="time"
-                value={manualTime}
-                onChange={(e) => onManualTimeChange(e.target.value)}
-                className="pl-9 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-sm focus:ring-2 focus:ring-health-500/40 outline-none transition-all cursor-pointer"
-              />
-            </div>
-            <p className="mt-1 text-[11px] text-slate-400 font-semibold">
-              Use manual time when auto slots are unavailable.
-            </p>
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
-}
+  const match = timePart.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return timePart.toUpperCase();
 
-function ConsultationModePicker({ value, onChange }) {
-  return (
-    <div>
-      <label htmlFor="booking-consultation-type" className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Consultation Type</label>
-      <div className="grid grid-cols-3 gap-2">
-        {CONSULTATION_MODE_OPTIONS.map((mode) => {
-          const isActive = value === mode.value;
-          return (
-            <button
-              key={mode.value}
-              type="button"
-              id={mode.value === 'VIDEO' ? 'booking-consultation-type' : undefined}
-              onClick={() => onChange(mode.value)}
-              className={`px-3 py-2 rounded-xl text-xs font-black border transition-all ${
-                isActive
-                  ? 'border-primary-600 bg-primary-600 text-white'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-primary-300'
-              }`}
-            >
-              {mode.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+  const hours24 = Number(match[1]);
+  const minutes = match[2];
+  const suffix = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 || 12;
+  return `${String(hours12).padStart(2, '0')}:${minutes} ${suffix}`;
+};
 
-/* ── Payment Summary Panel ── */
-function PatientSelector({ loadingMembers, familyMembers, selectedPatientId, onSelect, selfName }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3 shadow-sm">
-      <div>
-        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Patient Profile</p>
-        <h3 className="text-slate-900 font-heading font-black text-base mt-1">Who Is This Consultation For?</h3>
-      </div>
+const formatDateBadges = (dateString) => {
+  const parsed = new Date(`${dateString}T00:00:00`);
+  const day = parsed.toLocaleDateString('en-US', { weekday: 'long' });
+  return {
+    day,
+    date: dateString,
+  };
+};
 
-      {loadingMembers ? (
-        <div className="space-y-2">
-          <div className="h-12 rounded-xl bg-slate-100 border border-slate-200 animate-pulse" />
-          <div className="h-12 rounded-xl bg-slate-100 border border-slate-200 animate-pulse" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={() => onSelect('self')}
-            className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
-              selectedPatientId === 'self'
-                ? 'border-primary-600 bg-primary-600 text-white'
-                : 'border-slate-200 bg-white text-slate-700 hover:border-primary-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4" />
-              <div>
-                <p className="text-sm font-black leading-tight">Myself</p>
-                <p className={`text-[11px] font-semibold ${selectedPatientId === 'self' ? 'text-primary-100' : 'text-slate-400'}`}>
-                  {selfName || 'Current account'}
-                </p>
-              </div>
-            </div>
-          </button>
+const getDoctorRating = (doctor) => {
+  const numeric = Number(doctor?.averageRating ?? doctor?.rating ?? 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(5, numeric));
+};
 
-          {familyMembers.map((member) => (
-            <button
-              key={member.id}
-              type="button"
-              onClick={() => onSelect(member.id)}
-              className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
-                selectedPatientId === member.id
-                  ? 'border-health-600 bg-health-600 text-white'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-health-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                <div>
-                  <p className="text-sm font-black leading-tight">{member.name}</p>
-                  <p className={`text-[11px] font-semibold ${selectedPatientId === member.id ? 'text-health-100' : 'text-slate-400'}`}>
-                    {member.relation || 'Family member'}
-                  </p>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+const getDoctorReviewCount = (doctor) => {
+  const numeric = Number(doctor?.reviewCount ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) return 0;
+  return Math.floor(numeric);
+};
 
-function PaymentSummary({ doctor, bookingType, consultationMode, scheduledDate, selectedTimeLabel, processingId, onConfirm }) {
-  const fee = parseFloat(doctor?.fee || 150);
-  const isProcessing = processingId === doctor?.userId;
-  const consultationLabel = consultationMode === 'IN_PERSON'
-    ? 'In Person'
-    : consultationMode === 'AUDIO'
-      ? 'Audio'
-      : 'Video';
+const isDoctorOnline = (doctor) => doctor?.isOnline === true;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 28, delay: 0.1 }}
-      className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm"
-    >
-      <div className="h-px bg-gradient-to-r from-transparent via-primary-400/60 to-transparent" />
+const copyTextToClipboard = async (value) => {
+  if (!value) return;
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
 
-      <div className="p-5 space-y-4">
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-          <CreditCard size={11} /> Payment Summary
-        </p>
+  const textArea = document.createElement('textarea');
+  textArea.value = value;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'absolute';
+  textArea.style.left = '-9999px';
+  document.body.appendChild(textArea);
+  textArea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textArea);
+};
 
-        {/* Booking type indicator */}
-        {bookingType === 'ON_DEMAND' ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
-            <span className="text-amber-700 text-xs font-bold">Instant {consultationLabel} consultation</span>
-          </div>
-        ) : (
-          scheduledDate && selectedTimeLabel ? (
-            <div className="bg-health-50 border border-health-200 rounded-xl px-3.5 py-2.5">
-              <span className="text-health-700 text-xs font-bold">{scheduledDate} · {selectedTimeLabel}</span>
-            </div>
-          ) : (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5">
-              <span className="text-slate-400 text-xs font-bold">Select a slot above</span>
-            </div>
-          )
-        )}
-
-        {/* Price rows */}
-        <div className="space-y-2.5 pt-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Consultation Fee</span>
-            <span className="text-slate-900 font-bold">${fee.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Platform Fee</span>
-            <span className="text-health-600 font-bold">FREE</span>
-          </div>
-          <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-            <span className="text-slate-800 font-bold text-sm">Total Due</span>
-            <span className="font-heading font-black text-2xl text-slate-900">${fee.toFixed(2)}</span>
-          </div>
-        </div>
-
-        {/* Security */}
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck size={12} className="text-health-500 shrink-0" />
-          <span className="text-slate-400 text-xs">256-bit encrypted · Secured by Stripe</span>
-        </div>
-
-        {/* CTA */}
-        <motion.button
-          onClick={onConfirm}
-          disabled={isProcessing}
-          whileHover={{ scale: isProcessing ? 1 : 1.01 }}
-          whileTap={{ scale: isProcessing ? 1 : 0.98 }}
-          className="w-full py-4 rounded-xl font-heading font-black text-white text-sm flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60 relative overflow-hidden group"
-          style={{
-            background: 'linear-gradient(135deg, #0891B2 0%, #059669 100%)',
-            boxShadow: '0 8px 24px rgba(8,145,178,0.2)',
-          }}
-        >
-          <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-all" />
-          {isProcessing ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Processing…
-            </>
-          ) : (
-            <>
-              <CheckCircle2 size={16} />
-              Proceed to Payment
-              <ArrowRight size={15} />
-            </>
-          )}
-        </motion.button>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ── Main Page ── */
 export default function Booking() {
-  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const socket = useSocket();
+
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchParams] = useSearchParams();
-  const location = useLocation();
-  const socket = useSocket();
-  const [familyMembers, setFamilyMembers] = useState([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
-
-  const [bookingType, setBookingType] = useState('ON_DEMAND');
+  const [fetchError, setFetchError] = useState('');
+  const [futureBooking, setFutureBooking] = useState(true);
   const [consultationMode, setConsultationMode] = useState('VIDEO');
-  const [scheduledDate, setScheduledDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [selectedSlotStart, setSelectedSlotStart] = useState('');
-  const [manualTime, setManualTime] = useState('');
-  const [availableSlots, setAvailableSlots] = useState([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-  const [slotsError, setSlotsError] = useState('');
-  const [processingId, setProcessingId] = useState(null);
-  const [selectedPatientId, setSelectedPatientId] = useState(() => {
-    const fromAiSummary = location.state?.aiSummary?.selectedPatientId;
-    return fromAiSummary && typeof fromAiSummary === 'string' ? fromAiSummary : 'self';
-  });
-  // Which doctor card is selected for booking
-  const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [showDoctorPicker, setShowDoctorPicker] = useState(false);
+  const [bookingDate, setBookingDate] = useState(getDateWithOffset(0));
+  const [doctorSlots, setDoctorSlots] = useState({});
+  const [selectedSlotsByDoctor, setSelectedSlotsByDoctor] = useState({});
+  const [expandedSlotsByDoctor, setExpandedSlotsByDoctor] = useState({});
+  const [processingDoctorId, setProcessingDoctorId] = useState(null);
+  const [sharedDoctorId, setSharedDoctorId] = useState(null);
 
-  const specialization = searchParams.get('specialization') || '';
+  const [doctorNameFilter, setDoctorNameFilter] = useState('');
+  const [clinicFilter, setClinicFilter] = useState('');
+  const [specializationFilter, setSpecializationFilter] = useState('ANY');
+  const [availabilityFilter, setAvailabilityFilter] = useState('ANY');
+  const [genderFilter, setGenderFilter] = useState('ANY');
+  const [ratingFilter, setRatingFilter] = useState('ANY');
+
   const aiSummary = location.state?.aiSummary || {};
-  const preferredDoctorId =
-    searchParams.get('doctorId') ||
-    location.state?.selectedDoctorId ||
-    aiSummary?.assigned_doctor_id ||
-    '';
+  const selectedPatientId =
+    typeof aiSummary.selectedPatientId === 'string' ? aiSummary.selectedPatientId : 'self';
+  const specializationQuery = searchParams.get('specialization') || '';
+  const serviceQuery = searchParams.get('service') || '';
+  const categoryQuery = searchParams.get('category') || '';
 
   const fetchDoctors = useCallback(async () => {
+    setLoading(true);
+    setFetchError('');
     try {
-      const params = { type: bookingType };
-      if (specialization) {
-        params.specializationName = specialization;
-      }
+      const params = {
+        type: futureBooking ? 'SCHEDULED' : 'ON_DEMAND',
+        appointmentType: futureBooking ? 'SCHEDULED' : 'ON_DEMAND',
+      };
+      if (specializationQuery) params.specializationName = specializationQuery;
 
-      const { data } = await axios.get(
-        'http://localhost:5000/api/appointments/doctors',
-        {
-          params,
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        }
-      );
-      setDoctors(data);
-      setSelectedDoctor((prev) => {
-        if (!data.length) return null;
-        if (preferredDoctorId) {
-          const preferredDoctor = data.find((doc) => doc.userId === preferredDoctorId);
-          if (preferredDoctor) return preferredDoctor;
-        }
-        if (prev && data.some((doc) => doc.userId === prev.userId)) return prev;
-        return data[0];
+      const { data } = await axios.get('http://localhost:5000/api/appointments/doctors', {
+        params,
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-    } catch (err) {
-      console.error('Error fetching doctors:', err);
+      setDoctors(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      setFetchError(error?.response?.data?.error || 'Failed to load doctors.');
+      setDoctors([]);
     } finally {
       setLoading(false);
     }
-  }, [specialization, preferredDoctorId, bookingType]);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { fetchDoctors(); }, [fetchDoctors]);
+  }, [futureBooking, specializationQuery]);
 
   useEffect(() => {
-    let cancelled = false;
+    fetchDoctors();
+  }, [fetchDoctors]);
 
-    const fetchFamilyMembers = async () => {
-      setLoadingMembers(true);
-      try {
-        const { data } = await axios.get('http://localhost:5000/api/family-members', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (cancelled) return;
-        const members = Array.isArray(data) ? data : [];
-        setFamilyMembers(members);
-        setSelectedPatientId((prev) => {
-          if (prev === 'self') return 'self';
-          return members.some((member) => member.id === prev) ? prev : 'self';
-        });
-      } catch (err) {
-        if (cancelled) return;
-        console.error('Failed to fetch family members:', err);
-        setFamilyMembers([]);
-        setSelectedPatientId('self');
-      } finally {
-        if (!cancelled) setLoadingMembers(false);
-      }
+  useEffect(() => {
+    if (!socket) return undefined;
+    const handleDoctorsUpdated = () => {
+      fetchDoctors();
+    };
+    socket.on('doctors:updated', handleDoctorsUpdated);
+    return () => {
+      socket.off('doctors:updated', handleDoctorsUpdated);
+    };
+  }, [fetchDoctors, socket]);
+
+  useEffect(() => {
+    setSelectedSlotsByDoctor({});
+    setExpandedSlotsByDoctor({});
+  }, [consultationMode, bookingDate, futureBooking]);
+
+  useEffect(() => {
+    if (!futureBooking || doctors.length === 0) {
+      setDoctorSlots({});
+      return;
+    }
+
+    let cancelled = false;
+    const loadAllSlots = async () => {
+      const slotEntries = await Promise.all(
+        doctors.map(async (doctor) => {
+          try {
+            const { data } = await axios.get(
+              `http://localhost:5000/api/appointments/doctors/${doctor.userId}/slots`,
+              {
+                params: {
+                  date: bookingDate,
+                  mode: consultationMode,
+                },
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+              }
+            );
+            return [
+              doctor.userId,
+              {
+                loading: false,
+                error: '',
+                slots: Array.isArray(data?.slots) ? data.slots : [],
+              },
+            ];
+          } catch (error) {
+            return [
+              doctor.userId,
+              {
+                loading: false,
+                error: error?.response?.data?.error || 'Unable to load slots.',
+                slots: [],
+              },
+            ];
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setDoctorSlots(Object.fromEntries(slotEntries));
     };
 
-    fetchFamilyMembers();
+    const initialState = Object.fromEntries(
+      doctors.map((doctor) => [doctor.userId, { loading: true, error: '', slots: [] }])
+    );
+    setDoctorSlots(initialState);
+    loadAllSlots();
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bookingDate, consultationMode, doctors, futureBooking]);
 
-  useEffect(() => {
-    if (!socket) return;
-    const handleUpdate = () => fetchDoctors();
-    socket.on('doctors:updated', handleUpdate);
-    return () => socket.off('doctors:updated', handleUpdate);
-  }, [socket, fetchDoctors]);
+  const specializationOptions = useMemo(() => {
+    const names = doctors
+      .map((doctor) => doctor?.specialization?.name)
+      .filter(Boolean);
+    return ['ANY', ...Array.from(new Set(names))];
+  }, [doctors]);
 
-  const handleBookingTypeChange = (nextType) => {
-    setBookingType(nextType);
-    setSelectedSlotStart('');
-    setManualTime('');
+  const visibleDoctors = useMemo(
+    () => (futureBooking ? doctors : doctors.filter((doctor) => isDoctorOnline(doctor))),
+    [doctors, futureBooking]
+  );
+
+  const filteredDoctors = useMemo(() => {
+    return visibleDoctors.filter((doctor) => {
+      const doctorName = formatDoctorName(doctor?.user?.name, 'Doctor').toLowerCase();
+      const clinicName = String(
+        doctor?.clinicName || doctor?.clinic?.name || doctor?.clinicAddress || 'Online Clinic'
+      ).toLowerCase();
+      const specializationName = String(doctor?.specialization?.name || 'General Practitioner');
+      const doctorGender = String(doctor?.user?.gender || 'Unknown').toUpperCase();
+      const ratingValue = getDoctorRating(doctor);
+
+      if (doctorNameFilter && !doctorName.includes(doctorNameFilter.toLowerCase())) return false;
+      if (clinicFilter && !clinicName.includes(clinicFilter.toLowerCase())) return false;
+      if (specializationFilter !== 'ANY' && specializationName !== specializationFilter) return false;
+      if (genderFilter !== 'ANY' && doctorGender !== genderFilter) return false;
+      if (ratingFilter !== 'ANY' && ratingValue < Number(ratingFilter)) return false;
+      return true;
+    });
+  }, [
+    clinicFilter,
+    doctorNameFilter,
+      visibleDoctors,
+      genderFilter,
+      ratingFilter,
+      specializationFilter,
+    ]);
+
+  const avgFee = useMemo(() => {
+    if (!filteredDoctors.length) return 49.25;
+    const total = filteredDoctors.reduce((sum, doctor) => sum + (Number(doctor?.fee) || 150), 0);
+    return Number((total / filteredDoctors.length).toFixed(2));
+  }, [filteredDoctors]);
+
+  const clearFilters = () => {
+    setDoctorNameFilter('');
+    setClinicFilter('');
+    setSpecializationFilter('ANY');
+    setAvailabilityFilter('ANY');
+    setGenderFilter('ANY');
+    setRatingFilter('ANY');
+    setBookingDate(getDateWithOffset(0));
   };
 
-  const handleConsultationModeChange = (nextMode) => {
-    setConsultationMode(nextMode);
-    setSelectedSlotStart('');
-    setManualTime('');
-  };
+  const handleShareDoctor = async (doctor) => {
+    if (!doctor?.userId) return;
 
-  const handleDoctorSelect = (doctor) => {
-    setSelectedDoctor(doctor);
-    setSelectedSlotStart('');
-    setManualTime('');
-    setShowDoctorPicker(false);
-  };
+    const doctorName = formatDoctorName(doctor?.user?.name, 'Doctor');
+    const specialization = doctor?.specialization?.name || 'General Practitioner';
+    const shareUrl = new URL(`${window.location.origin}/booking`);
 
-  const handleDateChange = (nextDate) => {
-    setScheduledDate(nextDate);
-    setSelectedSlotStart('');
-    setManualTime('');
-  };
+    if (categoryQuery) shareUrl.searchParams.set('category', categoryQuery);
+    if (serviceQuery) shareUrl.searchParams.set('service', serviceQuery);
+    if (specializationQuery) shareUrl.searchParams.set('specialization', specializationQuery);
+    shareUrl.searchParams.set('doctorId', doctor.userId);
 
-  useEffect(() => {
-    const fetchSlots = async () => {
-      if (bookingType !== 'SCHEDULED' || !selectedDoctor?.userId || !scheduledDate) {
-        setAvailableSlots([]);
-        setSlotsError('');
-        return;
-      }
-
-      setSlotsLoading(true);
-      setSlotsError('');
-
-      try {
-        const { data } = await axios.get(
-          `http://localhost:5000/api/appointments/doctors/${selectedDoctor.userId}/slots?date=${scheduledDate}&mode=${encodeURIComponent(consultationMode)}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-        );
-
-        setAvailableSlots(Array.isArray(data?.slots) ? data.slots : []);
-      } catch (err) {
-        console.error('Failed to fetch slots:', err);
-        setAvailableSlots([]);
-        setSlotsError(err?.response?.data?.error || 'Unable to load slots for selected date.');
-      } finally {
-        setSlotsLoading(false);
-      }
+    const shareData = {
+      title: `${doctorName} - ${specialization}`,
+      text: `Book a consultation with ${doctorName} on CareBridge.`,
+      url: shareUrl.toString(),
     };
 
-    fetchSlots();
-  }, [bookingType, selectedDoctor?.userId, scheduledDate, consultationMode]);
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await copyTextToClipboard(shareData.url);
+      }
+      setSharedDoctorId(doctor.userId);
+      window.setTimeout(() => {
+        setSharedDoctorId((current) => (current === doctor.userId ? null : current));
+      }, 1700);
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      try {
+        await copyTextToClipboard(shareData.url);
+        setSharedDoctorId(doctor.userId);
+        window.setTimeout(() => {
+          setSharedDoctorId((current) => (current === doctor.userId ? null : current));
+        }, 1700);
+      } catch (copyError) {
+        console.error(copyError);
+      }
+    }
+  };
 
-  const selectedSlotLabel =
-    availableSlots.find((slot) => slot.startAt === selectedSlotStart)?.label || '';
-  const selectedTimeLabel = selectedSlotLabel || manualTime;
-  const alternativeDoctors = doctors.filter((doc) => doc.userId !== selectedDoctor?.userId);
+  const handleOpenDoctorReviews = (doctor) => {
+    if (!doctor?.userId) return;
+    navigate(`/doctor/${doctor.userId}/reviews`, {
+      state: {
+        aiSummary,
+        selectedPatientId,
+        doctorPreview: {
+          id: doctor.userId,
+          name: doctor?.user?.name || '',
+          specialization: doctor?.specialization?.name || 'General Practitioner',
+          qualification: doctor?.qualification || '',
+          yearsExperience: doctor?.yearsExperience || doctor?.years_of_experience || 0,
+        },
+      },
+    });
+  };
 
-  const confirmBooking = async () => {
-    if (!selectedDoctor) return;
-    if (bookingType === 'SCHEDULED' && (!scheduledDate || (!selectedSlotStart && !manualTime))) {
-      alert('Please select a slot or choose a manual time for your scheduled consultation.');
+  const handleAvailabilitySelect = (value) => {
+    setAvailabilityFilter(value);
+    if (value === 'TODAY') setBookingDate(getDateWithOffset(0));
+    if (value === 'TOMORROW') setBookingDate(getDateWithOffset(1));
+    if (value === 'NEXT_WEEK') setBookingDate(getDateWithOffset(7));
+  };
+
+  const toggleSlotExpand = (doctorId) => {
+    setExpandedSlotsByDoctor((prev) => ({
+      ...prev,
+      [doctorId]: !prev[doctorId],
+    }));
+  };
+
+  const handleBookDoctor = async (doctor) => {
+    if (!doctor?.userId) return;
+    const bookingType = futureBooking ? 'SCHEDULED' : 'ON_DEMAND';
+    const selectedSlotStart = selectedSlotsByDoctor[doctor.userId];
+
+    if (bookingType === 'SCHEDULED' && !selectedSlotStart) {
+      window.alert('Please select a timeslot before continuing.');
       return;
     }
-    setProcessingId(selectedDoctor.userId);
+
+    setProcessingDoctorId(doctor.userId);
     try {
-      let scheduledFor = null;
-      if (bookingType === 'SCHEDULED') {
-        if (selectedSlotStart) {
-          scheduledFor = selectedSlotStart;
-        } else {
-          const manualDateTime = new Date(`${scheduledDate}T${manualTime}`);
-          if (Number.isNaN(manualDateTime.getTime())) {
-            alert('Invalid manual date/time selected.');
-            setProcessingId(null);
-            return;
-          }
-          scheduledFor = manualDateTime.toISOString();
-        }
-      }
-      const familyMemberId = selectedPatientId !== 'self' ? selectedPatientId : null;
       const normalizedAiSummary = {
         ...(aiSummary || {}),
         selectedPatientId,
-        assigned_doctor_id: selectedDoctor.userId,
-        assigned_doctor_name: selectedDoctor.user?.name || '',
+        assigned_doctor_id: doctor.userId,
+        assigned_doctor_name: doctor?.user?.name || '',
       };
+
       const { data: appointment } = await axios.post(
         'http://localhost:5000/api/appointments',
         {
-          doctorId: selectedDoctor.userId,
+          doctorId: doctor.userId,
           aiSummary: normalizedAiSummary,
           type: bookingType,
           consultationMode,
-          scheduledFor,
-          familyMemberId
+          scheduledFor: bookingType === 'SCHEDULED' ? selectedSlotStart : null,
+          familyMemberId: selectedPatientId !== 'self' ? selectedPatientId : null,
         },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
+
       const { data: session } = await axios.post(
         'http://localhost:5000/api/payments/create-checkout-session',
-        { doctorId: selectedDoctor.userId, appointmentId: appointment.id, type: bookingType },
+        {
+          doctorId: doctor.userId,
+          appointmentId: appointment.id,
+          type: bookingType,
+        },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
+
       window.location.href = session.url;
-    } catch (err) {
-      console.error(err);
-      alert(err?.response?.data?.error || 'Failed to initiate booking process.');
-      setProcessingId(null);
+    } catch (error) {
+      console.error(error);
+      window.alert(error?.response?.data?.error || 'Failed to create booking.');
+      setProcessingDoctorId(null);
     }
   };
 
+  const { day: bookingDayLabel, date: bookingDateLabel } = formatDateBadges(bookingDate);
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans relative overflow-x-hidden">
-      <div className="relative z-40">
-        <TopHeader />
-      </div>
+    <main className="booking-page">
+      <LandingNavbar activeKey="patient" />
 
-      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 pb-10">
+      <section className="booking-shell booking-shell--page">
+        <div className="booking-breadcrumbs">
+          <span>Home</span>
+          <span>/</span>
+          <span>{serviceQuery || categoryQuery || 'Booking'}</span>
+        </div>
 
-        {/* ── Loading ── */}
-        {loading && (
-          <div className="flex flex-col lg:flex-row gap-8 items-start">
-            <div className="w-full lg:w-[400px] shrink-0 h-[400px] rounded-3xl bg-slate-200 animate-pulse" />
-            <div className="flex-1 space-y-4">
-              <div className="h-14 rounded-2xl bg-slate-200 animate-pulse" />
-              <div className="h-36 rounded-2xl bg-slate-200 animate-pulse" />
+        <div className="booking-layout">
+          <aside className="booking-filters">
+            <div className="booking-filters__head">
+              <h3>Filters</h3>
+              <button type="button" onClick={clearFilters}>Clear Filters</button>
             </div>
-          </div>
-        )}
 
-        {/* ── No doctors ── */}
-        {!loading && doctors.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-24 text-center"
-          >
-            <div className="w-16 h-16 rounded-3xl bg-slate-100 border border-slate-200 flex items-center justify-center mb-5">
-              <AlertCircle className="w-8 h-8 text-slate-300" />
+            <label className="booking-field">
+              <Search size={15} />
+              <input
+                type="text"
+                placeholder="Search Doctor Name"
+                value={doctorNameFilter}
+                onChange={(event) => setDoctorNameFilter(event.target.value)}
+              />
+            </label>
+
+            <label className="booking-field">
+              <SlidersHorizontal size={15} />
+              <input
+                type="text"
+                placeholder="Search Clinic Address"
+                value={clinicFilter}
+                onChange={(event) => setClinicFilter(event.target.value)}
+              />
+            </label>
+
+            <div className="booking-filter-block">
+              <p>Booking Date</p>
+              <label className="booking-field">
+                <CalendarDays size={15} />
+                <input
+                  type="date"
+                  value={bookingDate}
+                  min={getDateWithOffset(0)}
+                  onChange={(event) => {
+                    setAvailabilityFilter('ANY');
+                    setBookingDate(event.target.value);
+                  }}
+                />
+              </label>
             </div>
-            <h3 className="font-heading font-black text-xl text-slate-800 mb-2">No Providers Available</h3>
-            <p className="text-slate-400 text-sm max-w-xs">
-              {specialization ? `No ${specialization} specialists online right now.` : 'No doctors available. Try again shortly.'}
-            </p>
-          </motion.div>
-        )}
 
-        {/* ── Main split layout ── */}
-        {!loading && doctors.length > 0 && selectedDoctor && (
-          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
-
-            {/* Left — Doctor selector: horizontal scroll on mobile, vertical on desktop */}
-            <div className="w-full lg:w-[400px] shrink-0">
-              <div className="space-y-3">
-                <div className="ring-2 ring-primary-500/60 rounded-3xl">
-                  <DoctorCard
-                    doctor={selectedDoctor}
-                    onBook={() => {}}
-                    enableAnimations={false}
-                    hideBookButton={true}
-                  />
-                </div>
-
-                {alternativeDoctors.length > 0 && (
+            <div className="booking-filter-block">
+              <p>Specialization</p>
+              <div className="booking-chip-wrap">
+                {specializationOptions.map((option) => (
                   <button
+                    key={option}
                     type="button"
-                    onClick={() => setShowDoctorPicker((prev) => !prev)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
+                    className={specializationFilter === option ? 'is-active' : ''}
+                    onClick={() => setSpecializationFilter(option)}
                   >
-                    {showDoctorPicker ? 'Hide Other Doctors' : `Change Doctor (${alternativeDoctors.length})`}
-                    {showDoctorPicker ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    {option === 'ANY' ? 'Any' : option}
                   </button>
-                )}
-
-                <AnimatePresence>
-                  {showDoctorPicker && alternativeDoctors.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      className="space-y-3 max-h-[360px] overflow-y-auto pr-1"
-                    >
-                      {alternativeDoctors.map((doc) => (
-                        <motion.div
-                          key={doc.userId}
-                          onClick={() => handleDoctorSelect(doc)}
-                          initial={{ opacity: 0, x: -12 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-                          className="cursor-pointer opacity-85 hover:opacity-100 transition-opacity"
-                        >
-                          <DoctorCard
-                            doctor={doc}
-                            onBook={() => handleDoctorSelect(doc)}
-                            enableAnimations={false}
-                            hideBookButton={true}
-                          />
-                        </motion.div>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                ))}
               </div>
             </div>
 
-            {/* Right — Booking options + payment summary */}
-            <motion.div
-              className="flex-1 space-y-4 lg:sticky lg:top-24"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 28, delay: 0.1 }}
-            >
-              <PatientSelector
-                loadingMembers={loadingMembers}
-                familyMembers={familyMembers}
-                selectedPatientId={selectedPatientId}
-                onSelect={setSelectedPatientId}
-                selfName={user?.name}
-              />
+            <div className="booking-filter-block">
+              <p>Availability</p>
+              <div className="booking-chip-wrap">
+                {[
+                  { value: 'ANY', label: 'Any' },
+                  { value: 'TODAY', label: 'Today' },
+                  { value: 'TOMORROW', label: 'Tomorrow' },
+                  { value: 'NEXT_WEEK', label: 'Next Week' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={availabilityFilter === option.value ? 'is-active' : ''}
+                    onClick={() => handleAvailabilitySelect(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              {/* Toggle */}
-              <BookingToggle value={bookingType} onChange={handleBookingTypeChange} />
+            <div className="booking-filter-block">
+              <p>Gender</p>
+              <div className="booking-chip-wrap">
+                {[
+                  { value: 'ANY', label: 'Any' },
+                  { value: 'MALE', label: 'Male' },
+                  { value: 'FEMALE', label: 'Female' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={genderFilter === option.value ? 'is-active' : ''}
+                    onClick={() => setGenderFilter(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              <ConsultationModePicker
-                value={consultationMode}
-                onChange={handleConsultationModeChange}
-              />
+            <div className="booking-filter-block">
+              <p>Rating</p>
+              <div className="booking-chip-wrap booking-chip-wrap--rating">
+                {[
+                  { value: 'ANY', label: 'Any' },
+                  { value: '5', label: '5 Stars' },
+                  { value: '4', label: '4 Stars' },
+                  { value: '3', label: '3 Stars' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={ratingFilter === option.value ? 'is-active' : ''}
+                    onClick={() => setRatingFilter(option.value)}
+                  >
+                    {option.value !== 'ANY' && <Star size={12} fill="currentColor" />}
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
 
-              {/* Schedule picker */}
-              <AnimatePresence>
-                {bookingType === 'SCHEDULED' && (
-                  <SchedulePicker
-                    date={scheduledDate}
-                    slots={availableSlots}
-                    selectedSlotStart={selectedSlotStart}
-                    manualTime={manualTime}
-                    slotsLoading={slotsLoading}
-                    slotsError={slotsError}
-                    onDateChange={handleDateChange}
-                    onSelectSlot={(startAt) => {
-                      setSelectedSlotStart(startAt);
-                      setManualTime('');
-                    }}
-                    onManualTimeChange={(timeValue) => {
-                      setManualTime(timeValue);
-                      setSelectedSlotStart('');
-                    }}
-                  />
-                )}
-              </AnimatePresence>
+          <section className="booking-results">
+            <header className="booking-results__head">
+              <h1>
+                Televideo consultation fee for this service is <span>${avgFee.toFixed(2)}</span>
+              </h1>
+              <p>{filteredDoctors.length} results</p>
+            </header>
 
-              {/* Payment summary */}
-              <AnimatePresence mode="wait">
-                <PaymentSummary
-                  key={selectedDoctor.userId}
-                  doctor={selectedDoctor}
-                  bookingType={bookingType}
-                  consultationMode={consultationMode}
-                  scheduledDate={scheduledDate}
-                  selectedTimeLabel={selectedTimeLabel}
-                  processingId={processingId}
-                  onConfirm={confirmBooking}
+            <div className="booking-future-toggle">
+              <label htmlFor="future-booking">
+                <span>Future Booking</span>
+                <input
+                  id="future-booking"
+                  type="checkbox"
+                  checked={futureBooking}
+                  onChange={(event) => setFutureBooking(event.target.checked)}
                 />
-              </AnimatePresence>
-            </motion.div>
+                <i />
+              </label>
+            </div>
+
+            <div className="booking-mode-tabs">
+              {MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={option.disabled}
+                  className={consultationMode === option.value ? 'is-active' : ''}
+                  onClick={() => {
+                    if (!option.disabled) setConsultationMode(option.value);
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {loading && (
+              <div className="booking-state booking-state--loading">
+                <p>Loading doctors...</p>
+              </div>
+            )}
+
+            {!loading && fetchError && (
+              <div className="booking-state booking-state--error">
+                <p>{fetchError}</p>
+              </div>
+            )}
+
+            {!loading && !fetchError && filteredDoctors.length === 0 && (
+              <div className="booking-state">
+                <p>No doctors matched your current filters.</p>
+              </div>
+            )}
+
+            {!loading && !fetchError && filteredDoctors.length > 0 && (
+              <div className="booking-doctor-list">
+                {filteredDoctors.map((doctor) => {
+                  const doctorId = doctor.userId;
+                  const doctorName = formatDoctorName(doctor?.user?.name, 'Doctor');
+                  const specialization = doctor?.specialization?.name || 'General Practitioner';
+                  const rating = getDoctorRating(doctor);
+                  const reviewCount = getDoctorReviewCount(doctor);
+                  const slotsState = doctorSlots[doctorId] || { loading: futureBooking, slots: [], error: '' };
+                  const visibleSlots = expandedSlotsByDoctor[doctorId]
+                    ? slotsState.slots
+                    : slotsState.slots.slice(0, 9);
+                  const selectedSlot = selectedSlotsByDoctor[doctorId];
+                  const canShowMore = slotsState.slots.length > 9;
+
+                  return (
+                    <article
+                      key={doctorId}
+                      className="booking-doctor-card"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleOpenDoctorReviews(doctor)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleOpenDoctorReviews(doctor);
+                        }
+                      }}
+                    >
+                      <div className="booking-doctor-card__head">
+                        <div className="booking-doctor-main">
+                          <img
+                            src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(doctorName)}`}
+                            alt={doctorName}
+                          />
+                          <div>
+                            <div className="booking-doctor-name-row">
+                              <h3>{doctorName}</h3>
+                              <CheckCircle2 size={14} />
+                            </div>
+                            <div className="booking-doctor-rating">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star key={star} size={12} fill={star <= Math.round(rating) ? 'currentColor' : 'none'} />
+                              ))}
+                              <span>
+                                {reviewCount > 0 ? `${rating.toFixed(1)} (${reviewCount})` : 'No ratings yet'}
+                              </span>
+                            </div>
+                            <p className="booking-doctor-qualification">
+                              <ShieldCheck size={13} />
+                              {doctor?.qualification || 'MBBS'}
+                            </p>
+                            <p className="booking-doctor-meta">
+                              {specialization} | {(doctor?.user?.gender || 'N/A')} |{' '}
+                              {doctor?.yearsExperience || doctor?.years_of_experience || 1} Years experience
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className={`booking-share-btn ${sharedDoctorId === doctorId ? 'is-shared' : ''}`}
+                          aria-label={`Share ${doctorName}`}
+                          title={sharedDoctorId === doctorId ? 'Link copied' : `Share ${doctorName}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleShareDoctor(doctor);
+                          }}
+                        >
+                          {sharedDoctorId === doctorId ? <CheckCircle2 size={16} /> : <Share2 size={16} />}
+                        </button>
+                      </div>
+
+                      {futureBooking ? (
+                        <div
+                          className="booking-slot-panel"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <div className="booking-slot-date">
+                            <span>{bookingDayLabel}</span>
+                            <span>{bookingDateLabel}</span>
+                          </div>
+
+                          {slotsState.loading ? (
+                            <p className="booking-slot-hint">Loading slots...</p>
+                          ) : slotsState.error ? (
+                            <p className="booking-slot-hint booking-slot-hint--error">{slotsState.error}</p>
+                          ) : slotsState.slots.length === 0 ? (
+                            <p className="booking-slot-hint">No available slots for this date.</p>
+                          ) : (
+                            <>
+                              <div className="booking-slot-grid">
+                                {visibleSlots.map((slot) => (
+                                  <button
+                                    key={slot.startAt}
+                                    type="button"
+                                    className={selectedSlot === slot.startAt ? 'is-selected' : ''}
+                                    disabled={!slot.available}
+                                    onClick={() =>
+                                      setSelectedSlotsByDoctor((prev) => ({
+                                        ...prev,
+                                        [doctorId]: slot.startAt,
+                                      }))
+                                    }
+                                  >
+                                    {parseTimeTo12Hour(slot.label || slot.startAt)}
+                                  </button>
+                                ))}
+                              </div>
+                              {canShowMore && (
+                                <button
+                                  type="button"
+                                  className="booking-show-more"
+                                  onClick={() => toggleSlotExpand(doctorId)}
+                                >
+                                  {expandedSlotsByDoctor[doctorId] ? 'Show Less' : 'Show More'}
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          className="booking-slot-panel"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <p className="booking-slot-hint">On-demand consultation starts as soon as doctor accepts.</p>
+                        </div>
+                      )}
+
+                      <div
+                        className="booking-doctor-card__actions"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <p>
+                          {futureBooking && selectedSlot
+                            ? `Selected: ${parseTimeTo12Hour(selectedSlot)}`
+                            : futureBooking
+                              ? 'Choose a slot to continue'
+                              : 'Proceed with instant consultation'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleBookDoctor(doctor)}
+                          disabled={processingDoctorId === doctorId || (futureBooking && !selectedSlot)}
+                        >
+                          {processingDoctorId === doctorId ? 'Processing...' : futureBooking ? 'Book Appointment' : 'Consult Now'}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      </section>
+
+      <footer className="landing-footer">
+        <div className="container landing-footer__grid">
+          <div>
+            <div className="landing-footer__brand">
+              <AppIcon size={30} />
+              <span>CareBridge</span>
+            </div>
+            <p>
+              CareBridge is your all-in-one platform for consultations, prescriptions, referrals, and medical workflow
+              support, helping patients access quality healthcare without delays.
+            </p>
           </div>
-        )}
-      </main>
-    </div>
+          <div>
+            <h4>Patient</h4>
+            <a href="/">Telehealth Consultation</a>
+            <a href="/">Prescription</a>
+            <a href="/">Medical Certificates</a>
+            <a href="/">Blood Test Requests</a>
+            <a href="/">Radiology Requests</a>
+          </div>
+          <div>
+            <h4>Quick Links</h4>
+            <a href="/">About Us</a>
+            <a href="/">Our Team</a>
+            <a href="/">Blog</a>
+            <a href="/">Career</a>
+          </div>
+          <div>
+            <h4>Help &amp; Support</h4>
+            <a href="/">Contact Us</a>
+            <a href="/">Help Center</a>
+            <a href="/">Privacy Policy</a>
+            <a href="/">Terms &amp; Conditions</a>
+          </div>
+        </div>
+        <div className="landing-footer__bar">2026 CareBridge. All rights reserved.</div>
+      </footer>
+    </main>
   );
 }

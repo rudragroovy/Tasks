@@ -1,17 +1,27 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { formatDoctorName } = require('../utils/doctorName');
+const { addDoctorSocket, removeDoctorSocket } = require('./doctorPresenceStore');
 
 module.exports = function(io) {
+  const socketUsers = new Map();
+
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
     // Handshake will happen on connect (JWT verified middleware later, or just simple user identification)
     // For now, client sends 'identify'
     socket.on('identify', (user) => {
+      const previousUser = socketUsers.get(socket.id);
+      if (previousUser?.role === 'DOCTOR' && previousUser?.id) {
+        removeDoctorSocket(previousUser.id, socket.id);
+      }
+
+      socketUsers.set(socket.id, user);
       socket.join(`user:${user.id}`);
       if (user.role === 'DOCTOR') {
         socket.join('doctors');
+        addDoctorSocket(user.id, socket.id);
       }
     });
 
@@ -114,9 +124,35 @@ module.exports = function(io) {
       }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log('User disconnected:', socket.id);
-      // In a real app we'd track the user ID mapping and set them offline
+      const disconnectedUser = socketUsers.get(socket.id);
+      socketUsers.delete(socket.id);
+
+      if (disconnectedUser?.role !== 'DOCTOR' || !disconnectedUser?.id) {
+        return;
+      }
+
+      const presence = removeDoctorSocket(disconnectedUser.id, socket.id);
+      if (presence.isConnected) {
+        return;
+      }
+
+      try {
+        const updateResult = await prisma.doctor.updateMany({
+          where: {
+            userId: disconnectedUser.id,
+            isOnline: true,
+          },
+          data: { isOnline: false },
+        });
+
+        if (updateResult.count > 0) {
+          io.emit('doctors:updated');
+        }
+      } catch (e) {
+        console.error(e);
+      }
     });
   });
 };

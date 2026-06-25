@@ -456,7 +456,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             <button
-              onClick={() => { logout(); navigate('/login'); }}
+              onClick={() => { logout(); navigate('/'); }}
               className="ml-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
               title="Sign Out"
             >

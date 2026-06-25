@@ -1,9 +1,15 @@
-import { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
+import {
+  BrowserRouter as Router,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { useAuth } from './context/AuthContext';
-const Login = lazy(() => import('./pages/Login'));
-const Register = lazy(() => import('./pages/Register'));
+import AuthModal from './components/auth/AuthModal';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DoctorsList = lazy(() => import('./pages/DoctorsList'));
@@ -16,58 +22,121 @@ const DoctorWaitingRoom = lazy(() => import('./pages/DoctorWaitingRoom'));
 const DoctorAppointments = lazy(() => import('./pages/DoctorAppointments'));
 const DoctorPatients = lazy(() => import('./pages/DoctorPatients'));
 const DoctorChat = lazy(() => import('./pages/DoctorChat'));
+const PatientChat = lazy(() => import('./pages/PatientChat'));
 const DoctorPayouts = lazy(() => import('./pages/DoctorPayouts'));
 const DoctorMedicalDocuments = lazy(() => import('./pages/DoctorMedicalDocuments'));
 const DoctorInvoices = lazy(() => import('./pages/DoctorInvoices'));
+const DoctorReviews = lazy(() => import('./pages/DoctorReviews'));
 const DoctorProfile = lazy(() => import('./pages/DoctorProfile'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const MockCheckout = lazy(() => import('./pages/MockCheckout'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const MedicalHistory = lazy(() => import('./pages/MedicalHistory'));
 const FamilyMembers = lazy(() => import('./pages/FamilyMembers'));
+const CategoryPage = lazy(() => import('./pages/CategoryPage'));
+const ServiceDetailPage = lazy(() => import('./pages/ServiceDetailPage'));
+const PatientDoctorReviews = lazy(() => import('./pages/PatientDoctorReviews'));
+const PatientAccount = lazy(() => import('./pages/PatientAccount'));
+
+function getDefaultPostAuthPath(user) {
+  return user?.role === 'ADMIN' ? '/admin' : '/dashboard';
+}
+
+function AuthRouteRedirect({ mode }) {
+  const { user, openAuthModal } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate(getDefaultPostAuthPath(user), { replace: true });
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const redirectTo = params.get('redirectTo') || '/dashboard';
+    openAuthModal({ mode, redirectTo });
+    navigate('/', { replace: true });
+  }, [location.search, mode, navigate, openAuthModal, user]);
+
+  return null;
+}
+
+function RequireAuthRedirect({ redirectTo }) {
+  const { openAuthModal } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    openAuthModal({ mode: 'login', redirectTo });
+    navigate('/', { replace: true });
+  }, [navigate, openAuthModal, redirectTo]);
+
+  return null;
+}
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!user) {
+    return <RequireAuthRedirect redirectTo={`${location.pathname}${location.search}`} />;
+  }
   return children;
 }
 
-function App() {
+function AppRoutes() {
   const { user } = useAuth();
 
   return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center text-sm font-semibold text-slate-500">
+            Loading...
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/home" element={<LandingPage />} />
+          <Route path="/category/:categoryKey" element={<CategoryPage />} />
+          <Route path="/services/:serviceSlug" element={<ServiceDetailPage />} />
+          <Route path="/doctor/:doctorId/reviews" element={<ProtectedRoute><PatientDoctorReviews /></ProtectedRoute>} />
+          <Route path="/login" element={<AuthRouteRedirect mode="login" />} />
+          <Route path="/register" element={<AuthRouteRedirect mode="register" />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/doctors" element={<ProtectedRoute><DoctorsList /></ProtectedRoute>} />
+          <Route path="/booking" element={<ProtectedRoute><Booking /></ProtectedRoute>} />
+          <Route path="/room/:appointmentId" element={<ProtectedRoute><MeetingRoom /></ProtectedRoute>} />
+          <Route path="/doctor/in-person/:appointmentId" element={<ProtectedRoute><DoctorInPersonSession /></ProtectedRoute>} />
+          <Route path="/doctor/waiting-room" element={<ProtectedRoute><DoctorWaitingRoom /></ProtectedRoute>} />
+          <Route path="/doctor/appointments" element={<ProtectedRoute><DoctorAppointments /></ProtectedRoute>} />
+          <Route path="/doctor/patients" element={<ProtectedRoute><DoctorPatients /></ProtectedRoute>} />
+          <Route path="/doctor/chat" element={<ProtectedRoute><DoctorChat /></ProtectedRoute>} />
+          <Route path="/patient/chat" element={<ProtectedRoute><PatientChat /></ProtectedRoute>} />
+          <Route path="/patient/account" element={<ProtectedRoute><PatientAccount /></ProtectedRoute>} />
+          <Route path="/account" element={<ProtectedRoute><PatientAccount /></ProtectedRoute>} />
+          <Route path="/doctor/payouts" element={<ProtectedRoute><DoctorPayouts /></ProtectedRoute>} />
+          <Route path="/doctor/medical-documents" element={<ProtectedRoute><DoctorMedicalDocuments /></ProtectedRoute>} />
+          <Route path="/doctor/invoices" element={<ProtectedRoute><DoctorInvoices /></ProtectedRoute>} />
+          <Route path="/doctor/reviews" element={<ProtectedRoute><DoctorReviews /></ProtectedRoute>} />
+          <Route path="/doctor/profile" element={<ProtectedRoute><DoctorProfile /></ProtectedRoute>} />
+          <Route path="/patient/in-person/:appointmentId" element={<ProtectedRoute><PatientInPersonSession /></ProtectedRoute>} />
+          <Route path="/waiting-room" element={<ProtectedRoute><PatientWaitingRoom /></ProtectedRoute>} />
+          <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
+          <Route path="/mock-checkout" element={<ProtectedRoute><MockCheckout /></ProtectedRoute>} />
+          <Route path="/family-members" element={<ProtectedRoute><FamilyMembers /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        </Routes>
+      </Suspense>
+      <AuthModal />
+    </div>
+  );
+}
+
+function App() {
+  return (
     <MotionConfig reducedMotion="user">
       <Router>
-        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-          <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm font-semibold text-slate-500">Loading...</div>}>
-            <Routes>
-              <Route path="/" element={user ? <Navigate to={user.role === 'ADMIN' ? "/admin" : "/dashboard"} replace /> : <LandingPage />} />
-              <Route path="/home" element={user ? <Navigate to={user.role === 'ADMIN' ? "/admin" : "/dashboard"} replace /> : <LandingPage />} />
-              <Route path="/login" element={user ? <Navigate to={user.role === 'ADMIN' ? "/admin" : "/dashboard"} replace /> : <Login />} />
-              <Route path="/register" element={user ? <Navigate to={user.role === 'ADMIN' ? "/admin" : "/dashboard"} replace /> : <Register />} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/doctors" element={<ProtectedRoute><DoctorsList /></ProtectedRoute>} />
-              <Route path="/booking" element={<ProtectedRoute><Booking /></ProtectedRoute>} />
-              <Route path="/room/:appointmentId" element={<ProtectedRoute><MeetingRoom /></ProtectedRoute>} />
-              <Route path="/doctor/in-person/:appointmentId" element={<ProtectedRoute><DoctorInPersonSession /></ProtectedRoute>} />
-              <Route path="/doctor/waiting-room" element={<ProtectedRoute><DoctorWaitingRoom /></ProtectedRoute>} />
-              <Route path="/doctor/appointments" element={<ProtectedRoute><DoctorAppointments /></ProtectedRoute>} />
-              <Route path="/doctor/patients" element={<ProtectedRoute><DoctorPatients /></ProtectedRoute>} />
-              <Route path="/doctor/chat" element={<ProtectedRoute><DoctorChat /></ProtectedRoute>} />
-              <Route path="/doctor/payouts" element={<ProtectedRoute><DoctorPayouts /></ProtectedRoute>} />
-              <Route path="/doctor/medical-documents" element={<ProtectedRoute><DoctorMedicalDocuments /></ProtectedRoute>} />
-              <Route path="/doctor/invoices" element={<ProtectedRoute><DoctorInvoices /></ProtectedRoute>} />
-              <Route path="/doctor/profile" element={<ProtectedRoute><DoctorProfile /></ProtectedRoute>} />
-              <Route path="/patient/in-person/:appointmentId" element={<ProtectedRoute><PatientInPersonSession /></ProtectedRoute>} />
-              <Route path="/waiting-room" element={<ProtectedRoute><PatientWaitingRoom /></ProtectedRoute>} />
-              <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
-              <Route path="/mock-checkout" element={<ProtectedRoute><MockCheckout /></ProtectedRoute>} />
-              <Route path="/medical-history" element={<ProtectedRoute><MedicalHistory /></ProtectedRoute>} />
-              <Route path="/family-members" element={<ProtectedRoute><FamilyMembers /></ProtectedRoute>} />
-              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-            </Routes>
-          </Suspense>
-        </div>
+        <AppRoutes />
       </Router>
     </MotionConfig>
   );

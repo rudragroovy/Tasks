@@ -26,9 +26,106 @@ import {
 import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
+import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+function normalizeExperienceLabel(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '0-1 Experience';
+  return /experience/i.test(raw) ? raw : `${raw} Experience`;
+}
+
+function resolveExperience(appointment) {
+  const aiSummary = parseAppointmentAiSummary(appointment);
+  const aiPatient = aiSummary?.patient && typeof aiSummary.patient === 'object' ? aiSummary.patient : {};
+  const aiExperience = pickFirstNonEmpty([
+    aiSummary?.experience,
+    aiSummary?.experience_range,
+    aiSummary?.patient_experience,
+    aiPatient?.experience,
+    aiPatient?.experience_range,
+  ]);
+  return normalizeExperienceLabel(
+    aiExperience ||
+      appointment?.patient?.experienceRange ||
+      appointment?.familyMember?.experienceRange
+  );
+}
+
+function parseAppointmentAiSummary(appointment) {
+  const raw = appointment?.aiSummary;
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function pickFirstNonEmpty(values) {
+  for (const value of values) {
+    const normalized = String(value || '').trim();
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
+function resolveAddress(appointment) {
+  const aiSummary = parseAppointmentAiSummary(appointment);
+  const aiPatient = aiSummary?.patient && typeof aiSummary.patient === 'object' ? aiSummary.patient : {};
+  const aiAddressObject = aiSummary?.address && typeof aiSummary.address === 'object' ? aiSummary.address : {};
+
+  const aiAddressDirect = pickFirstNonEmpty([
+    aiSummary?.address,
+    aiSummary?.location,
+    aiSummary?.patient_address,
+    aiSummary?.full_address,
+    aiSummary?.formatted_address,
+    aiSummary?.home_address,
+    aiPatient?.address,
+    aiPatient?.location,
+    aiAddressObject?.full,
+    aiAddressObject?.line1,
+  ]);
+
+  const aiAddressParts = [
+    aiAddressObject?.street,
+    aiSummary?.street,
+    aiPatient?.street,
+    aiAddressObject?.suburb,
+    aiSummary?.suburb,
+    aiPatient?.suburb,
+    aiAddressObject?.city,
+    aiSummary?.city,
+    aiPatient?.city,
+    aiAddressObject?.state,
+    aiSummary?.state,
+    aiPatient?.state,
+    aiAddressObject?.postcode,
+    aiSummary?.postcode,
+    aiPatient?.postcode,
+    aiAddressObject?.country,
+    aiSummary?.country,
+    aiPatient?.country,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  const mergedAiAddress = aiAddressParts.join(', ');
+
+  const rawAddress =
+    aiAddressDirect ||
+    mergedAiAddress ||
+    appointment?.patient?.address ||
+    appointment?.patient?.doctorProfile?.address ||
+    appointment?.familyMember?.address;
+  const address = String(rawAddress || '').trim();
+  return address || 'Address not provided';
+}
 
 function getSessionRoute(appointment) {
   if (appointment?.consultationMode === 'IN_PERSON') return `/doctor/in-person/${appointment.id}`;
@@ -128,21 +225,17 @@ export default function DoctorWaitingRoom() {
   const doctorDisplayName = formatDoctorName(user?.name, 'Doctor');
   const displayedRecords = pendingRecords;
   const highlightedPatient = displayedRecords[0] || null;
-  const highlightedCardName =
-    highlightedPatient?.familyMember?.name || highlightedPatient?.patient?.name || doctorDisplayName;
-  const highlightedConsultationKind =
-    highlightedPatient?.type === 'SCHEDULED' ? 'Scheduled Consultation' : 'On-Demand Consultation';
+  const highlightedDoctorProfile = user?.doctorProfile || highlightedPatient?.doctor?.doctorProfile || null;
+  const highlightedCardName = doctorDisplayName;
   const highlightedServiceName =
+    highlightedDoctorProfile?.specialization?.name ||
     highlightedPatient?.doctor?.doctorProfile?.specialization?.name ||
     highlightedPatient?.doctor?.specialization?.name ||
     'General Consultation';
-  const highlightedDateRaw =
-    highlightedPatient?.scheduledFor || highlightedPatient?.createdAt || highlightedPatient?.updatedAt;
-  const highlightedDate = highlightedDateRaw ? new Date(highlightedDateRaw) : null;
-  const highlightedTimeLabel =
-    highlightedDate && !Number.isNaN(highlightedDate.getTime())
-      ? highlightedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : '--';
+  const highlightedDoctorExperience = normalizeExperienceLabel(
+    highlightedDoctorProfile?.experienceRange || highlightedDoctorProfile?.experience
+  );
+  const highlightedDoctorAddress = String(highlightedDoctorProfile?.address || '').trim() || 'Address not provided';
 
   const avgWaitMinutes = displayedRecords.length
     ? Math.max(
@@ -160,6 +253,8 @@ export default function DoctorWaitingRoom() {
     key: appointment.id,
     id: appointment.id,
     patientName: appointment.familyMember?.name || appointment.patient?.name || '-',
+    patientExperience: resolveExperience(appointment),
+    patientAddress: resolveAddress(appointment),
     userType: appointment.familyMember ? 'Family' : 'Self',
     serviceType: appointment.type || 'ON_DEMAND',
     consultationFor: appointment.familyMember ? 'Family Member' : 'Self',
@@ -173,7 +268,23 @@ export default function DoctorWaitingRoom() {
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80, render: (id) => <Text strong>#{id}</Text> },
-    { title: 'Patient Name', dataIndex: 'patientName', key: 'patientName', width: 220 },
+    {
+      title: 'Patient Name',
+      dataIndex: 'patientName',
+      key: 'patientName',
+      width: 320,
+      render: (_, row) => (
+        <div className="flex flex-col leading-tight">
+          <Text strong className="!text-slate-900 !text-sm">
+            {row.patientName}
+          </Text>
+          <Text className="!text-xs !text-slate-500">{row.patientExperience}</Text>
+          <Text className="!text-xs !text-slate-500 !truncate" title={row.patientAddress}>
+            {row.patientAddress}
+          </Text>
+        </div>
+      ),
+    },
     { title: 'User Type', dataIndex: 'userType', key: 'userType', width: 120 },
     { title: 'Service Type', dataIndex: 'serviceType', key: 'serviceType', width: 140 },
     { title: 'Consultation For', dataIndex: 'consultationFor', key: 'consultationFor', width: 170 },
@@ -202,26 +313,10 @@ export default function DoctorWaitingRoom() {
     },
   ];
 
-  const doctorNavItems = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'waiting-room', label: 'Waiting Room' },
-    { key: 'appointments', label: 'My Appointment' },
-    { key: 'patients', label: 'My Patients' },
-    { key: 'chat', label: 'Chat' },
-    { key: 'more', label: 'More Options' },
-  ];
+  const doctorNavItems = DOCTOR_NAV_ITEMS;
 
   const handleDoctorNavClick = (key) => {
-    if (key === 'dashboard') navigate('/dashboard');
-    if (key === 'waiting-room') navigate('/doctor/waiting-room');
-    if (key === 'appointments') navigate('/doctor/appointments');
-    if (key === 'patients') navigate('/doctor/patients');
-    if (key === 'chat') navigate('/doctor/chat');
-    if (key === 'pay-out') navigate('/doctor/payouts');
-    if (key === 'medical-documents') navigate('/doctor/medical-documents');
-    if (key === 'invoices') navigate('/doctor/invoices');
-    if (key === 'my-profile') navigate('/doctor/profile');
-    if (key === 'change-password') navigate('/doctor/profile?tab=settings');
+    navigateDoctorNavClick(key, navigate);
   };
 
   const handleToggleOnline = async () => {
@@ -250,7 +345,7 @@ export default function DoctorWaitingRoom() {
           colorPrimary: '#0e7490',
           colorSuccess: '#059669',
           borderRadius: 12,
-          fontFamily: '"Noto Sans", sans-serif',
+          fontFamily: '"Outfit", sans-serif',
         },
         components: {
           Segmented: {
@@ -266,7 +361,7 @@ export default function DoctorWaitingRoom() {
       <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
         <SharedNavbar
           user={user}
-          brandLabel="MyDrScripts"
+          brandLabel="CareBridge"
           onLogoClick={() => navigate('/dashboard')}
           navItems={doctorNavItems}
           activeTab="waiting-room"
@@ -300,8 +395,9 @@ export default function DoctorWaitingRoom() {
                         {highlightedCardName.toUpperCase()}
                       </Text>
                       <Text className="!block !text-white/80">{highlightedServiceName}</Text>
-                      <Text className="!block !text-white/95">
-                        {highlightedConsultationKind} - {highlightedTimeLabel}
+                      <Text className="!block !text-white/80">{highlightedDoctorExperience}</Text>
+                      <Text className="!block !max-w-[360px] !truncate !text-white/80" title={highlightedDoctorAddress}>
+                        {highlightedDoctorAddress}
                       </Text>
                     </div>
                   </div>
@@ -312,45 +408,51 @@ export default function DoctorWaitingRoom() {
                 </Card>
               </Col>
 
-              {[
-                { title: 'Total Appointments', value: scopedRecords.length, icon: <Users size={16} color="#fff" />, bg: '#0e7490' },
-                { title: 'Waiting Room', value: pendingRecords.length, icon: <Clock3 size={16} color="#fff" />, bg: '#0891b2' },
-                { title: 'Completed Today', value: completedToday.length, icon: <CheckCircle size={16} color="#fff" />, bg: '#059669' },
-                { title: 'Avg. Wait Time', value: `${avgWaitMinutes} Minutes`, icon: <TimerReset size={16} color="#fff" />, bg: '#155e75' },
-              ].map((item) => (
-                <Col xs={24} sm={12} lg={4} key={item.title}>
-                  <Card size="small" className="h-full">
-                    <div className="flex items-center justify-between">
-                      <Statistic title={item.title} value={item.value} valueStyle={{ fontWeight: 800, fontSize: 24 }} />
-                      <div
-                        className="flex h-11 w-11 items-center justify-center rounded-xl"
-                        style={{ backgroundColor: item.bg }}
-                      >
-                        {item.icon}
-                      </div>
-                    </div>
-                  </Card>
-                </Col>
-              ))}
+              <Col xs={24} lg={16}>
+                <Row gutter={[12, 12]}>
+                  {[
+                    { title: 'Total Appointments', value: scopedRecords.length, icon: <Users size={16} color="#fff" />, bg: '#0e7490' },
+                    { title: 'Waiting Room', value: pendingRecords.length, icon: <Clock3 size={16} color="#fff" />, bg: '#0891b2' },
+                    { title: 'Completed Today', value: completedToday.length, icon: <CheckCircle size={16} color="#fff" />, bg: '#059669' },
+                    { title: 'Avg. Wait Time', value: `${avgWaitMinutes} Minutes`, icon: <TimerReset size={16} color="#fff" />, bg: '#155e75' },
+                  ].map((item) => (
+                    <Col xs={24} sm={12} lg={12} xl={6} key={item.title}>
+                      <Card size="small" className="h-full">
+                        <div className="flex items-center justify-between">
+                          <Statistic title={item.title} value={item.value} valueStyle={{ fontWeight: 800, fontSize: 24 }} />
+                          <div
+                            className="flex h-11 w-11 items-center justify-center rounded-xl"
+                            style={{ backgroundColor: item.bg }}
+                          >
+                            {item.icon}
+                          </div>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+
+                <Alert
+                  style={{ marginTop: 12 }}
+                  type="info"
+                  message={`${waitingTab === 'general' ? 'General Queue' : 'Doctor Specific Queue'}: ${scopedRecords.length} total, ${pendingRecords.length} waiting, ${completedToday.length} completed today (${todayLabel}).`}
+                  showIcon
+                />
+              </Col>
             </Row>
 
-            <Alert
-              style={{ marginTop: 12, marginBottom: 16 }}
-              type="info"
-              message={`${waitingTab === 'general' ? 'General Queue' : 'Doctor Specific Queue'}: ${scopedRecords.length} total, ${pendingRecords.length} waiting, ${completedToday.length} completed today (${todayLabel}).`}
-              showIcon
-            />
-
-            <Segmented
-              block={false}
-              value={waitingTab}
-              onChange={setWaitingTab}
-              options={[
-                { label: 'General Waiting Room', value: 'general' },
-                { label: 'Doctor Specific Requests', value: 'doctor' },
-              ]}
-              style={{ marginBottom: 14, padding: 4, borderRadius: 12 }}
-            />
+            <div className="mt-4 mb-4">
+              <Segmented
+                block={false}
+                value={waitingTab}
+                onChange={setWaitingTab}
+                options={[
+                  { label: 'General Waiting Room', value: 'general' },
+                  { label: 'Doctor Specific Requests', value: 'doctor' },
+                ]}
+                style={{ padding: 4, borderRadius: 12 }}
+              />
+            </div>
 
             <Table
               columns={columns}

@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
@@ -10,6 +10,11 @@ export const AuthProvider = ({ children }) => {
   const token = localStorage.getItem('token');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(Boolean(token));
+  const [authModal, setAuthModal] = useState({
+    open: false,
+    mode: 'login',
+    redirectTo: null,
+  });
 
   const fetchMe = async () => {
     try {
@@ -45,6 +50,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', data.token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
     setUser(data.user);
+    return data.user;
   };
 
   const logout = () => {
@@ -53,8 +59,53 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const openAuthModal = useCallback(({ mode = 'login', redirectTo = null } = {}) => {
+    const fallbackRedirect =
+      redirectTo ||
+      `${window.location.pathname || '/'}${window.location.search || ''}`;
+
+    setAuthModal({
+      open: true,
+      mode: mode === 'register' ? 'register' : 'login',
+      redirectTo: fallbackRedirect,
+    });
+  }, []);
+
+  const closeAuthModal = useCallback(() => {
+    setAuthModal((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  const requireAuth = useCallback(
+    (action, options = {}) => {
+      if (user) {
+        if (typeof action === 'function') action();
+        return true;
+      }
+
+      openAuthModal({
+        mode: options.mode || 'login',
+        redirectTo: options.redirectTo,
+      });
+      return false;
+    },
+    [openAuthModal, user]
+  );
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        loading,
+        authModal,
+        setAuthModal,
+        openAuthModal,
+        closeAuthModal,
+        requireAuth,
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );

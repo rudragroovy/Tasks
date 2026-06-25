@@ -1,26 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Card,
-  Col,
-  Layout,
-  Row,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
+import { Button, Card, Col, Layout, Row, Space, Tag, Typography } from 'antd';
 import {
   Activity,
   ArrowRight,
   CalendarClock,
   CheckCircle,
+  ChevronRight,
   Clock,
   FileText,
   House,
   MapPin,
-  Menu,
   MessageSquare,
   Mic,
   Phone,
@@ -31,26 +22,25 @@ import {
   Video,
 } from 'lucide-react';
 import AppIcon from '../components/branding/AppIcon';
+import LandingNavbar from '../components/LandingNavbar';
 import './landing-page.css';
 
-const { Header, Content, Footer } = Layout;
+const { Content, Footer } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
-const primaryNav = [
-  { label: 'Patient', target: 'services' },
-  { label: 'Organization', target: 'consult-types' },
-  { label: 'Doctors', target: 'doctors' },
-  { label: 'Medical Links', target: 'steps' },
-  { label: 'More Options', target: 'pricing' },
-];
+const imageLibrary = {
+  doctorsTeam: '/landing/images/v1_2846.png',
+  patientTablet: '/landing/images/v1_3373.png',
+  telehealthSession: '/landing/images/v1_3394.png',
+};
 
 const heroSlides = [
-  '/landing/images/v1_2846.png',
-  '/landing/images/v1_3394.png',
-  '/landing/images/v1_3415.png',
-  '/landing/images/v1_3436.png',
+  imageLibrary.doctorsTeam,
+  imageLibrary.telehealthSession,
+  imageLibrary.patientTablet,
+  imageLibrary.telehealthSession,
 ];
-const heroTypedPhrase = 'Quality Care, Anytime, Anywhere';
+const heroTypedPhrase = 'Healthcare Designed for You';
 
 const heroCards = [
   { label: 'Video Consultation', icon: Video, tone: 'purple' },
@@ -64,7 +54,7 @@ const heroTagCarouselItems = [
   { label: 'With or Without Insurance', icon: ShieldCheck },
   { label: 'Specialties Offered', icon: Stethoscope },
   { label: 'Choose Your Provider', icon: Users },
-  { label: 'Rating On app Store', icon: Star, metric: '4.9' },
+  { label: 'Rating On App Store', icon: Star, metric: '4.9' },
   { label: 'Services', icon: Activity, metric: '6' },
   { label: 'Same Day Visits', icon: CalendarClock },
 ];
@@ -112,67 +102,423 @@ const steps = [
   {
     title: 'Select Service',
     desc: 'Choose the healthcare service that best suits your needs.',
-    image: '/landing/images/v1_3373.png',
+    image: imageLibrary.patientTablet,
   },
   {
     title: 'Choose Consultation Type',
-    desc: 'Select video, telephone, in-person or home visit and pick a time slot.',
-    image: '/landing/images/v1_3394.png',
+    desc: 'Select video, telephone, in-person, or home visit and pick a suitable time slot.',
+    image: imageLibrary.telehealthSession,
   },
   {
     title: 'View Doctor Details',
     desc: 'Review doctor experience, specialization, and patient feedback.',
-    image: '/landing/images/v1_3415.png',
+    image: imageLibrary.doctorsTeam,
   },
   {
     title: 'Get Your Solution',
-    desc: 'Confirm your booking and receive consultation or required documents.',
-    image: '/landing/images/v1_3436.png',
+    desc: 'Confirm your booking and receive consultation, prescription, or care plan.',
+    image: imageLibrary.patientTablet,
   },
 ];
 
-const doctors = [
-  { name: 'Dr Deepak Nair', spec: 'General Practitioner', exp: '15+ years', fee: '$45' },
-  { name: 'Dr Anna Jones', spec: 'General Practitioner', exp: '12+ years', fee: '$45' },
-  { name: 'Dr Fabian Andrews', spec: 'General Practitioner', exp: '20+ years', fee: '$45' },
+const awesomeFeatureTabs = [
+  {
+    key: 'patients',
+    label: 'For Patients',
+    items: [
+      {
+        title: 'Instant Access to Care',
+        description: 'Speak to verified doctors in minutes without waiting in long queues.',
+        icon: CalendarClock,
+      },
+      {
+        title: 'All Medical Docs in One Place',
+        description: 'Prescriptions, referrals, and certificates are delivered digitally.',
+        icon: FileText,
+      },
+      {
+        title: 'Flexible Consultation Modes',
+        description: 'Video, phone, in-person, and home visit options for every lifestyle.',
+        icon: Video,
+      },
+    ],
+  },
+  {
+    key: 'families',
+    label: 'For Families',
+    items: [
+      {
+        title: 'Care for Every Age Group',
+        description: 'Book appointments for adults, seniors, and children in one account.',
+        icon: Users,
+      },
+      {
+        title: 'Safer Ongoing Follow-ups',
+        description: 'Track recurring conditions and maintain continuity of care.',
+        icon: ShieldCheck,
+      },
+      {
+        title: 'Shared Health Timeline',
+        description: 'Keep your family appointments and records organized in one place.',
+        icon: Activity,
+      },
+    ],
+  },
+  {
+    key: 'providers',
+    label: 'For Providers',
+    items: [
+      {
+        title: 'Structured Consultation Flow',
+        description: 'Reduce admin burden with streamlined intake and booking workflows.',
+        icon: Clock,
+      },
+      {
+        title: 'Secure Clinical Communication',
+        description: 'Use compliant messaging and telehealth sessions for patient care.',
+        icon: MessageSquare,
+      },
+      {
+        title: 'Better Capacity Management',
+        description: 'Publish slots, handle demand, and improve consultation throughput.',
+        icon: CalendarClock,
+      },
+    ],
+  },
+];
+
+const whyChooseCards = [
+  {
+    title: 'AHPRA-Verified Professionals',
+    description: 'Every provider on CareBridge is credentialed and verified before onboarding.',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Faster Access, Better Outcomes',
+    description: 'Get the right care sooner with shorter wait times and guided follow-ups.',
+    icon: Activity,
+  },
+  {
+    title: 'Patient-First Experience',
+    description: 'Clear pricing, flexible appointment options, and an experience built around you.',
+    icon: Users,
+  },
+];
+
+const plusCards = [
+  {
+    title: 'Priority Booking Windows',
+    description: 'Get faster access to peak-hour appointments and urgent telehealth slots.',
+    icon: CalendarClock,
+  },
+  {
+    title: 'Member-Only Price Protection',
+    description: 'Lock in lower consultation fees and predictable out-of-pocket costs.',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Dedicated Care Follow-up',
+    description: 'Receive guided post-consultation support for better long-term outcomes.',
+    icon: CheckCircle,
+  },
+];
+
+const testimonials = [
+  {
+    name: 'Sarah Thompson',
+    role: 'Patient - Brisbane',
+    message:
+      'The whole process was seamless. I booked in five minutes, spoke to a doctor quickly, and received my prescription digitally right after the consultation.',
+    image: imageLibrary.patientTablet,
+  },
+  {
+    name: 'Michael Lewis',
+    role: 'Patient - Sydney',
+    message:
+      'CareBridge saved me hours. The doctor was clear, professional, and I got my referral and care plan without visiting a clinic.',
+    image: imageLibrary.telehealthSession,
+  },
+  {
+    name: 'Priya Nair',
+    role: 'Patient - Melbourne',
+    message:
+      'The home visit option was exactly what we needed for my parents. The experience was reliable, respectful, and easy to manage.',
+    image: imageLibrary.doctorsTeam,
+  },
+];
+
+const benefitsList = [
+  'Book appointments anytime, anywhere',
+  'Video and phone consultations on your device',
+  'Access prescriptions and medical records instantly',
+  'Track appointments and consultation history in one place',
+  'Secure communication with verified Australian doctors',
+];
+
+const topRatedTabs = [
+  { key: 'popular', label: 'Most Popular Services', icon: Stethoscope },
+  { key: 'specialists', label: 'Specialist Consults', icon: Users },
+  { key: 'documents', label: 'Medical Documents', icon: FileText },
+];
+
+const topRatedCards = {
+  popular: [
+    {
+      title: 'General Consultation',
+      description: 'Fast telehealth consultation for common symptoms and medical advice.',
+      image: imageLibrary.telehealthSession,
+      duration: '15-20 mins',
+      mode: 'Video or Phone',
+      rating: '4.9',
+      price: '$45',
+      badge: 'Save $30',
+      note: 'Compared to traditional clinic rates',
+    },
+    {
+      title: 'Weight Management',
+      description: 'Evidence-based weight support plan with regular doctor follow-up.',
+      image: imageLibrary.patientTablet,
+      duration: '20-30 mins',
+      mode: 'Video Consultation',
+      rating: '4.8',
+      price: '$59',
+      badge: 'Save $36',
+      note: 'Includes follow-up recommendations',
+    },
+    {
+      title: 'Skin & Dermatology Advice',
+      description: 'Review skin concerns and receive treatment options and referral guidance.',
+      image: imageLibrary.doctorsTeam,
+      duration: '20 mins',
+      mode: 'Video Consultation',
+      rating: '4.9',
+      price: '$65',
+      badge: 'Save $40',
+      note: 'Digital scripts when clinically appropriate',
+    },
+  ],
+  specialists: [
+    {
+      title: 'Cardiology Pre-Screen',
+      description: 'Initial specialist-focused review and referral guidance for cardiac concerns.',
+      image: imageLibrary.doctorsTeam,
+      duration: '25 mins',
+      mode: 'Video Consultation',
+      rating: '4.8',
+      price: '$80',
+      badge: 'Save $70',
+      note: 'Referral-ready documentation included',
+    },
+    {
+      title: 'Endocrinology Review',
+      description: 'Diabetes and hormone-related review with tailored clinical advice.',
+      image: imageLibrary.telehealthSession,
+      duration: '25-30 mins',
+      mode: 'Video Consultation',
+      rating: '4.9',
+      price: '$85',
+      badge: 'Save $65',
+      note: 'Designed for ongoing condition support',
+    },
+    {
+      title: 'Mental Health Consultation',
+      description: 'Confidential consultation with pathway support for ongoing mental care.',
+      image: imageLibrary.patientTablet,
+      duration: '30 mins',
+      mode: 'Video or Phone',
+      rating: '4.9',
+      price: '$75',
+      badge: 'Save $45',
+      note: 'Follow-up and referral options available',
+    },
+  ],
+  documents: [
+    {
+      title: 'Digital Prescription',
+      description: 'Get clinically appropriate scripts delivered digitally to your phone or email.',
+      image: imageLibrary.patientTablet,
+      duration: '10-15 mins',
+      mode: 'Telehealth',
+      rating: '4.9',
+      price: '$35',
+      badge: 'Save $25',
+      note: 'Quick turnaround for eligible cases',
+    },
+    {
+      title: 'Medical Certificate',
+      description: 'Request same-day medical certificates for work or university requirements.',
+      image: imageLibrary.telehealthSession,
+      duration: '10 mins',
+      mode: 'Telehealth',
+      rating: '4.8',
+      price: '$35',
+      badge: 'Save $25',
+      note: 'Delivered digitally after consultation',
+    },
+    {
+      title: 'Specialist Referral',
+      description: 'Receive specialist referral letters with complete consultation context.',
+      image: imageLibrary.doctorsTeam,
+      duration: '15 mins',
+      mode: 'Telehealth',
+      rating: '4.9',
+      price: '$45',
+      badge: 'Save $30',
+      note: 'Accepted by specialist clinics nationwide',
+    },
+  ],
+};
+
+const scheduleTabs = [
+  { key: 'gp', label: 'General Practitioners' },
+  { key: 'specialists', label: 'Specialists' },
+  { key: 'mental-health', label: 'Mental Health' },
+];
+
+const scheduleCardsByTab = {
+  gp: [
+    {
+      doctor: 'Dr Deepak Nair',
+      specialty: 'General Practitioner | Male',
+      image: imageLibrary.telehealthSession,
+      experience: '15+ Years',
+      consultations: '5.2k+',
+      day: 'Monday',
+      date: '2026-06-29',
+      slots: ['09:00 AM', '09:15 AM', '09:30 AM', '10:00 AM', '10:15 AM'],
+    },
+    {
+      doctor: 'Dr Anna Jones',
+      specialty: 'General Practitioner | Female',
+      image: imageLibrary.patientTablet,
+      experience: '12+ Years',
+      consultations: '4.1k+',
+      day: 'Monday',
+      date: '2026-06-29',
+      slots: ['09:00 AM', '09:30 AM', '09:45 AM', '10:15 AM', '10:30 AM'],
+    },
+    {
+      doctor: 'Dr Fabian Andrews',
+      specialty: 'General Practitioner | Male',
+      image: imageLibrary.doctorsTeam,
+      experience: '20+ Years',
+      consultations: '6.8k+',
+      day: 'Tuesday',
+      date: '2026-06-30',
+      slots: ['09:00 AM', '09:15 AM', '09:45 AM', '10:00 AM', '10:30 AM'],
+    },
+  ],
+  specialists: [
+    {
+      doctor: 'Dr Amelia Hart',
+      specialty: 'Endocrinology Specialist',
+      image: imageLibrary.doctorsTeam,
+      experience: '16+ Years',
+      consultations: '2.4k+',
+      day: 'Wednesday',
+      date: '2026-07-01',
+      slots: ['11:00 AM', '11:15 AM', '11:30 AM', '12:00 PM', '12:15 PM'],
+    },
+    {
+      doctor: 'Dr Noah Parker',
+      specialty: 'Cardiology Specialist',
+      image: imageLibrary.telehealthSession,
+      experience: '14+ Years',
+      consultations: '2.0k+',
+      day: 'Wednesday',
+      date: '2026-07-01',
+      slots: ['10:00 AM', '10:15 AM', '10:45 AM', '11:00 AM', '11:30 AM'],
+    },
+    {
+      doctor: 'Dr Olivia Bennett',
+      specialty: 'Respiratory Specialist',
+      image: imageLibrary.patientTablet,
+      experience: '18+ Years',
+      consultations: '2.8k+',
+      day: 'Thursday',
+      date: '2026-07-02',
+      slots: ['09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:15 AM'],
+    },
+  ],
+  'mental-health': [
+    {
+      doctor: 'Dr Liam Cooper',
+      specialty: 'Psychiatrist',
+      image: imageLibrary.patientTablet,
+      experience: '13+ Years',
+      consultations: '3.1k+',
+      day: 'Friday',
+      date: '2026-07-03',
+      slots: ['01:00 PM', '01:30 PM', '02:00 PM', '02:15 PM', '02:30 PM'],
+    },
+    {
+      doctor: 'Dr Emily Foster',
+      specialty: 'Psychologist',
+      image: imageLibrary.telehealthSession,
+      experience: '10+ Years',
+      consultations: '2.7k+',
+      day: 'Friday',
+      date: '2026-07-03',
+      slots: ['10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM'],
+    },
+    {
+      doctor: 'Dr Jacob Reed',
+      specialty: 'Mental Health GP',
+      image: imageLibrary.doctorsTeam,
+      experience: '11+ Years',
+      consultations: '2.2k+',
+      day: 'Saturday',
+      date: '2026-07-04',
+      slots: ['09:00 AM', '09:30 AM', '10:00 AM', '10:15 AM', '10:45 AM'],
+    },
+  ],
+};
+
+const transparentPricingRows = [
+  {
+    type: 'service',
+    service: 'General Consultation',
+    detail: 'Standard telehealth visit',
+    clinic: '$75',
+    ours: '$45',
+    save: 'Save $30',
+  },
+  {
+    type: 'service',
+    service: 'Specialist Consultation',
+    detail: 'With referral support',
+    clinic: '$150',
+    ours: '$80',
+    save: 'Save $70',
+  },
+  {
+    type: 'service',
+    service: 'Medical Certificate',
+    detail: 'Digital delivery',
+    clinic: '$60',
+    ours: '$35',
+    save: 'Save $25',
+  },
+  {
+    type: 'state',
+    service: 'Wait Time',
+    detail: 'Average queue before doctor connect',
+    clinicState: '30-60 mins',
+    oursState: '5-10 mins',
+  },
+  {
+    type: 'state',
+    service: 'Prescription Delivery',
+    detail: 'How scripts are delivered after consult',
+    clinicState: 'Paper only',
+    oursState: 'Instant digital',
+  },
 ];
 
 const tutorials = [
-  { title: 'Patient Onboarding Guide', duration: '3 min', image: '/landing/images/v1_5559.png' },
-  { title: 'Standard Consultation Booking', duration: '2 min', image: '/landing/images/v1_5575.png' },
-  { title: 'Get Your Prescription', duration: '2 min', image: '/landing/images/v1_5591.png' },
-];
-
-const pricingData = [
-  { key: '1', service: 'General Consultation', clinic: '$75', ours: '$45', save: 'Save $30' },
-  { key: '2', service: 'Specialist Consultation', clinic: '$150', ours: '$80', save: 'Save $70' },
-  { key: '3', service: 'Medical Certificate', clinic: '$60', ours: '$35', save: 'Save $25' },
-];
-
-const pricingColumns = [
-  {
-    title: 'Service',
-    dataIndex: 'service',
-    key: 'service',
-  },
-  {
-    title: 'Traditional Clinic',
-    dataIndex: 'clinic',
-    key: 'clinic',
-    align: 'center',
-  },
-  {
-    title: 'MyDrScripts',
-    dataIndex: 'ours',
-    key: 'ours',
-    align: 'center',
-    render: (_, row) => (
-      <Space direction="vertical" size={0}>
-        <Text strong className="pricing-ours-value">{row.ours}</Text>
-        <Text className="pricing-save-text">{row.save}</Text>
-      </Space>
-    ),
-  },
+  { title: 'Patient Onboarding Guide', duration: '3 min', image: imageLibrary.patientTablet },
+  { title: 'Standard Consultation Booking', duration: '2 min', image: imageLibrary.telehealthSession },
+  { title: 'Get Your Prescription', duration: '2 min', image: imageLibrary.doctorsTeam },
 ];
 
 function SectionHeader({ badge, title, highlighted, subtitle, leftAligned = false }) {
@@ -187,27 +533,41 @@ function SectionHeader({ badge, title, highlighted, subtitle, leftAligned = fals
   );
 }
 
+function getInitialByDirection(direction) {
+  if (direction === 'left') return { opacity: 0, x: -34, y: 0 };
+  if (direction === 'right') return { opacity: 0, x: 34, y: 0 };
+  return { opacity: 0, x: 0, y: 28 };
+}
+
 export default function LandingPage() {
-  const navigate = useNavigate();
   const [activeHeroSlide, setActiveHeroSlide] = useState(0);
-  const prefersReducedMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const [typedHeroText, setTypedHeroText] = useState(() =>
-    prefersReducedMotion ? heroTypedPhrase : ''
+  const reduceMotion = useReducedMotion();
+  const [typedHeroText, setTypedHeroText] = useState(() => (reduceMotion ? heroTypedPhrase : ''));
+  const [activeFeatureTab, setActiveFeatureTab] = useState(awesomeFeatureTabs[0].key);
+  const [activeTopRatedTab, setActiveTopRatedTab] = useState(topRatedTabs[0].key);
+  const [activeScheduleTab, setActiveScheduleTab] = useState(scheduleTabs[0].key);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
+
+  const activeFeatureItems = useMemo(
+    () => awesomeFeatureTabs.find((tab) => tab.key === activeFeatureTab)?.items ?? awesomeFeatureTabs[0].items,
+    [activeFeatureTab]
+  );
+  const activeTopRatedCards = useMemo(() => topRatedCards[activeTopRatedTab] ?? topRatedCards.popular, [activeTopRatedTab]);
+  const activeScheduleCards = useMemo(
+    () => scheduleCardsByTab[activeScheduleTab] ?? scheduleCardsByTab.gp,
+    [activeScheduleTab]
   );
 
   useEffect(() => {
-    if (heroSlides.length < 2) return undefined;
+    if (heroSlides.length < 2 || reduceMotion) return undefined;
     const intervalId = window.setInterval(() => {
       setActiveHeroSlide((previous) => (previous + 1) % heroSlides.length);
     }, 5500);
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [reduceMotion]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || prefersReducedMotion) {
-      return undefined;
-    }
+    if (reduceMotion) return undefined;
 
     let characterIndex = 0;
     const intervalId = window.setInterval(() => {
@@ -219,13 +579,37 @@ export default function LandingPage() {
     }, 75);
 
     return () => window.clearInterval(intervalId);
-  }, [prefersReducedMotion]);
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    if (reduceMotion) return undefined;
+    const intervalId = window.setInterval(() => {
+      setActiveTestimonial((current) => (current + 1) % testimonials.length);
+    }, 5200);
+    return () => window.clearInterval(intervalId);
+  }, [reduceMotion]);
+
+  const revealProps = (direction = 'up', delay = 0) => {
+    const initial = reduceMotion ? { opacity: 1, x: 0, y: 0 } : getInitialByDirection(direction);
+    const transition = reduceMotion
+      ? { duration: 0 }
+      : { duration: 0.58, delay, ease: [0.22, 1, 0.36, 1] };
+
+    return {
+      initial,
+      whileInView: { opacity: 1, x: 0, y: 0 },
+      viewport: { once: true, amount: 0.2 },
+      transition,
+    };
+  };
 
   const scrollToSection = (sectionId) => {
     const section = document.getElementById(sectionId);
     if (!section) return;
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const activeReview = testimonials[activeTestimonial];
 
   return (
     <Layout className="landing-page-v2">
@@ -241,54 +625,16 @@ export default function LandingPage() {
         </div>
         <div className="landing-hero-v2__overlay" />
 
-        <Header className="landing-nav-v2">
-          <div className="landing-nav-v2__left">
-            <Button type="text" className="landing-nav-v2__menu" aria-label="Open menu">
-              <Menu size={20} />
-            </Button>
-            <div className="landing-nav-v2__brand">
-              <AppIcon size={28} />
-              <span>MyDrScripts</span>
-            </div>
-          </div>
-
-          <Space className="landing-nav-v2__center landing-nav-v2__links" size={20}>
-            {primaryNav.map((item) => (
-              <Button key={item.label} type="text" onClick={() => scrollToSection(item.target)}>
-                {item.label}
-              </Button>
-            ))}
-          </Space>
-
-          <div className="landing-nav-v2__right">
-            <Button
-              className="landing-nav-v2__ai"
-              icon={<Mic size={14} />}
-              onClick={() => navigate('/login')}
-            >
-              <span className="label-full">OLA AI</span>
-              <span className="label-short">AI</span>
-            </Button>
-            <Button className="landing-nav-v2__ghost" onClick={() => scrollToSection('onboarding-videos')}>
-              <span className="label-full">Onboarding Videos</span>
-              <span className="label-short">Videos</span>
-            </Button>
-            <Link to="/login" className="landing-nav-v2__solid">
-              <span className="label-full">Login</span>
-              <span className="label-short">Login</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-        </Header>
+        <LandingNavbar />
 
         <div className="landing-hero-v2__content">
-          <div className="landing-hero-v2__left">
+          <motion.div className="landing-hero-v2__left" {...revealProps('left', 0.04)}>
             <Space direction="vertical" size={12} className="landing-hero-v2__copy">
               <Tag className="landing-chip" bordered={false}>
                 <ShieldCheck size={14} /> AHPRA Verified Doctors
               </Tag>
               <Title level={1}>
-                MyDrScripts is
+                CareBridge is
                 <span className="landing-hero-v2__typed-wrap">
                   <span className="landing-hero-v2__typed">{typedHeroText}</span>
                   <span className="landing-hero-v2__typed-caret" aria-hidden="true">
@@ -297,14 +643,14 @@ export default function LandingPage() {
                 </span>
               </Title>
               <Paragraph className="landing-hero-v2__subtitle">
-                Choose how you want to see a doctor-video, phone, in-person, or at home.
+                Choose how you want to see a doctor: video, phone, in-person, or at home.
               </Paragraph>
               <ul>
                 <li>
                   <CheckCircle size={16} /> Available 24/7, including weekends
                 </li>
                 <li>
-                  <CheckCircle size={16} /> Prescriptions & referrals provided
+                  <CheckCircle size={16} /> Prescriptions and referrals provided
                 </li>
                 <li>
                   <CheckCircle size={16} /> Same-day appointments available
@@ -326,8 +672,9 @@ export default function LandingPage() {
                 <span>500+ verified doctors</span>
               </Space>
             </Space>
-          </div>
-          <div className="landing-hero-v2__right">
+          </motion.div>
+
+          <motion.div className="landing-hero-v2__right" {...revealProps('right', 0.08)}>
             <div className="landing-hero-v2__cards">
               {heroCards.map((card) => {
                 const Icon = card.icon;
@@ -351,20 +698,22 @@ export default function LandingPage() {
                 <ArrowRight size={18} />
               </Card>
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        <Card className="landing-hero-v2__banner" bordered={false}>
-          <ShieldCheck size={18} />
-          <p>
-            MyDrScripts is Australia's first truly digital GP clinic, combining personalised care, smart technology, and
-            long-term health support so every patient has a doctor who knows them.
-          </p>
-        </Card>
+        <motion.div {...revealProps('up', 0.12)}>
+          <Card className="landing-hero-v2__banner" bordered={false}>
+            <ShieldCheck size={18} />
+            <p>
+              CareBridge is Australia&apos;s first truly digital GP clinic, combining personalised care, smart technology,
+              and long-term health support so every patient has a doctor who knows them.
+            </p>
+          </Card>
+        </motion.div>
       </section>
 
       <Content>
-        <section className="landing-tag-carousel" aria-label="MyDrScripts highlights">
+        <section className="landing-tag-carousel" aria-label="CareBridge highlights">
           <div className="landing-tag-carousel__track" role="list">
             {[...heroTagCarouselItems, ...heroTagCarouselItems].map((item, index) => {
               const Icon = item.icon;
@@ -390,32 +739,36 @@ export default function LandingPage() {
         </section>
 
         <section id="services" className="landing-section container landing-services">
-          <SectionHeader
-            badge="Comprehensive Healthcare Solutions"
-            title="Our"
-            highlighted="Healthcare Services"
-            subtitle="Access professional healthcare services delivered by AHPRA verified doctors. Choose the service that best fits your needs."
-          />
+          <motion.div {...revealProps('up', 0.02)}>
+            <SectionHeader
+              badge="Comprehensive Healthcare Solutions"
+              title="Our"
+              highlighted="Healthcare Services"
+              subtitle="Access professional healthcare services delivered by AHPRA verified doctors. Choose the service that best fits your needs."
+            />
+          </motion.div>
           <Row className="service-row" gutter={[16, 16]}>
-            {serviceCards.map((service) => {
+            {serviceCards.map((service, index) => {
               const Icon = service.icon;
               return (
                 <Col xs={24} md={12} lg={8} key={service.title}>
-                  <Card className={`service-card service-card--${service.tone}`}>
-                    <span className="service-card__icon">
-                      <Icon size={20} />
-                    </span>
-                    <Title level={4}>{service.title}</Title>
-                    <Paragraph>{service.description}</Paragraph>
-                    <div className="service-card__footer">
-                      <Button type="text">Learn more</Button>
-                      <span className="service-card__dots" aria-hidden="true">
-                        <i />
-                        <i />
-                        <i />
+                  <motion.div {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.04 + index * 0.03)}>
+                    <Card className={`service-card service-card--${service.tone}`}>
+                      <span className="service-card__icon">
+                        <Icon size={20} />
                       </span>
-                    </div>
-                  </Card>
+                      <Title level={4}>{service.title}</Title>
+                      <Paragraph>{service.description}</Paragraph>
+                      <div className="service-card__footer">
+                        <Button type="text">Learn more</Button>
+                        <span className="service-card__dots" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      </div>
+                    </Card>
+                  </motion.div>
                 </Col>
               );
             })}
@@ -425,40 +778,36 @@ export default function LandingPage() {
         <section className="landing-highlight">
           <div className="container">
             <Row className="highlight-row" gutter={[14, 14]}>
-              <Col xs={24} md={8}>
-                <Card className="highlight-card">
-                  <Title level={4}>24/7</Title>
-                  <Text strong>Available Anytime</Text>
-                  <Paragraph>Round-the-clock access to healthcare</Paragraph>
-                </Card>
-              </Col>
-              <Col xs={24} md={8}>
-                <Card className="highlight-card">
-                  <Title level={4}>100%</Title>
-                  <Text strong>AHPRA Verified</Text>
-                  <Paragraph>All doctors professionally certified</Paragraph>
-                </Card>
-              </Col>
-              <Col xs={24} md={8}>
-                <Card className="highlight-card">
-                  <Title level={4}>15min</Title>
-                  <Text strong>Fast Service</Text>
-                  <Paragraph>Quick consultations & responses</Paragraph>
-                </Card>
-              </Col>
+              {[
+                { value: '24/7', title: 'Available Anytime', copy: 'Round-the-clock access to healthcare' },
+                { value: '100%', title: 'AHPRA Verified', copy: 'All doctors professionally certified' },
+                { value: '15min', title: 'Fast Service', copy: 'Quick consultations and responses' },
+              ].map((item, index) => (
+                <Col xs={24} md={8} key={item.title}>
+                  <motion.div {...revealProps('up', 0.05 + index * 0.04)}>
+                    <Card className="highlight-card">
+                      <Title level={4}>{item.value}</Title>
+                      <Text strong>{item.title}</Text>
+                      <Paragraph>{item.copy}</Paragraph>
+                    </Card>
+                  </motion.div>
+                </Col>
+              ))}
             </Row>
           </div>
         </section>
 
         <section id="steps" className="landing-section container landing-steps-v2">
-          <SectionHeader
-            title="4 Easy"
-            highlighted="Steps"
-            subtitle="Getting quality healthcare is simple with MyDrScripts."
-          />
+          <motion.div {...revealProps('up', 0.02)}>
+            <SectionHeader title="4 Easy" highlighted="Steps" subtitle="Getting quality healthcare is simple with CareBridge." />
+          </motion.div>
           <div className="landing-steps-v2__grid">
             {steps.map((step, index) => (
-              <article className="landing-steps-v2__item" key={step.title}>
+              <motion.article
+                className="landing-steps-v2__item"
+                key={step.title}
+                {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.04 + index * 0.04)}
+              >
                 <div className="landing-steps-v2__media-wrap">
                   <img src={step.image} alt={step.title} loading="lazy" />
                   <span className="landing-steps-v2__number">{index + 1}</span>
@@ -470,22 +819,26 @@ export default function LandingPage() {
                     <ArrowRight size={18} />
                   </span>
                 ) : null}
-              </article>
+              </motion.article>
             ))}
           </div>
-          <Link to="/login" className="landing-btn landing-btn--primary landing-steps-v2__cta">
-            <CalendarClock size={16} /> Book Standard Consultation now <ArrowRight size={16} />
-          </Link>
+          <motion.div {...revealProps('up', 0.08)}>
+            <Link to="/login" className="landing-btn landing-btn--primary landing-steps-v2__cta">
+              <CalendarClock size={16} /> Book Standard Consultation now <ArrowRight size={16} />
+            </Link>
+          </motion.div>
         </section>
 
         <section id="consult-types" className="landing-section landing-consult-types">
           <div className="container">
-            <SectionHeader
-              badge="Choose Your Consultation Type"
-              title="Flexible Healthcare"
-              highlighted="On Your Terms"
-              subtitle="Select the consultation method that works best for you. All options connect you with verified Australian healthcare professionals."
-            />
+            <motion.div {...revealProps('up', 0.02)}>
+              <SectionHeader
+                badge="Choose Your Consultation Type"
+                title="Flexible Healthcare"
+                highlighted="On Your Terms"
+                subtitle="Select the consultation method that works best for you. All options connect you with verified Australian healthcare professionals."
+              />
+            </motion.div>
 
             <Space className="consult-chip-list" wrap>
               <Button className="is-active">
@@ -505,7 +858,7 @@ export default function LandingPage() {
               </Button>
             </Space>
 
-            <div className="consult-panel">
+            <motion.div className="consult-panel" {...revealProps('up', 0.06)}>
               <div className="consult-panel__left">
                 <div className="consult-panel__title-row">
                   <span className="consult-panel__title-icon">
@@ -556,14 +909,14 @@ export default function LandingPage() {
 
                 <div className="consult-panel__group">
                   <Text strong className="consult-section-head">
-                    <CheckCircle size={14} /> What's Included
+                    <CheckCircle size={14} /> What&apos;s Included
                   </Text>
                   <ul className="consult-include-list">
                     <li>
                       <CheckCircle size={16} /> HD video consultation with specialist
                     </li>
                     <li>
-                      <CheckCircle size={16} /> Digital prescription via email/SMS
+                      <CheckCircle size={16} /> Digital prescription via email and SMS
                     </li>
                     <li>
                       <CheckCircle size={16} /> Medical certificate if required
@@ -586,7 +939,7 @@ export default function LandingPage() {
                       <ShieldCheck size={14} /> Fast connect in minutes
                     </span>
                     <span>
-                      <Mic size={14} /> Secure & private
+                      <Mic size={14} /> Secure and private
                     </span>
                     <span>
                       <Users size={14} /> AHPRA certified doctors
@@ -614,7 +967,7 @@ export default function LandingPage() {
                     <span>2</span>
                     <div>
                       <h5>Provide Your Details</h5>
-                      <p>Fill in medical history & symptoms</p>
+                      <p>Fill in medical history and symptoms</p>
                     </div>
                   </li>
                   <li>
@@ -628,7 +981,7 @@ export default function LandingPage() {
                     <span>4</span>
                     <div>
                       <h5>Receive Care Plan</h5>
-                      <p>Get prescriptions & follow-up advice</p>
+                      <p>Get prescriptions and follow-up advice</p>
                     </div>
                   </li>
                 </ol>
@@ -645,124 +998,473 @@ export default function LandingPage() {
                   <CalendarClock size={16} /> Book Appointment Now <ArrowRight size={16} />
                 </Link>
               </div>
+            </motion.div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-awesome-features">
+          <div className="container">
+            <motion.div className="awesome-features__header" {...revealProps('up', 0.02)}>
+              <h2>
+                Awesome <span>Features</span>
+              </h2>
+              <Paragraph>
+                Powerful capabilities for patients, families, and healthcare providers in one connected ecosystem.
+              </Paragraph>
+              <div className="awesome-features__tabs" role="tablist" aria-label="Feature categories">
+                {awesomeFeatureTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab.key === activeFeatureTab}
+                    className={`awesome-features__tab${tab.key === activeFeatureTab ? ' is-active' : ''}`}
+                    onClick={() => setActiveFeatureTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+            <div className="awesome-features__tab-panel" role="tabpanel">
+              <div className="awesome-features__grid">
+                {activeFeatureItems.map((item, index) => {
+                  const Icon = item.icon;
+                  return (
+                    <motion.article
+                      key={item.title}
+                      className="awesome-feature-card"
+                      {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.04 + index * 0.03)}
+                    >
+                      <span className="awesome-feature-card__icon">
+                        <Icon size={18} />
+                      </span>
+                      <h4>{item.title}</h4>
+                      <p>{item.description}</p>
+                    </motion.article>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="doctors" className="landing-section container">
-          <SectionHeader title="Top Rated" highlighted="Doctors & Specialists" />
-          <Row className="doctor-row" gutter={[16, 16]}>
-            {doctors.map((doctor) => (
-              <Col xs={24} md={12} lg={8} key={doctor.name}>
-                <Card className="doctor-card">
-                  <div className="doctor-card__avatar">{doctor.name.slice(3, 4)}</div>
-                  <Title level={4}>{doctor.name}</Title>
-                  <Paragraph>{doctor.spec}</Paragraph>
-                  <div className="doctor-card__meta">
-                    <span>{doctor.exp}</span>
-                    <span>{doctor.fee}</span>
-                  </div>
-                  <Button className="landing-btn landing-btn--outline">Book Consultation</Button>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </section>
-
-        <section className="landing-section container">
-          <SectionHeader title="Awesome" highlighted="Features" />
-          <Row className="feature-row" gutter={[16, 16]}>
-            <Col xs={24} md={8}>
-              <Card className="feature-card">
-                <Clock size={18} />
-                <Title level={4}>Same Day Visits</Title>
-                <Paragraph>Get appointments with qualified doctors quickly.</Paragraph>
-              </Card>
-            </Col>
-            <Col xs={24} md={8}>
-              <Card className="feature-card">
-                <ShieldCheck size={18} />
-                <Title level={4}>AHPRA Verified Doctors</Title>
-                <Paragraph>Every practitioner is professionally accredited.</Paragraph>
-              </Card>
-            </Col>
-            <Col xs={24} md={8}>
-              <Card className="feature-card">
-                <Activity size={18} />
-                <Title level={4}>All Services In One Place</Title>
-                <Paragraph>Consultation, scripts, referrals and certificates.</Paragraph>
-              </Card>
-            </Col>
-          </Row>
-        </section>
-
-        <section id="pricing" className="landing-section landing-pricing">
+        <section className="landing-section landing-why-choose">
           <div className="container">
-            <SectionHeader
-              title="Transparent"
-              highlighted="Pricing"
-              subtitle="No hidden fees. Pay less than traditional clinics."
-            />
-            <Table
-              className="pricing-table-ant"
-              dataSource={pricingData}
-              columns={pricingColumns}
-              pagination={false}
-              bordered
-            />
+            <motion.div className="why-choose__header" {...revealProps('up', 0.02)}>
+              <h2>
+                Why Choose <span>CareBridge</span>
+              </h2>
+              <Paragraph>
+                We combine quality clinical care with modern digital workflows so you can access healthcare with confidence.
+              </Paragraph>
+            </motion.div>
+            <div className="why-choose__grid">
+              {whyChooseCards.map((card, index) => {
+                const Icon = card.icon;
+                return (
+                  <motion.article
+                    key={card.title}
+                    className="why-choose-card"
+                    {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.04 + index * 0.03)}
+                  >
+                    <span className="why-choose-card__icon">
+                      <Icon size={18} />
+                    </span>
+                    <h4>{card.title}</h4>
+                    <p>{card.description}</p>
+                  </motion.article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-plus">
+          <div className="container">
+            <motion.div className="plus-header" {...revealProps('up', 0.02)}>
+              <Tag className="plus-badge">Membership</Tag>
+              <h2>CareBridge Plus</h2>
+            </motion.div>
+            <div className="plus-grid">
+              {plusCards.map((card, index) => {
+                const Icon = card.icon;
+                return (
+                  <motion.article
+                    key={card.title}
+                    className="plus-card"
+                    {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.05 + index * 0.03)}
+                  >
+                    <span className="plus-card__icon">
+                      <Icon size={20} />
+                    </span>
+                    <h4>{card.title}</h4>
+                    <p>{card.description}</p>
+                  </motion.article>
+                );
+              })}
+            </div>
+            <motion.div className="plus-cta-wrap" {...revealProps('up', 0.08)}>
+              <Link to="/login" className="landing-btn landing-btn--primary plus-cta">
+                Join CareBridge Plus <ArrowRight size={16} />
+              </Link>
+            </motion.div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-testimonials">
+          <div className="container">
+            <motion.div {...revealProps('up', 0.02)}>
+              <SectionHeader
+                title="What Our"
+                highlighted="Patients Say"
+                subtitle="Real stories from patients using CareBridge across Australia."
+              />
+            </motion.div>
+            <div className="testimonials-wrap">
+              <motion.article key={activeReview.name} className="testimonial-card" {...revealProps('up', 0.05)}>
+                <div className="testimonial-card__stars" aria-label="5 star rating">
+                  <Star size={16} fill="currentColor" />
+                  <Star size={16} fill="currentColor" />
+                  <Star size={16} fill="currentColor" />
+                  <Star size={16} fill="currentColor" />
+                  <Star size={16} fill="currentColor" />
+                </div>
+                <span className="testimonial-card__quote-mark" aria-hidden="true">
+                  &ldquo;
+                </span>
+                <p className="testimonial-card__message">{activeReview.message}</p>
+                <div className="testimonial-card__person">
+                  <img src={activeReview.image} alt={activeReview.name} loading="lazy" />
+                  <div>
+                    <h4>{activeReview.name}</h4>
+                    <span>{activeReview.role}</span>
+                  </div>
+                </div>
+              </motion.article>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-benefits">
+          <div className="container">
+            <div className="benefits-layout">
+              <motion.div className="benefits-visual" {...revealProps('left', 0.03)}>
+                <span className="benefits-visual__orb" aria-hidden="true" />
+                <img src={imageLibrary.telehealthSession} alt="Doctor assisting patient via telehealth" loading="lazy" />
+              </motion.div>
+              <motion.div className="benefits-copy" {...revealProps('right', 0.07)}>
+                <h2>
+                  What are the benefits of using <span>CareBridge?</span>
+                </h2>
+                <Paragraph>
+                  CareBridge gives you easier access to quality healthcare with transparent pricing, short wait times, and
+                  complete digital convenience.
+                </Paragraph>
+                <ul className="benefits-list">
+                  {benefitsList.map((item) => (
+                    <li key={item}>
+                      <CheckCircle size={18} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-top-rated" id="doctors">
+          <div className="container">
+            <motion.div className="top-rated__header" {...revealProps('up', 0.02)}>
+              <Tag className="top-rated__badge">
+                <Star size={14} /> Top Rated
+              </Tag>
+              <h2>
+                Top-Rated Doctors &amp; <span>Specialists</span>
+              </h2>
+              <Paragraph>
+                Explore our most popular services and meet our highly qualified healthcare professionals.
+              </Paragraph>
+              <div className="top-rated__tabs" role="tablist" aria-label="Top rated categories">
+                {topRatedTabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab.key === activeTopRatedTab}
+                      className={`top-rated__tab${tab.key === activeTopRatedTab ? ' is-active' : ''}`}
+                      onClick={() => setActiveTopRatedTab(tab.key)}
+                    >
+                      <Icon size={14} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+
+            <div className="top-rated__content">
+              <div className="top-rated__grid">
+                {activeTopRatedCards.map((card, index) => (
+                  <motion.article
+                    key={card.title}
+                    className="top-rated-card"
+                    {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.05 + index * 0.03)}
+                  >
+                    <div className="top-rated-card__media">
+                      <img src={card.image} alt={card.title} loading="lazy" />
+                    </div>
+                    <div className="top-rated-card__body">
+                      <h4>{card.title}</h4>
+                      <p>
+                        {card.description}
+                        <span className="top-rated-card__read-more">Read more</span>
+                      </p>
+                      <div className="top-rated-card__meta">
+                        <span>
+                          <Clock size={12} /> {card.duration}
+                        </span>
+                        <span>
+                          <Video size={12} /> {card.mode}
+                        </span>
+                        <span>
+                          <Star size={12} /> {card.rating}
+                        </span>
+                      </div>
+                      <div className="top-rated-card__footer">
+                        <div className="top-rated-card__price">
+                          <strong>
+                            {card.price}
+                            <small>{card.badge}</small>
+                          </strong>
+                          <em>{card.note}</em>
+                        </div>
+                        <Link to="/login" className="top-rated-card__cta">
+                          Book now
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.article>
+                ))}
+              </div>
+              <span className="top-rated__next" aria-hidden="true">
+                <ChevronRight size={18} />
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-schedule">
+          <div className="container">
+            <motion.div className="landing-schedule__header" {...revealProps('up', 0.02)}>
+              <h2>
+                Select your <span>appointment</span>
+              </h2>
+              <Paragraph>
+                Choose your preferred doctor and slot. Availability updates in real time across consultation categories.
+              </Paragraph>
+              <div className="landing-schedule__tabs" role="tablist" aria-label="Schedule categories">
+                {scheduleTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab.key === activeScheduleTab}
+                    className={`landing-schedule__tab${tab.key === activeScheduleTab ? ' is-active' : ''}`}
+                    onClick={() => setActiveScheduleTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+
+            <div className="landing-schedule__content">
+              <div className="landing-schedule__grid">
+                {activeScheduleCards.map((card, index) => (
+                  <motion.article
+                    key={card.doctor}
+                    className="schedule-card"
+                    {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.05 + index * 0.03)}
+                  >
+                    <div className="schedule-card__media">
+                      <img src={card.image} alt={card.doctor} loading="lazy" />
+                    </div>
+                    <div className="schedule-card__body">
+                      <h4>{card.doctor}</h4>
+                      <p>{card.specialty}</p>
+                      <div className="schedule-card__stats">
+                        <div>
+                          <small>Experience</small>
+                          <strong>{card.experience}</strong>
+                        </div>
+                        <div>
+                          <small>Consultations</small>
+                          <strong>{card.consultations}</strong>
+                        </div>
+                      </div>
+                      <div className="schedule-card__availability">
+                        <div className="schedule-card__date">
+                          <span>{card.day}</span>
+                          <span>{card.date}</span>
+                        </div>
+                        <div className="schedule-card__slots">
+                          {card.slots.map((slot) => (
+                            <button key={slot} type="button">
+                              {slot}
+                            </button>
+                          ))}
+                          <button type="button" className="schedule-card__more">
+                            Show More
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.article>
+                ))}
+              </div>
+              <span className="landing-schedule__next" aria-hidden="true">
+                <ChevronRight size={16} />
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" className="landing-section landing-transparent-pricing">
+          <div className="container">
+            <motion.div className="transparent-pricing__header" {...revealProps('up', 0.02)}>
+              <h2>
+                Transparent <span>Pricing</span>
+              </h2>
+              <Paragraph>No hidden fees. Pay less than traditional clinics while getting faster digital healthcare.</Paragraph>
+            </motion.div>
+            <motion.div className="transparent-pricing__table-wrap" {...revealProps('up', 0.06)}>
+              <div className="transparent-pricing__table">
+                <div className="transparent-pricing__head">
+                  <div>Service</div>
+                  <div>Traditional Clinic</div>
+                  <div>CareBridge</div>
+                </div>
+                {transparentPricingRows.map((row) => (
+                  <div className="transparent-pricing__row" key={row.service}>
+                    <div data-label="Service">
+                      <div className="transparent-pricing__service">
+                        <h4>{row.service}</h4>
+                        <p>{row.detail}</p>
+                      </div>
+                    </div>
+                    <div data-label="Traditional Clinic">
+                      {row.type === 'state' ? (
+                        <span className="transparent-pricing__state transparent-pricing__state--negative">{row.clinicState}</span>
+                      ) : (
+                        <div className="transparent-pricing__traditional">
+                          <strong>{row.clinic}</strong>
+                        </div>
+                      )}
+                    </div>
+                    <div data-label="CareBridge">
+                      {row.type === 'state' ? (
+                        <span className="transparent-pricing__state transparent-pricing__state--positive">{row.oursState}</span>
+                      ) : (
+                        <div className="transparent-pricing__price-stack">
+                          <strong>{row.ours}</strong>
+                          <small>{row.save}</small>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
           </div>
         </section>
 
         <section id="onboarding-videos" className="landing-section container">
-          <SectionHeader
-            title="How"
-            highlighted="It Works"
-            subtitle="Watch our simple guides to get started."
-          />
+          <motion.div {...revealProps('up', 0.02)}>
+            <SectionHeader title="How" highlighted="It Works" subtitle="Watch our simple guides to get started." />
+          </motion.div>
           <Row className="tutorial-row" gutter={[16, 16]}>
-            {tutorials.map((item) => (
+            {tutorials.map((item, index) => (
               <Col xs={24} md={8} key={item.title}>
-                <Card className="tutorial-card" cover={<img src={item.image} alt={item.title} loading="lazy" />}>
-                  <Text>{item.duration}</Text>
-                  <Title level={4}>{item.title}</Title>
-                </Card>
+                <motion.div {...revealProps(index % 2 === 0 ? 'left' : 'right', 0.04 + index * 0.03)}>
+                  <Card className="tutorial-card" cover={<img src={item.image} alt={item.title} loading="lazy" />}>
+                    <Text>{item.duration}</Text>
+                    <Title level={4}>{item.title}</Title>
+                  </Card>
+                </motion.div>
               </Col>
             ))}
           </Row>
         </section>
 
         <section className="landing-section landing-app">
-          <div className="container">
-            <Row gutter={[24, 24]} align="middle">
-              <Col xs={24} lg={13}>
-                <SectionHeader
-                  badge="Available on iOS & Android"
-                  title="Download"
-                  highlighted="Our Mobile App"
-                  subtitle="Access healthcare services on the go. Book appointments, consult with doctors and manage your health from your smartphone."
-                  leftAligned
-                />
-                <Space className="app-cta" wrap>
-                  <Button>Download on App Store</Button>
-                  <Button>Get it on Google Play</Button>
-                </Space>
-              </Col>
-              <Col xs={24} lg={11}>
-                <div className="app-image-wrap">
-                  <img src="/landing/images/v1_5723.png" alt="MyDrScripts app preview" loading="lazy" />
-                </div>
-              </Col>
-            </Row>
+          <div className="container app-layout">
+            <motion.div className="landing-app__panel" {...revealProps('left', 0.04)}>
+              <SectionHeader
+                badge="Available on iOS and Android"
+                title="Download"
+                highlighted="Our Mobile App"
+                subtitle="Access healthcare services on the go. Book appointments, consult with doctors, and manage your health from your smartphone."
+                leftAligned
+              />
+              <ul className="benefits-list">
+                <li>
+                  <CheckCircle size={16} /> Book appointments anytime, anywhere
+                </li>
+                <li>
+                  <CheckCircle size={16} /> Video and phone consultations on your device
+                </li>
+                <li>
+                  <CheckCircle size={16} /> Access prescriptions and medical records instantly
+                </li>
+              </ul>
+              <Space className="app-cta" wrap>
+                <Button>Download on App Store</Button>
+                <Button>Get it on Google Play</Button>
+              </Space>
+            </motion.div>
+
+            <motion.div className="app-image-wrap" {...revealProps('right', 0.08)}>
+              <span className="app-image-wrap__glow" aria-hidden="true" />
+              <span className="app-image-chip app-image-chip--rating">
+                <Star size={14} fill="currentColor" /> 4.9 Rating
+              </span>
+              <span className="app-image-chip app-image-chip--secure">
+                <ShieldCheck size={14} /> Secure & Private
+              </span>
+              <div className="app-image-frame">
+                <img src={imageLibrary.patientTablet} alt="Patient using CareBridge app on tablet" loading="lazy" />
+              </div>
+            </motion.div>
           </div>
         </section>
 
         <section className="landing-final-cta">
           <div className="container">
-            <Title level={2}>Book the best-priced telehealth appointment today.</Title>
-            <Paragraph>Find top-rated doctors available today. Pay less than anywhere else.</Paragraph>
-            <Link to="/login" className="landing-btn landing-btn--primary">
-              Book Telehealth Appointment <ArrowRight size={16} />
-            </Link>
+            <motion.div className="landing-final-cta__panel" {...revealProps('up', 0.04)}>
+              <span className="landing-final-cta__badge">
+                <ShieldCheck size={14} /> Trusted by patients across Australia
+              </span>
+              <Title level={2}>Book the best-priced telehealth appointment today.</Title>
+              <Paragraph>Find top-rated doctors available now and get care faster for less.</Paragraph>
+              <div className="landing-final-cta__highlights">
+                <span>
+                  <Clock size={13} /> Avg. connect time: 5 minutes
+                </span>
+                <span>
+                  <CheckCircle size={13} /> Prescriptions, referrals, certificates
+                </span>
+                <span>
+                  <ShieldCheck size={13} /> AHPRA verified doctors
+                </span>
+              </div>
+              <Link to="/login" className="landing-btn landing-btn--primary">
+                Book Telehealth Appointment <ArrowRight size={16} />
+              </Link>
+            </motion.div>
           </div>
         </section>
       </Content>
@@ -772,11 +1474,11 @@ export default function LandingPage() {
           <div>
             <div className="landing-footer__brand">
               <AppIcon size={30} />
-              <span>MyDrScripts</span>
+              <span>CareBridge</span>
             </div>
             <Paragraph>
-              MyDrScripts is your all-in-one platform for managing prescriptions, patient records, and medical workflows
-              securely and efficiently.
+              CareBridge is your all-in-one platform for consultations, prescriptions, referrals, and medical workflow
+              support, helping patients access quality healthcare without delays.
             </Paragraph>
           </div>
           <div>
@@ -795,14 +1497,14 @@ export default function LandingPage() {
             <a href="/">Career</a>
           </div>
           <div>
-            <Title level={4}>Help & Support</Title>
+            <Title level={4}>Help &amp; Support</Title>
             <a href="/">Contact Us</a>
             <a href="/">Help Center</a>
             <a href="/">Privacy Policy</a>
-            <a href="/">Terms & Conditions</a>
+            <a href="/">Terms &amp; Conditions</a>
           </div>
         </div>
-        <div className="landing-footer__bar">2026 MyDrScripts. All rights reserved.</div>
+        <div className="landing-footer__bar">2026 CareBridge. All rights reserved.</div>
       </Footer>
     </Layout>
   );

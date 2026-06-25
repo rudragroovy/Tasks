@@ -20,6 +20,7 @@ import { CalendarDays, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
+import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
 
 const { RangePicker } = DatePicker;
 const { Title } = Typography;
@@ -96,26 +97,10 @@ export default function DoctorAppointments() {
 
   const doctorName = formatDoctorName(user?.name, 'Doctor');
 
-  const doctorNavItems = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'waiting-room', label: 'Waiting Room' },
-    { key: 'appointments', label: 'My Appointment' },
-    { key: 'patients', label: 'My Patients' },
-    { key: 'chat', label: 'Chat' },
-    { key: 'more', label: 'More Options' },
-  ];
+  const doctorNavItems = DOCTOR_NAV_ITEMS;
 
   const handleDoctorNavClick = (key) => {
-    if (key === 'dashboard') navigate('/dashboard');
-    if (key === 'waiting-room') navigate('/doctor/waiting-room');
-    if (key === 'appointments') navigate('/doctor/appointments');
-    if (key === 'patients') navigate('/doctor/patients');
-    if (key === 'chat') navigate('/doctor/chat');
-    if (key === 'pay-out') navigate('/doctor/payouts');
-    if (key === 'medical-documents') navigate('/doctor/medical-documents');
-    if (key === 'invoices') navigate('/doctor/invoices');
-    if (key === 'my-profile') navigate('/doctor/profile');
-    if (key === 'change-password') navigate('/doctor/profile?tab=settings');
+    navigateDoctorNavClick(key, navigate);
   };
 
   const handleToggleOnline = async () => {
@@ -267,7 +252,7 @@ export default function DoctorAppointments() {
           colorPrimary: '#0e7490',
           colorSuccess: '#059669',
           borderRadius: 12,
-          fontFamily: '"Noto Sans", sans-serif',
+          fontFamily: '"Outfit", sans-serif',
         },
         components: {
           Segmented: {
@@ -283,7 +268,7 @@ export default function DoctorAppointments() {
       <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
         <SharedNavbar
           user={user}
-          brandLabel="MyDrScripts"
+          brandLabel="CareBridge"
           onLogoClick={() => navigate('/dashboard')}
           navItems={doctorNavItems}
           activeTab="appointments"

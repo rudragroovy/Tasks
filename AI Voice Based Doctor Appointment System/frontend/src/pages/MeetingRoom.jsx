@@ -692,7 +692,7 @@ export default function MeetingRoom() {
         pendingCount={0}
         doctorName={user?.name}
         isDoctor={isDoctor}
-        onLogout={() => { leaveCall(true).then(() => { if (typeof logout === 'function') logout(); else navigate('/login'); }) }}
+        onLogout={() => { leaveCall(true).then(() => { if (typeof logout === 'function') logout(); else navigate('/'); }) }}
       />
 
       {/* â”€â”€ Joining overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}

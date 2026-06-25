@@ -36,14 +36,50 @@ model User {
   createdAt DateTime @default(now())
 
   doctorProfile       Doctor?
+  patientProfile      PatientProfile?
   familyMembers       FamilyMember[]
   patientAppointments Appointment[]   @relation("PatientAppointments")
   doctorAppointments  Appointment[]   @relation("DoctorAppointments")
+  patientReviews      Review[]        @relation("PatientReviews")
   invitedAppointments InvitedDoctor[] @relation("InvitedDoctor")
   doctorNotes         DoctorNote[]    @relation("DoctorNote")
   workingHours        DoctorWorkingHour[] @relation("DoctorWorkingHours")
   workingHourOverrides DoctorWorkingHourOverride[] @relation("DoctorWorkingHourOverrides")
   slots               DoctorSlot[]        @relation("DoctorSlots")
+}
+
+model PatientProfile {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profilePictureUrl     String?
+  givenName             String?
+  secondaryName         String?
+  familyName            String?
+  noFamilyName          Boolean  @default(false)
+  relation              String?
+  gender                String?
+  dateOfBirth           String?
+  phoneCode             String?  @default("+61")
+  phone                 String?
+  email                 String?
+  address               String?
+  ctgIslandOrigin       String?
+  allergies             String?
+  medicareCardNumber    String?
+  medicareIrn           String?
+  dvaCardNumber         String?
+  dvaCardColor          String?
+  currentGpName         String?
+  currentGpEmail        String?
+  partnerCode           String?
+  noCurrentGpDetails    Boolean  @default(false)
+  healthIdentifierType  String?  @default("Medicare Number")
+  saveHealthIdentifier  Boolean  @default(false)
+  onBehalfOfFamilyMember Boolean @default(false)
+  patientConsentGiven   Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model FamilyMember {
@@ -72,10 +108,44 @@ model Doctor {
   specialization   Specialization @relation(fields: [specializationId], references: [id])
   fee              Decimal
   isOnline         Boolean        @default(false)
+  averageRating    Float          @default(0)
+  reviewCount      Int            @default(0)
   showOnlineOnLogin Boolean       @default(true)
+  givenName        String?
+  secondaryName    String?
+  familyName       String?
+  noFamilyName     Boolean        @default(false)
+  gender           String?
+  dateOfBirth      String?
+  phoneCode        String?        @default("+91")
+  phone            String?
+  address          String?
+  experienceRange  String?
+  qualification    String?
+  practitionerType String?
+  services         String?
+  about            String?
+  ahpraNumber      String?
+  prescriberNumber String?
+  providerNumber   String?
+  hpiIndividualNumber String?
+  hpioNumber       String?
+  saveMyHINumber   Boolean        @default(true)
+  mimsUserId       String?
+  mimsEulaAccepted Boolean        @default(false)
+  mimsTermsAccepted Boolean       @default(false)
+  prescriptionEntityId String?
+  prescriptionAccessEnabled Boolean @default(true)
+  accountHolderName String?
+  accountNumber    String?
+  routingNumber    String?
+  autoDraftNotesEnabled Boolean   @default(false)
+  otpDeliveryChannel String       @default("BOTH")
   slotDurationMinutesVideo Int    @default(30)
   slotDurationMinutesAudio Int    @default(20)
   slotDurationMinutesInPerson Int @default(40)
+
+  reviews          Review[]
 }
 
 model Appointment {
@@ -107,6 +177,7 @@ model Appointment {
   invitedDoctors InvitedDoctor[]
   doctorNotes    DoctorNote[]
   slot           DoctorSlot?
+  review         Review?
 
   @@index([doctorId, scheduledFor])
 }
@@ -214,4 +285,24 @@ model DoctorNote {
   @@unique([appointmentId, doctorId])
   @@index([appointmentId])
   @@index([doctorId])
+}
+
+model Review {
+  id            String      @id @default(uuid())
+  appointmentId String      @unique
+  patientId     String
+  doctorId      String
+  rating        Int
+  message       String?
+  isVisible     Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient       User        @relation("PatientReviews", fields: [patientId], references: [id], onDelete: Cascade)
+  doctor        Doctor      @relation(fields: [doctorId], references: [userId], onDelete: Cascade)
+
+  @@index([doctorId, createdAt])
+  @@index([patientId, createdAt])
+  @@index([rating])
 }

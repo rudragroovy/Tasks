@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Noto Sans", sans-serif;
-  --font-heading: "Figtree", sans-serif;
+  --font-sans: "Outfit", sans-serif;
+  --font-heading: "Space Grotesk", "Outfit", sans-serif;
 
   /* Primary — Cyan/Teal palette */
   --color-primary-50:  #ECFEFF;
@@ -50,6 +50,52 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   overflow-y: scroll;
+}
+
+/* Unified typography baseline across native and Ant components */
+:where(
+  button,
+  input,
+  select,
+  textarea,
+  .ant-typography,
+  .ant-btn,
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-select,
+  .ant-select-selector,
+  .ant-menu,
+  .ant-dropdown-menu,
+  .ant-table,
+  .ant-pagination,
+  .ant-form,
+  .ant-tag,
+  .ant-modal,
+  .ant-drawer,
+  .ant-card
+) {
+  font-family: var(--font-sans);
+}
+
+:where(
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .ant-typography h1,
+  .ant-typography h2,
+  .ant-typography h3,
+  .ant-typography h4,
+  .ant-typography h5,
+  .ant-typography h6,
+  .ant-typography-title,
+  .ant-card-head-title,
+  .ant-modal-title,
+  .ant-drawer-title
+) {
+  font-family: var(--font-heading);
 }
 
 @media (prefers-reduced-motion: reduce) {

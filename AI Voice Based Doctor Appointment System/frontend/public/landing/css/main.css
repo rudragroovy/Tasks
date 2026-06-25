@@ -1,4 +1,4 @@
-﻿* {
+* {
   box-sizing: border-box;
 }
 body {
@@ -98,7 +98,7 @@ body {
   position: absolute;
   top: 168px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -160,7 +160,7 @@ body {
   position: absolute;
   top: 0px;
   left: 28px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -208,7 +208,7 @@ body {
   position: absolute;
   top: 0px;
   left: 28px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -256,7 +256,7 @@ body {
   position: absolute;
   top: 0px;
   left: 28px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -298,7 +298,7 @@ body {
   position: absolute;
   top: 15px;
   left: 28px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 16px;
   opacity: 1;
@@ -351,7 +351,7 @@ body {
   position: absolute;
   top: 15px;
   left: 29px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 16px;
   opacity: 1;
@@ -412,7 +412,7 @@ body {
   position: absolute;
   top: 0px;
   left: 29px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -452,7 +452,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -478,7 +478,7 @@ body {
   position: absolute;
   top: 0px;
   left: 438px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -516,7 +516,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 44px;
   opacity: 1;
@@ -555,7 +555,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 44px;
   opacity: 1;
@@ -580,7 +580,7 @@ body {
   position: absolute;
   top: 4px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Light;
   font-size: 44px;
   opacity: 1;
@@ -630,7 +630,7 @@ body {
   position: absolute;
   top: 7px;
   left: 42px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -707,7 +707,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -784,7 +784,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -861,7 +861,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -938,7 +938,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -1042,7 +1042,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -1067,7 +1067,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -1320,7 +1320,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -1346,7 +1346,7 @@ body {
   position: absolute;
   top: 5px;
   left: 41px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -1437,7 +1437,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -1463,7 +1463,7 @@ body {
   position: absolute;
   top: 5px;
   left: 78px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -1580,7 +1580,7 @@ body {
   position: absolute;
   top: 5px;
   left: 53px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -1671,7 +1671,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -1697,7 +1697,7 @@ body {
   position: absolute;
   top: 5px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -1814,7 +1814,7 @@ body {
   position: absolute;
   top: 5px;
   left: 24px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -1931,7 +1931,7 @@ body {
   position: absolute;
   top: 5px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2048,7 +2048,7 @@ body {
   position: absolute;
   top: 5px;
   left: 36px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2139,7 +2139,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -2165,7 +2165,7 @@ body {
   position: absolute;
   top: 5px;
   left: 41px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2256,7 +2256,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -2282,7 +2282,7 @@ body {
   position: absolute;
   top: 5px;
   left: 78px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2399,7 +2399,7 @@ body {
   position: absolute;
   top: 5px;
   left: 53px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2490,7 +2490,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -2516,7 +2516,7 @@ body {
   position: absolute;
   top: 5px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2633,7 +2633,7 @@ body {
   position: absolute;
   top: 5px;
   left: 24px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2750,7 +2750,7 @@ body {
   position: absolute;
   top: 5px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2867,7 +2867,7 @@ body {
   position: absolute;
   top: 5px;
   left: 36px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -2994,7 +2994,7 @@ body {
   position: absolute;
   top: 8px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -3019,7 +3019,7 @@ body {
   position: absolute;
   top: 1px;
   left: 104px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -3031,7 +3031,7 @@ body {
   position: absolute;
   top: 1px;
   left: 233px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -3057,7 +3057,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -3173,7 +3173,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -3211,7 +3211,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -3250,7 +3250,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -3409,7 +3409,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -3447,7 +3447,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -3486,7 +3486,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -3645,7 +3645,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -3683,7 +3683,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -3722,7 +3722,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -3881,7 +3881,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -3919,7 +3919,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -3958,7 +3958,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -4117,7 +4117,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -4155,7 +4155,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -4194,7 +4194,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -4353,7 +4353,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -4391,7 +4391,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -4430,7 +4430,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 14px;
   opacity: 1;
@@ -4590,7 +4590,7 @@ body {
   position: absolute;
   top: 0px;
   left: 158px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 56px;
   opacity: 1;
@@ -4616,7 +4616,7 @@ body {
   position: absolute;
   top: 15px;
   left: 121px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -4642,7 +4642,7 @@ body {
   position: absolute;
   top: 8px;
   left: 85px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -4681,7 +4681,7 @@ body {
   position: absolute;
   top: 0px;
   left: 141px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 56px;
   opacity: 1;
@@ -4707,7 +4707,7 @@ body {
   position: absolute;
   top: 15px;
   left: 136px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -4733,7 +4733,7 @@ body {
   position: absolute;
   top: 8px;
   left: 100px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -4772,7 +4772,7 @@ body {
   position: absolute;
   top: 0px;
   left: 135px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 56px;
   opacity: 1;
@@ -4798,7 +4798,7 @@ body {
   position: absolute;
   top: 15px;
   left: 147px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -4824,7 +4824,7 @@ body {
   position: absolute;
   top: 8px;
   left: 102px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -4912,7 +4912,7 @@ body {
   position: absolute;
   top: 1px;
   left: 252px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -4924,7 +4924,7 @@ body {
   position: absolute;
   top: 1px;
   left: 426px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -4950,7 +4950,7 @@ body {
   position: absolute;
   top: 20px;
   left: 213px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -5030,7 +5030,7 @@ body {
   position: absolute;
   top: 12px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 22px;
   opacity: 1;
@@ -5088,7 +5088,7 @@ body {
   position: absolute;
   top: 0px;
   left: 99px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 19px;
   opacity: 1;
@@ -5114,7 +5114,7 @@ body {
   position: absolute;
   top: 10px;
   left: 20px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -5190,7 +5190,7 @@ body {
   position: absolute;
   top: 12px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 22px;
   opacity: 1;
@@ -5248,7 +5248,7 @@ body {
   position: absolute;
   top: 0px;
   left: 47px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 19px;
   opacity: 1;
@@ -5274,7 +5274,7 @@ body {
   position: absolute;
   top: 10px;
   left: 20px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -5363,7 +5363,7 @@ body {
   position: absolute;
   top: 12px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 22px;
   opacity: 1;
@@ -5421,7 +5421,7 @@ body {
   position: absolute;
   top: 0px;
   left: 76px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 19px;
   opacity: 1;
@@ -5447,7 +5447,7 @@ body {
   position: absolute;
   top: 10px;
   left: 20px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -5536,7 +5536,7 @@ body {
   position: absolute;
   top: 12px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 22px;
   opacity: 1;
@@ -5594,7 +5594,7 @@ body {
   position: absolute;
   top: 0px;
   left: 85px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 19px;
   opacity: 1;
@@ -5620,7 +5620,7 @@ body {
   position: absolute;
   top: 10px;
   left: 20px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -5698,7 +5698,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -5834,7 +5834,7 @@ body {
   position: absolute;
   top: 8px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -5859,7 +5859,7 @@ body {
   position: absolute;
   top: 1px;
   left: 324px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -5871,7 +5871,7 @@ body {
   position: absolute;
   top: 1px;
   left: 799px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -5897,7 +5897,7 @@ body {
   position: absolute;
   top: 20px;
   left: 261px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -6007,7 +6007,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -6086,7 +6086,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -6165,7 +6165,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -6244,7 +6244,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -6321,7 +6321,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -6452,7 +6452,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 32px;
   opacity: 1;
@@ -6478,7 +6478,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -6527,7 +6527,7 @@ body {
   position: absolute;
   top: 30px;
   left: 23px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -6629,7 +6629,7 @@ body {
   position: absolute;
   top: 0px;
   left: 21px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -6655,7 +6655,7 @@ body {
   position: absolute;
   top: 5px;
   left: 6px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -6730,7 +6730,7 @@ body {
   position: absolute;
   top: 0px;
   left: 19px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -6756,7 +6756,7 @@ body {
   position: absolute;
   top: 5px;
   left: 6px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -6831,7 +6831,7 @@ body {
   position: absolute;
   top: 0px;
   left: 19px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -6857,7 +6857,7 @@ body {
   position: absolute;
   top: 5px;
   left: 6px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -6932,7 +6932,7 @@ body {
   position: absolute;
   top: 0px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -6958,7 +6958,7 @@ body {
   position: absolute;
   top: 5px;
   left: 6px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -7007,7 +7007,7 @@ body {
   position: absolute;
   top: 30px;
   left: 23px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -7072,7 +7072,7 @@ body {
   position: absolute;
   top: 3px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7122,7 +7122,7 @@ body {
   position: absolute;
   top: 3px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7172,7 +7172,7 @@ body {
   position: absolute;
   top: 3px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7222,7 +7222,7 @@ body {
   position: absolute;
   top: 3px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7272,7 +7272,7 @@ body {
   position: absolute;
   top: 3px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7321,7 +7321,7 @@ body {
   position: absolute;
   top: 30px;
   left: 29px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -7423,7 +7423,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7498,7 +7498,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7573,7 +7573,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7648,7 +7648,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -7724,7 +7724,7 @@ body {
   position: absolute;
   top: 0px;
   left: 27px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -7802,7 +7802,7 @@ body {
   position: absolute;
   top: 15px;
   left: 21px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -7840,7 +7840,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -7866,7 +7866,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -7907,7 +7907,7 @@ body {
   position: absolute;
   top: 15px;
   left: 21px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -7945,7 +7945,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -7971,7 +7971,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8012,7 +8012,7 @@ body {
   position: absolute;
   top: 15px;
   left: 21px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8050,7 +8050,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -8076,7 +8076,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8117,7 +8117,7 @@ body {
   position: absolute;
   top: 15px;
   left: 21px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8155,7 +8155,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -8181,7 +8181,7 @@ body {
   position: absolute;
   top: 5px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8286,7 +8286,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -8311,7 +8311,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -8389,7 +8389,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -8486,7 +8486,7 @@ body {
   position: absolute;
   top: 1px;
   left: 493px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -8498,7 +8498,7 @@ body {
   position: absolute;
   top: 2px;
   left: 744px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -8524,7 +8524,7 @@ body {
   position: absolute;
   top: 20px;
   left: 549px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -8582,7 +8582,7 @@ body {
   position: absolute;
   top: 10px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8612,7 +8612,7 @@ body {
   position: absolute;
   top: 10px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8642,7 +8642,7 @@ body {
   position: absolute;
   top: 10px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -8746,7 +8746,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 20px;
   opacity: 1;
@@ -8772,7 +8772,7 @@ body {
   position: absolute;
   top: 12px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -8863,7 +8863,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 20px;
   opacity: 1;
@@ -8889,7 +8889,7 @@ body {
   position: absolute;
   top: 12px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -8980,7 +8980,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 20px;
   opacity: 1;
@@ -9006,7 +9006,7 @@ body {
   position: absolute;
   top: 12px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -9097,7 +9097,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 20px;
   opacity: 1;
@@ -9123,7 +9123,7 @@ body {
   position: absolute;
   top: 12px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -9214,7 +9214,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 20px;
   opacity: 1;
@@ -9240,7 +9240,7 @@ body {
   position: absolute;
   top: 12px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -9331,7 +9331,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 20px;
   opacity: 1;
@@ -9357,7 +9357,7 @@ body {
   position: absolute;
   top: 12px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -9432,7 +9432,7 @@ body {
   position: absolute;
   top: 1px;
   left: 420px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -9444,7 +9444,7 @@ body {
   position: absolute;
   top: 1px;
   left: 743px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -9470,7 +9470,7 @@ body {
   position: absolute;
   top: 20px;
   left: 571px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -9574,7 +9574,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -9600,7 +9600,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -9691,7 +9691,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -9717,7 +9717,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -9808,7 +9808,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -9834,7 +9834,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -9925,7 +9925,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -9951,7 +9951,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -10042,7 +10042,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -10068,7 +10068,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -10159,7 +10159,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -10185,7 +10185,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -10283,7 +10283,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 40px;
   opacity: 1;
@@ -10295,7 +10295,7 @@ body {
   position: absolute;
   top: 49px;
   left: 122px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 40px;
   opacity: 1;
@@ -10321,7 +10321,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -10397,7 +10397,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10458,7 +10458,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10519,7 +10519,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10580,7 +10580,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10641,7 +10641,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10702,7 +10702,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10763,7 +10763,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10824,7 +10824,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -10938,7 +10938,7 @@ body {
   position: absolute;
   top: 8px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -10963,7 +10963,7 @@ body {
   position: absolute;
   top: 1px;
   left: 329px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -10975,7 +10975,7 @@ body {
   position: absolute;
   top: 1px;
   left: 617px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -11001,7 +11001,7 @@ body {
   position: absolute;
   top: 20px;
   left: 398px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -11107,7 +11107,7 @@ body {
   position: absolute;
   top: 12px;
   left: 48px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -11172,7 +11172,7 @@ body {
   position: absolute;
   top: 12px;
   left: 49px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -11237,7 +11237,7 @@ body {
   position: absolute;
   top: 12px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -11302,7 +11302,7 @@ body {
   position: absolute;
   top: 12px;
   left: 48px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -11475,7 +11475,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -11513,7 +11513,7 @@ body {
   position: absolute;
   top: 1px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -11525,7 +11525,7 @@ body {
   position: absolute;
   top: 23px;
   left: 235px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -11612,7 +11612,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -11672,7 +11672,7 @@ body {
   position: absolute;
   top: 1px;
   left: 15px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -11724,7 +11724,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -11748,7 +11748,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -11775,7 +11775,7 @@ body {
   position: absolute;
   top: 7px;
   left: 24px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -11868,7 +11868,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -11906,7 +11906,7 @@ body {
   position: absolute;
   top: 1px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -11918,7 +11918,7 @@ body {
   position: absolute;
   top: 23px;
   left: 134px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -12005,7 +12005,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12065,7 +12065,7 @@ body {
   position: absolute;
   top: 1px;
   left: 15px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12130,7 +12130,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -12154,7 +12154,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -12181,7 +12181,7 @@ body {
   position: absolute;
   top: 7px;
   left: 24px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -12274,7 +12274,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -12312,7 +12312,7 @@ body {
   position: absolute;
   top: 1px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12324,7 +12324,7 @@ body {
   position: absolute;
   top: 23px;
   left: 133px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -12411,7 +12411,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12471,7 +12471,7 @@ body {
   position: absolute;
   top: 1px;
   left: 15px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12523,7 +12523,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -12547,7 +12547,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -12574,7 +12574,7 @@ body {
   position: absolute;
   top: 7px;
   left: 24px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -12681,7 +12681,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -12719,7 +12719,7 @@ body {
   position: absolute;
   top: 1px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12731,7 +12731,7 @@ body {
   position: absolute;
   top: 23px;
   left: 241px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -12818,7 +12818,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12878,7 +12878,7 @@ body {
   position: absolute;
   top: 1px;
   left: 15px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -12930,7 +12930,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -12954,7 +12954,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -12981,7 +12981,7 @@ body {
   position: absolute;
   top: 7px;
   left: 24px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -13074,7 +13074,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -13112,7 +13112,7 @@ body {
   position: absolute;
   top: 1px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -13124,7 +13124,7 @@ body {
   position: absolute;
   top: 23px;
   left: 178px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -13211,7 +13211,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -13271,7 +13271,7 @@ body {
   position: absolute;
   top: 1px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -13323,7 +13323,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -13347,7 +13347,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -13374,7 +13374,7 @@ body {
   position: absolute;
   top: 7px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -13467,7 +13467,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -13505,7 +13505,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -13517,7 +13517,7 @@ body {
   position: absolute;
   top: 23px;
   left: 135px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -13604,7 +13604,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -13664,7 +13664,7 @@ body {
   position: absolute;
   top: 1px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -13716,7 +13716,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -13740,7 +13740,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -13767,7 +13767,7 @@ body {
   position: absolute;
   top: 7px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -13874,7 +13874,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -13912,7 +13912,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -13924,7 +13924,7 @@ body {
   position: absolute;
   top: 23px;
   left: 217px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -14011,7 +14011,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14071,7 +14071,7 @@ body {
   position: absolute;
   top: 1px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14123,7 +14123,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -14147,7 +14147,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -14174,7 +14174,7 @@ body {
   position: absolute;
   top: 7px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -14267,7 +14267,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -14305,7 +14305,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14317,7 +14317,7 @@ body {
   position: absolute;
   top: 23px;
   left: 151px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -14404,7 +14404,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14464,7 +14464,7 @@ body {
   position: absolute;
   top: 1px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14516,7 +14516,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -14540,7 +14540,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -14567,7 +14567,7 @@ body {
   position: absolute;
   top: 7px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -14660,7 +14660,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -14698,7 +14698,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14710,7 +14710,7 @@ body {
   position: absolute;
   top: 23px;
   left: 158px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -14797,7 +14797,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14857,7 +14857,7 @@ body {
   position: absolute;
   top: 1px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -14922,7 +14922,7 @@ body {
   position: absolute;
   top: 1px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -14946,7 +14946,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -14973,7 +14973,7 @@ body {
   position: absolute;
   top: 7px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -15093,7 +15093,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -15131,7 +15131,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -15143,7 +15143,7 @@ body {
   position: absolute;
   top: 23px;
   left: 225px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -15230,7 +15230,7 @@ body {
   position: absolute;
   top: 1px;
   left: 17px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -15290,7 +15290,7 @@ body {
   position: absolute;
   top: 1px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -15342,7 +15342,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -15366,7 +15366,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -15393,7 +15393,7 @@ body {
   position: absolute;
   top: 7px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -15631,7 +15631,7 @@ body {
   position: absolute;
   top: 6px;
   left: 20px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 13px;
   opacity: 1;
@@ -15657,7 +15657,7 @@ body {
   position: absolute;
   top: 20px;
   left: 216px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Extra Bold;
   font-size: 44px;
   opacity: 1;
@@ -15774,7 +15774,7 @@ body {
   position: absolute;
   top: 25px;
   left: 27px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 20px;
   opacity: 1;
@@ -15800,7 +15800,7 @@ body {
   position: absolute;
   top: 15px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -15904,7 +15904,7 @@ body {
   position: absolute;
   top: 25px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 20px;
   opacity: 1;
@@ -15930,7 +15930,7 @@ body {
   position: absolute;
   top: 15px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -16034,7 +16034,7 @@ body {
   position: absolute;
   top: 25px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 20px;
   opacity: 1;
@@ -16060,7 +16060,7 @@ body {
   position: absolute;
   top: 15px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -16151,7 +16151,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -16248,7 +16248,7 @@ body {
   position: absolute;
   top: 2px;
   left: 492px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 40px;
   opacity: 1;
@@ -16260,7 +16260,7 @@ body {
   position: absolute;
   top: 2px;
   left: 703px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 40px;
   opacity: 1;
@@ -16286,7 +16286,7 @@ body {
   position: absolute;
   top: 10px;
   left: 529px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -16590,7 +16590,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Italic;
   font-size: 16px;
   opacity: 1;
@@ -16660,7 +16660,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -16685,7 +16685,7 @@ body {
   position: absolute;
   top: 1px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -16760,7 +16760,7 @@ body {
   position: absolute;
   top: 2px;
   left: 383px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -16772,7 +16772,7 @@ body {
   position: absolute;
   top: 2px;
   left: 639px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -16798,7 +16798,7 @@ body {
   position: absolute;
   top: 20px;
   left: 407px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -16869,7 +16869,7 @@ body {
   position: absolute;
   top: 12px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -16899,7 +16899,7 @@ body {
   position: absolute;
   top: 12px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -16929,7 +16929,7 @@ body {
   position: absolute;
   top: 12px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -16959,7 +16959,7 @@ body {
   position: absolute;
   top: 12px;
   left: 25px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -17112,7 +17112,7 @@ body {
 .v1_4697 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/5327585/pexels-photo-5327585.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -17155,7 +17155,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -17180,7 +17180,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -17247,7 +17247,7 @@ body {
   position: absolute;
   top: 0px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17272,7 +17272,7 @@ body {
   position: absolute;
   top: 1px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -17312,7 +17312,7 @@ body {
   position: absolute;
   top: 0px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17337,7 +17337,7 @@ body {
   position: absolute;
   top: 1px;
   left: 70px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -17432,7 +17432,7 @@ body {
   position: absolute;
   top: 5px;
   left: 10px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17459,7 +17459,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17527,7 +17527,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17590,7 +17590,7 @@ body {
 .v1_4746 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/8460157/pexels-photo-8460157.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -17659,7 +17659,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -17684,7 +17684,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -17751,7 +17751,7 @@ body {
   position: absolute;
   top: 0px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17776,7 +17776,7 @@ body {
   position: absolute;
   top: 1px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -17816,7 +17816,7 @@ body {
   position: absolute;
   top: 0px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17841,7 +17841,7 @@ body {
   position: absolute;
   top: 1px;
   left: 70px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -17936,7 +17936,7 @@ body {
   position: absolute;
   top: 5px;
   left: 10px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -17963,7 +17963,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18031,7 +18031,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18071,7 +18071,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18111,7 +18111,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18151,7 +18151,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18191,7 +18191,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18231,7 +18231,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18271,7 +18271,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18283,7 +18283,7 @@ body {
   position: absolute;
   top: 79px;
   left: 100px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -18320,7 +18320,7 @@ body {
 .v1_4827 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/6749772/pexels-photo-6749772.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -18389,7 +18389,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -18414,7 +18414,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -18481,7 +18481,7 @@ body {
   position: absolute;
   top: 0px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18506,7 +18506,7 @@ body {
   position: absolute;
   top: 1px;
   left: 48px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -18546,7 +18546,7 @@ body {
   position: absolute;
   top: 0px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18571,7 +18571,7 @@ body {
   position: absolute;
   top: 1px;
   left: 70px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -18666,7 +18666,7 @@ body {
   position: absolute;
   top: 5px;
   left: 10px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18693,7 +18693,7 @@ body {
   position: absolute;
   top: 5px;
   left: 10px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18761,7 +18761,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18801,7 +18801,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18841,7 +18841,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18881,7 +18881,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18921,7 +18921,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -18961,7 +18961,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19001,7 +19001,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19013,7 +19013,7 @@ body {
   position: absolute;
   top: 79px;
   left: 100px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -19064,7 +19064,7 @@ body {
 .v1_4911 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/5215024/pexels-photo-5215024.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -19133,7 +19133,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -19158,7 +19158,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -19225,7 +19225,7 @@ body {
   position: absolute;
   top: 0px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19250,7 +19250,7 @@ body {
   position: absolute;
   top: 1px;
   left: 48px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -19290,7 +19290,7 @@ body {
   position: absolute;
   top: 0px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19315,7 +19315,7 @@ body {
   position: absolute;
   top: 1px;
   left: 70px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -19410,7 +19410,7 @@ body {
   position: absolute;
   top: 5px;
   left: 10px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19437,7 +19437,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19505,7 +19505,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19545,7 +19545,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19585,7 +19585,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19625,7 +19625,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19662,7 +19662,7 @@ body {
 .v1_4974 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/5998474/pexels-photo-5998474.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -19705,7 +19705,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -19730,7 +19730,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -19797,7 +19797,7 @@ body {
   position: absolute;
   top: 0px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19822,7 +19822,7 @@ body {
   position: absolute;
   top: 1px;
   left: 48px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -19862,7 +19862,7 @@ body {
   position: absolute;
   top: 0px;
   left: 39px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -19887,7 +19887,7 @@ body {
   position: absolute;
   top: 1px;
   left: 58px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -19982,7 +19982,7 @@ body {
   position: absolute;
   top: 5px;
   left: 10px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20009,7 +20009,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20077,7 +20077,7 @@ body {
   position: absolute;
   top: 0px;
   left: 3px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20140,7 +20140,7 @@ body {
 .v1_5023 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/6749778/pexels-photo-6749778.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -20209,7 +20209,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -20234,7 +20234,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -20301,7 +20301,7 @@ body {
   position: absolute;
   top: 0px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20326,7 +20326,7 @@ body {
   position: absolute;
   top: 1px;
   left: 47px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -20366,7 +20366,7 @@ body {
   position: absolute;
   top: 0px;
   left: 40px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20391,7 +20391,7 @@ body {
   position: absolute;
   top: 1px;
   left: 71px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -20486,7 +20486,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20513,7 +20513,7 @@ body {
   position: absolute;
   top: 5px;
   left: 12px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20581,7 +20581,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20621,7 +20621,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20661,7 +20661,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20701,7 +20701,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20752,7 +20752,7 @@ body {
 .v1_5089 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/7088524/pexels-photo-7088524.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -20821,7 +20821,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -20846,7 +20846,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -20913,7 +20913,7 @@ body {
   position: absolute;
   top: 0px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -20938,7 +20938,7 @@ body {
   position: absolute;
   top: 1px;
   left: 49px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -20978,7 +20978,7 @@ body {
   position: absolute;
   top: 0px;
   left: 40px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21003,7 +21003,7 @@ body {
   position: absolute;
   top: 1px;
   left: 71px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -21098,7 +21098,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21125,7 +21125,7 @@ body {
   position: absolute;
   top: 5px;
   left: 12px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21193,7 +21193,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21233,7 +21233,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21273,7 +21273,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21313,7 +21313,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21353,7 +21353,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21390,7 +21390,7 @@ body {
 .v1_5157 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -21459,7 +21459,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -21484,7 +21484,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -21551,7 +21551,7 @@ body {
   position: absolute;
   top: 0px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21576,7 +21576,7 @@ body {
   position: absolute;
   top: 1px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -21616,7 +21616,7 @@ body {
   position: absolute;
   top: 0px;
   left: 40px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21641,7 +21641,7 @@ body {
   position: absolute;
   top: 1px;
   left: 71px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -21736,7 +21736,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21763,7 +21763,7 @@ body {
   position: absolute;
   top: 5px;
   left: 12px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21831,7 +21831,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21871,7 +21871,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21911,7 +21911,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21951,7 +21951,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -21991,7 +21991,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22031,7 +22031,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22071,7 +22071,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22083,7 +22083,7 @@ body {
   position: absolute;
   top: 79px;
   left: 101px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -22120,7 +22120,7 @@ body {
 .v1_5238 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/5214993/pexels-photo-5214993.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -22189,7 +22189,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -22214,7 +22214,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -22281,7 +22281,7 @@ body {
   position: absolute;
   top: 0px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22306,7 +22306,7 @@ body {
   position: absolute;
   top: 1px;
   left: 49px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -22346,7 +22346,7 @@ body {
   position: absolute;
   top: 0px;
   left: 40px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22371,7 +22371,7 @@ body {
   position: absolute;
   top: 1px;
   left: 71px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -22466,7 +22466,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22493,7 +22493,7 @@ body {
   position: absolute;
   top: 5px;
   left: 12px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22561,7 +22561,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22601,7 +22601,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22641,7 +22641,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22681,7 +22681,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22721,7 +22721,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22761,7 +22761,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22801,7 +22801,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -22813,7 +22813,7 @@ body {
   position: absolute;
   top: 79px;
   left: 101px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -22877,7 +22877,7 @@ body {
 .v1_5322 {
   width: 398px;
   height: 240px;
-  background: none;
+  background: url("https://images.pexels.com/photos/8376270/pexels-photo-8376270.jpeg?auto=compress&cs=tinysrgb&w=1200");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -22946,7 +22946,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 22px;
   opacity: 1;
@@ -22971,7 +22971,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   opacity: 1;
   text-align: left;
@@ -23038,7 +23038,7 @@ body {
   position: absolute;
   top: 0px;
   left: 46px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23063,7 +23063,7 @@ body {
   position: absolute;
   top: 1px;
   left: 45px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -23103,7 +23103,7 @@ body {
   position: absolute;
   top: 0px;
   left: 40px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23128,7 +23128,7 @@ body {
   position: absolute;
   top: 1px;
   left: 71px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -23223,7 +23223,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23250,7 +23250,7 @@ body {
   position: absolute;
   top: 5px;
   left: 11px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23318,7 +23318,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23358,7 +23358,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23398,7 +23398,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23438,7 +23438,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23478,7 +23478,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23518,7 +23518,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23558,7 +23558,7 @@ body {
   position: absolute;
   top: 0px;
   left: 4px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -23570,7 +23570,7 @@ body {
   position: absolute;
   top: 79px;
   left: 101px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -23804,7 +23804,7 @@ body {
   position: absolute;
   top: 2px;
   left: 496px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -23816,7 +23816,7 @@ body {
   position: absolute;
   top: 2px;
   left: 799px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 48px;
   opacity: 1;
@@ -23842,7 +23842,7 @@ body {
   position: absolute;
   top: 20px;
   left: 543px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -23905,7 +23905,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -23930,7 +23930,7 @@ body {
   position: absolute;
   top: 0px;
   left: 40px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -23968,7 +23968,7 @@ body {
   position: absolute;
   top: 20px;
   left: 57px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -24030,7 +24030,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24055,7 +24055,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -24080,7 +24080,7 @@ body {
   position: absolute;
   top: 0px;
   left: 91px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24116,7 +24116,7 @@ body {
   position: absolute;
   top: 20px;
   left: 91px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24128,7 +24128,7 @@ body {
   position: absolute;
   top: 40px;
   left: 79px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -24177,7 +24177,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24202,7 +24202,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -24227,7 +24227,7 @@ body {
   position: absolute;
   top: 0px;
   left: 87px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24263,7 +24263,7 @@ body {
   position: absolute;
   top: 20px;
   left: 91px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24275,7 +24275,7 @@ body {
   position: absolute;
   top: 40px;
   left: 79px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -24324,7 +24324,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24349,7 +24349,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -24374,7 +24374,7 @@ body {
   position: absolute;
   top: 0px;
   left: 91px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24410,7 +24410,7 @@ body {
   position: absolute;
   top: 20px;
   left: 91px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24422,7 +24422,7 @@ body {
   position: absolute;
   top: 40px;
   left: 79px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -24458,7 +24458,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24506,7 +24506,7 @@ body {
   position: absolute;
   top: 0px;
   left: 73px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -24578,7 +24578,7 @@ body {
   position: absolute;
   top: 0px;
   left: 19px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -24617,7 +24617,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24665,7 +24665,7 @@ body {
   position: absolute;
   top: 0px;
   left: 75px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -24739,7 +24739,7 @@ body {
   position: absolute;
   top: 0px;
   left: 19px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -24814,7 +24814,7 @@ body {
   position: absolute;
   top: 2px;
   left: 585px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 40px;
   opacity: 1;
@@ -24826,7 +24826,7 @@ body {
   position: absolute;
   top: 2px;
   left: 689px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 40px;
   opacity: 1;
@@ -24852,7 +24852,7 @@ body {
   position: absolute;
   top: 10px;
   left: 576px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -24996,7 +24996,7 @@ body {
   position: absolute;
   top: 6px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -25048,7 +25048,7 @@ body {
   position: absolute;
   top: 0px;
   left: 107px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -25179,7 +25179,7 @@ body {
   position: absolute;
   top: 6px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -25231,7 +25231,7 @@ body {
   position: absolute;
   top: 0px;
   left: 87px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -25362,7 +25362,7 @@ body {
   position: absolute;
   top: 6px;
   left: 16px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -25414,7 +25414,7 @@ body {
   position: absolute;
   top: 0px;
   left: 125px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -25468,7 +25468,7 @@ body {
   position: absolute;
   top: 14px;
   left: 51px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -25592,7 +25592,7 @@ body {
   position: absolute;
   top: 5px;
   left: 26px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 13px;
   opacity: 1;
@@ -25617,7 +25617,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 44px;
   opacity: 1;
@@ -25629,7 +25629,7 @@ body {
   position: absolute;
   top: 0px;
   left: 243px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 44px;
   opacity: 1;
@@ -25641,7 +25641,7 @@ body {
   position: absolute;
   top: 53px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 44px;
   opacity: 1;
@@ -25667,7 +25667,7 @@ body {
   position: absolute;
   top: 20px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -25782,7 +25782,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 19px;
   opacity: 1;
@@ -25807,7 +25807,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -25894,7 +25894,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 19px;
   opacity: 1;
@@ -25919,7 +25919,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -26006,7 +26006,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 19px;
   opacity: 1;
@@ -26031,7 +26031,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -26095,7 +26095,7 @@ body {
   position: absolute;
   top: 3px;
   left: 37px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 15px;
   opacity: 1;
@@ -26146,7 +26146,7 @@ body {
   position: absolute;
   top: 15px;
   left: 37px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 15px;
   opacity: 1;
@@ -26197,7 +26197,7 @@ body {
   position: absolute;
   top: 15px;
   left: 37px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 15px;
   opacity: 1;
@@ -26248,7 +26248,7 @@ body {
   position: absolute;
   top: 15px;
   left: 37px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 15px;
   opacity: 1;
@@ -26326,7 +26326,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -26338,7 +26338,7 @@ body {
   position: absolute;
   top: 13px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 17px;
   opacity: 1;
@@ -26401,7 +26401,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 11px;
   opacity: 1;
@@ -26413,7 +26413,7 @@ body {
   position: absolute;
   top: 13px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 17px;
   opacity: 1;
@@ -26546,7 +26546,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 30px;
   opacity: 1;
@@ -26572,7 +26572,7 @@ body {
   position: absolute;
   top: 25px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 20px;
   opacity: 1;
@@ -26654,7 +26654,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 12px;
   opacity: 1;
@@ -26891,7 +26891,7 @@ body {
   position: absolute;
   top: 0px;
   left: 193px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 41px;
   opacity: 1;
@@ -26917,7 +26917,7 @@ body {
   position: absolute;
   top: 18px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 17px;
   opacity: 1;
@@ -26989,7 +26989,7 @@ body {
   position: absolute;
   top: 14px;
   left: 34px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Bold;
   font-size: 16px;
   opacity: 1;
@@ -27309,7 +27309,7 @@ body {
   position: absolute;
   top: 16px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 12px;
   opacity: 1;
@@ -27712,7 +27712,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 16px;
   opacity: 1;
@@ -27751,7 +27751,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -27777,7 +27777,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -27803,7 +27803,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -27829,7 +27829,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -27855,7 +27855,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -27881,7 +27881,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -27919,7 +27919,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 16px;
   opacity: 1;
@@ -27958,7 +27958,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -27984,7 +27984,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -28010,7 +28010,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -28036,7 +28036,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -28074,7 +28074,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 16px;
   opacity: 1;
@@ -28113,7 +28113,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -28139,7 +28139,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -28165,7 +28165,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -28191,7 +28191,7 @@ body {
   position: absolute;
   top: 10px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 15px;
   opacity: 1;
@@ -28286,7 +28286,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -28359,7 +28359,7 @@ body {
   position: absolute;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 16px;
   opacity: 1;
@@ -28854,7 +28854,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -28879,7 +28879,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -28904,7 +28904,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -28929,7 +28929,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -28954,7 +28954,7 @@ body {
   position: absolute;
   top: 1px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Regular;
   font-size: 14px;
   opacity: 1;
@@ -29083,7 +29083,7 @@ body {
   position: absolute;
   top: 0px;
   left: 1px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Medium;
   font-size: 14px;
   opacity: 1;
@@ -29739,7 +29739,7 @@ body {
   position: relative;
   top: 0px;
   left: 0px;
-  font-family: Stolzl;
+  font-family: Outfit, sans-serif;
   font-weight: Semi Bold;
   font-size: 12px;
   opacity: 1;
@@ -29884,5 +29884,107 @@ body {
   top: 0px;
   left: 0px;
   overflow: hidden;
+}
+
+/* Theme and spacing normalization for section blocks */
+body {
+  background: #f5f8ff;
+}
+
+.v1_2978 {
+  background: #ffffff;
+  border-top: 1px solid #edf2ff;
+  border-bottom: 1px solid #edf2ff;
+}
+
+.v1_3147,
+.v1_3461,
+.v1_3942,
+.v1_4659,
+.v1_5542 {
+  background: #ffffff;
+}
+
+.v1_3308,
+.v1_3742,
+.v1_4013,
+.v1_5421 {
+  background: #f7faff;
+}
+
+.v1_3353,
+.v1_3848,
+.v1_4591,
+.v1_5611 {
+  background: #eff4ff;
+}
+
+.v1_5786 {
+  background: linear-gradient(135deg, #2a006f 0%, #3d0195 55%, #5a14c4 100%);
+}
+
+.v1_3147,
+.v1_3353,
+.v1_3461,
+.v1_3742,
+.v1_3848 {
+  padding: 96px 0;
+}
+
+.v1_3942,
+.v1_4591,
+.v1_5421,
+.v1_5542,
+.v1_5611 {
+  padding: 88px 0;
+}
+
+.v1_4013,
+.v1_4659 {
+  padding: 64px 0;
+}
+
+.v1_5786 {
+  padding: 56px 0;
+}
+
+.v1_3307,
+.v1_3460,
+.v1_3741,
+.v1_3847 {
+  top: 96px;
+}
+
+.v1_4012,
+.v1_4658,
+.v1_5541,
+.v1_5610,
+.v1_5725 {
+  top: 88px;
+}
+
+.v1_4523,
+.v1_5420,
+.v1_5971 {
+  top: 64px;
+}
+
+/* Benefits image sizing fix */
+.v1_3946 {
+  width: 560px;
+  height: 390px;
+  top: 96px;
+  left: 88px;
+}
+
+.v1_3948 {
+  width: 540px;
+  height: 390px;
+  top: 96px;
+  left: 96px;
+  background-size: contain;
+  background-position: center center;
+  border-radius: 24px;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, .12);
 }
 

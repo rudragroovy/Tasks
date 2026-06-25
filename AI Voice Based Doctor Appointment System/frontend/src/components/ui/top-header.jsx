@@ -1,7 +1,7 @@
 import { useState, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, User, Mic, Bell, LogOut, Activity, X, Menu, History, Users, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, User, Mic, Bell, LogOut, Activity, X, Menu, History, Users, ChevronRight, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppIcon from '../branding/AppIcon';
@@ -14,6 +14,9 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
   const { user, logout } = useAuth();
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isMedicalHistoryTabActive =
+    (location.pathname === '/patient/account' || location.pathname === '/account') &&
+    new URLSearchParams(location.search).get('tab') === 'medical-history';
 
   // Triage state
   const [triageStep, setTriageStep] = useState('select_patient');
@@ -79,6 +82,15 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
           >
             <User className="w-4 h-4" /> Doctors
           </button>
+          {user ? (
+            <button
+              type="button"
+              onClick={() => navigate('/patient/chat')}
+              className={`font-bold text-sm flex items-center gap-1.5 transition-colors cursor-pointer ${location.pathname === '/patient/chat' ? 'text-primary-700' : 'text-slate-500 hover:text-primary-600'}`}
+            >
+              <MessageSquare className="w-4 h-4" /> Chat
+            </button>
+          ) : null}
           <button type="button"
             onClick={handleOpenTriage}
             className="bg-primary-50 text-primary-700 hover:bg-primary-100 hover:text-primary-800 px-4 py-2 rounded-full font-bold text-sm flex items-center gap-1.5 transition-all shadow-sm shadow-primary-900/5 cursor-pointer border border-primary-100"
@@ -106,7 +118,7 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
           </div>
           <button
             type="button"
-            onClick={() => { logout(); navigate('/login'); }}
+            onClick={() => { logout(); navigate('/'); }}
             className="ml-2 text-slate-400 hover:text-red-500 transition-colors cursor-pointer min-h-11 min-w-11"
             title="Sign Out"
             aria-label="Sign out"
@@ -278,6 +290,15 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
                 >
                   <User className="w-5 h-5" /> Doctors
                 </button>
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={() => { setIsSidebarOpen(false); navigate('/patient/chat'); }}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${location.pathname === '/patient/chat' ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                  >
+                    <MessageSquare className="w-5 h-5" /> Chat
+                  </button>
+                ) : null}
                 <button type="button"
                   onClick={() => { setIsSidebarOpen(false); navigate('/family-members'); }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${location.pathname === '/family-members' ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -285,15 +306,15 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
                   <Users className="w-5 h-5" /> Family Members
                 </button>
                 <button type="button"
-                  onClick={() => { setIsSidebarOpen(false); navigate('/medical-history'); }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${location.pathname === '/medical-history' ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                  onClick={() => { setIsSidebarOpen(false); navigate('/patient/account?tab=medical-history'); }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${isMedicalHistoryTabActive ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
                 >
                   <History className="w-5 h-5" /> Medical History
                 </button>
               </div>
 
               <div className="p-6 border-t border-slate-100">
-                <button type="button" onClick={() => { logout(); navigate('/login'); }} className="flex items-center gap-3 text-slate-500 hover:text-red-600 font-bold w-full transition-colors cursor-pointer">
+                <button type="button" onClick={() => { logout(); navigate('/'); }} className="flex items-center gap-3 text-slate-500 hover:text-red-600 font-bold w-full transition-colors cursor-pointer">
                   <LogOut className="w-5 h-5" /> Sign Out
                 </button>
               </div>

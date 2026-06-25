@@ -13,6 +13,13 @@ const {
   getSlotDurationForMode,
   parseDateOnly,
 } = require('../utils/doctorAvailability');
+const {
+  buildDoctorProfileResponse,
+  sanitizeDoctorProfilePayload,
+  sanitizeDoctorBankPayload,
+  sanitizeDoctorSettingsPayload,
+  buildDoctorSettingsResponse,
+} = require('../services/doctorProfileService');
 
 const router = express.Router();
 const DAY_COUNT = 7;
@@ -295,6 +302,8 @@ router.get('/', authenticate, async (req, res) => {
       specialization: { name: d.specialization.name },
       isOnline: d.isOnline,
       fee: parseFloat(d.fee) || 150.00,
+      averageRating: Number(d.averageRating || 0),
+      reviewCount: Number(d.reviewCount || 0),
       slotDurationMinutes: getSlotDurationForMode(d, 'VIDEO'),
       slotDurationsByMode: {
         VIDEO: getSlotDurationForMode(d, 'VIDEO'),
@@ -335,6 +344,195 @@ router.put('/me/online', authenticate, async (req, res) => {
   }
 });
 
+router.get('/me/profile', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'DOCTOR') {
+      return res.status(403).json({ error: 'Only doctors can access profile' });
+    }
+
+    const doctor = await prisma.doctor.findUnique({
+      where: { userId: req.user.id },
+      select: {
+        userId: true,
+        isOnline: true,
+        showOnlineOnLogin: true,
+        givenName: true,
+        secondaryName: true,
+        familyName: true,
+        noFamilyName: true,
+        gender: true,
+        dateOfBirth: true,
+        phoneCode: true,
+        phone: true,
+        address: true,
+        experienceRange: true,
+        qualification: true,
+        practitionerType: true,
+        services: true,
+        about: true,
+        ahpraNumber: true,
+        prescriberNumber: true,
+        providerNumber: true,
+        hpiIndividualNumber: true,
+        hpioNumber: true,
+        saveMyHINumber: true,
+        mimsUserId: true,
+        mimsEulaAccepted: true,
+        mimsTermsAccepted: true,
+        prescriptionEntityId: true,
+        prescriptionAccessEnabled: true,
+        accountHolderName: true,
+        accountNumber: true,
+        routingNumber: true,
+        autoDraftNotesEnabled: true,
+        otpDeliveryChannel: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor profile not found' });
+    }
+
+    res.json(buildDoctorProfileResponse(doctor, doctor.user));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch doctor profile' });
+  }
+});
+
+router.put('/me/profile', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'DOCTOR') {
+      return res.status(403).json({ error: 'Only doctors can update profile' });
+    }
+
+    const existing = await prisma.doctor.findUnique({
+      where: { userId: req.user.id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Doctor profile not found' });
+    }
+
+    const { userData, doctorData } = sanitizeDoctorProfilePayload(req.body || {}, existing, existing.user);
+    const updatedDoctor = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: req.user.id },
+        data: userData,
+      });
+
+      return tx.doctor.update({
+        where: { userId: req.user.id },
+        data: doctorData,
+        select: {
+          userId: true,
+          isOnline: true,
+          showOnlineOnLogin: true,
+          givenName: true,
+          secondaryName: true,
+          familyName: true,
+          noFamilyName: true,
+          gender: true,
+          dateOfBirth: true,
+          phoneCode: true,
+          phone: true,
+          address: true,
+          experienceRange: true,
+          qualification: true,
+          practitionerType: true,
+          services: true,
+          about: true,
+          ahpraNumber: true,
+          prescriberNumber: true,
+          providerNumber: true,
+          hpiIndividualNumber: true,
+          hpioNumber: true,
+          saveMyHINumber: true,
+          mimsUserId: true,
+          mimsEulaAccepted: true,
+          mimsTermsAccepted: true,
+          prescriptionEntityId: true,
+          prescriptionAccessEnabled: true,
+          accountHolderName: true,
+          accountNumber: true,
+          routingNumber: true,
+          autoDraftNotesEnabled: true,
+          otpDeliveryChannel: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+    });
+
+    res.json(buildDoctorProfileResponse(updatedDoctor, updatedDoctor.user));
+  } catch (error) {
+    console.error(error);
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    if (error?.code === 'P2002') {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    res.status(500).json({ error: 'Failed to update doctor profile' });
+  }
+});
+
+router.put('/me/bank-details', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'DOCTOR') {
+      return res.status(403).json({ error: 'Only doctors can update bank details' });
+    }
+
+    const existing = await prisma.doctor.findUnique({
+      where: { userId: req.user.id },
+      select: {
+        accountHolderName: true,
+        accountNumber: true,
+        routingNumber: true,
+      },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Doctor profile not found' });
+    }
+
+    const updatedBankDetails = sanitizeDoctorBankPayload(req.body || {}, existing);
+    const updated = await prisma.doctor.update({
+      where: { userId: req.user.id },
+      data: updatedBankDetails,
+      select: {
+        accountHolderName: true,
+        accountNumber: true,
+        routingNumber: true,
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update bank details' });
+  }
+});
+
 router.get('/me/settings', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'DOCTOR') {
@@ -345,6 +543,8 @@ router.get('/me/settings', authenticate, async (req, res) => {
       where: { userId: req.user.id },
       select: {
         showOnlineOnLogin: true,
+        autoDraftNotesEnabled: true,
+        otpDeliveryChannel: true,
         isOnline: true,
       },
     });
@@ -353,7 +553,7 @@ router.get('/me/settings', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Doctor profile not found' });
     }
 
-    res.json(settings);
+    res.json(buildDoctorSettingsResponse(settings));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch doctor settings' });
@@ -366,28 +566,28 @@ router.put('/me/settings', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Only doctors can update settings' });
     }
 
-    const { showOnlineOnLogin } = req.body || {};
-    if (typeof showOnlineOnLogin !== 'boolean') {
-      return res.status(400).json({ error: 'showOnlineOnLogin must be a boolean' });
-    }
-
     const existing = await prisma.doctor.findUnique({
       where: { userId: req.user.id },
-      select: { isOnline: true },
+      select: {
+        isOnline: true,
+        showOnlineOnLogin: true,
+        autoDraftNotesEnabled: true,
+        otpDeliveryChannel: true,
+      },
     });
 
     if (!existing) {
       return res.status(404).json({ error: 'Doctor profile not found' });
     }
 
+    const settingsUpdate = sanitizeDoctorSettingsPayload(req.body || {}, existing);
     const updated = await prisma.doctor.update({
       where: { userId: req.user.id },
-      data: {
-        showOnlineOnLogin,
-        isOnline: showOnlineOnLogin,
-      },
+      data: settingsUpdate,
       select: {
         showOnlineOnLogin: true,
+        autoDraftNotesEnabled: true,
+        otpDeliveryChannel: true,
         isOnline: true,
       },
     });
@@ -399,9 +599,12 @@ router.put('/me/settings', authenticate, async (req, res) => {
       }
     }
 
-    res.json(updated);
+    res.json(buildDoctorSettingsResponse(updated));
   } catch (error) {
     console.error(error);
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Failed to update doctor settings' });
   }
 });

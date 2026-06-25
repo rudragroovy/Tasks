@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Avatar, Button, Card, ConfigProvider, Empty, Input, Pagination, Typography } from 'antd';
 import { FileBadge2, FileText, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
+import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -104,17 +105,29 @@ function resolveDocumentUrl(rawUrl) {
 export default function DoctorMedicalDocuments() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(Boolean(user?.doctorProfile?.isOnline));
   const [searchText, setSearchText] = useState('');
-  const [activeDocType, setActiveDocType] = useState('PRESCRIPTION');
+  const resolveDocTypeFromQuery = () => {
+    const requestedType = searchParams.get('type');
+    if (DOCUMENT_TYPES.some((docType) => docType.key === requestedType)) {
+      return requestedType;
+    }
+    return 'PRESCRIPTION';
+  };
+  const [activeDocType, setActiveDocType] = useState(resolveDocTypeFromQuery);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setIsOnline(Boolean(user?.doctorProfile?.isOnline));
   }, [user?.doctorProfile?.isOnline]);
+
+  useEffect(() => {
+    setActiveDocType(resolveDocTypeFromQuery());
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -140,26 +153,10 @@ export default function DoctorMedicalDocuments() {
   const pendingCount = appointments.filter((appointment) => appointment.status === 'PENDING').length;
   const activeTypeConfig = DOCUMENT_TYPES.find((type) => type.key === activeDocType) || DOCUMENT_TYPES[0];
 
-  const doctorNavItems = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'waiting-room', label: 'Waiting Room' },
-    { key: 'appointments', label: 'My Appointment' },
-    { key: 'patients', label: 'My Patients' },
-    { key: 'chat', label: 'Chat' },
-    { key: 'more', label: 'More Options' },
-  ];
+  const doctorNavItems = DOCTOR_NAV_ITEMS;
 
   const handleDoctorNavClick = (key) => {
-    if (key === 'dashboard') navigate('/dashboard');
-    if (key === 'waiting-room') navigate('/doctor/waiting-room');
-    if (key === 'appointments') navigate('/doctor/appointments');
-    if (key === 'patients') navigate('/doctor/patients');
-    if (key === 'chat') navigate('/doctor/chat');
-    if (key === 'pay-out') navigate('/doctor/payouts');
-    if (key === 'medical-documents') navigate('/doctor/medical-documents');
-    if (key === 'invoices') navigate('/doctor/invoices');
-    if (key === 'my-profile') navigate('/doctor/profile');
-    if (key === 'change-password') navigate('/doctor/profile?tab=settings');
+    navigateDoctorNavClick(key, navigate);
   };
 
   const handleToggleOnline = async () => {
@@ -238,20 +235,27 @@ export default function DoctorMedicalDocuments() {
     return filteredDocuments.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredDocuments, currentPage]);
 
+  const handleDocTypeChange = (docTypeKey) => {
+    setActiveDocType(docTypeKey);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('type', docTypeKey);
+    setSearchParams(nextParams, { replace: true });
+  };
+
   return (
     <ConfigProvider
       theme={{
         token: {
           colorPrimary: '#0e7490',
           borderRadius: 12,
-          fontFamily: '"Noto Sans", sans-serif',
+          fontFamily: '"Outfit", sans-serif',
         },
       }}
     >
       <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
         <SharedNavbar
           user={user}
-          brandLabel="MyDrScripts"
+          brandLabel="CareBridge"
           onLogoClick={() => navigate('/dashboard')}
           navItems={doctorNavItems}
           activeTab="more"
@@ -287,7 +291,7 @@ export default function DoctorMedicalDocuments() {
                   <button
                     type="button"
                     key={docType.key}
-                    onClick={() => setActiveDocType(docType.key)}
+                    onClick={() => handleDocTypeChange(docType.key)}
                     className={`rounded-xl px-6 py-2.5 text-base font-bold transition-colors ${
                       isActive
                         ? 'bg-primary-700 text-white shadow-sm'

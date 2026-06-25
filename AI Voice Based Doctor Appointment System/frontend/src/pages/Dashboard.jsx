@@ -8,6 +8,7 @@ import { TopHeader } from '../components/ui/top-header';
 import { Stethoscope, Mic, FileText, Video, CalendarClock, X, MessageSquare, Phone, PhoneOff, Clock, LayoutDashboard, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDoctorName } from '../utils/doctorName';
+import AppointmentReviewModal from '../components/reviews/AppointmentReviewModal';
 
 const AIVoiceAssistant = lazy(() => import('../components/AIVoiceAssistant'));
 const DoctorDashboard = lazy(() => import('./DoctorDashboard'));
@@ -23,6 +24,7 @@ export default function Dashboard() {
   const [cancelingAppointmentId, setCancelingAppointmentId] = useState(null);
   const [cancelTargetAppointmentId, setCancelTargetAppointmentId] = useState(null);
   const [cancelErrorMessage, setCancelErrorMessage] = useState('');
+  const [reviewTargetAppointment, setReviewTargetAppointment] = useState(null);
   const [, setDismissedDeclineRevision] = useState(0);
   const [payingAppointmentId, setPayingAppointmentId] = useState(null);
   
@@ -254,6 +256,17 @@ export default function Dashboard() {
       setDismissedDeclineRevision((prev) => prev + 1);
     }
   };
+
+  const handleReviewSubmitted = useCallback((review) => {
+    if (!review?.appointmentId) return;
+    setAppointments((prev) =>
+      prev.map((appointment) =>
+        appointment.id === review.appointmentId
+          ? { ...appointment, review }
+          : appointment
+      )
+    );
+  }, []);
 
   if (user?.role === 'DOCTOR') {
     return (
@@ -597,7 +610,7 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-500 mt-1">Recent consultations and prescriptions</p>
               </div>
               <button
-                onClick={() => navigate('/medical-history')}
+                onClick={() => navigate('/patient/account?tab=medical-history')}
                 className="px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 text-[11px] font-black uppercase tracking-wide transition-colors shrink-0 cursor-pointer"
               >
                 View All
@@ -662,12 +675,33 @@ export default function Dashboard() {
                         {apt.aiSummary?.primary_symptom || 'General consultation regarding health concerns.'}
                       </p>
                     </div>
+                    <div className="ml-2 mt-3 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-slate-400">
+                        {apt.review
+                          ? `Rated ${apt.review.rating}/5`
+                          : 'Not rated yet'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setReviewTargetAppointment(apt);
+                        }}
+                        className={`rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wide transition-colors ${
+                          apt.review
+                            ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+                        }`}
+                      >
+                        {apt.review ? 'View Review' : 'Rate Doctor'}
+                      </button>
+                    </div>
                   </motion.div>
                 ))}
 
                 {pastAppointments.length > 5 && (
                   <button
-                    onClick={() => navigate('/medical-history')}
+                    onClick={() => navigate('/patient/account?tab=medical-history')}
                     className="w-full py-3 mt-1 border border-slate-200 rounded-xl text-slate-600 font-bold text-sm hover:bg-slate-50 hover:text-slate-900 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     View More Records
@@ -684,6 +718,10 @@ export default function Dashboard() {
          <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-primary-600 cursor-pointer">
            <LayoutDashboard className="w-5 h-5" />
            <span className="text-[10px] font-bold">Home</span>
+         </button>
+         <button onClick={() => navigate('/patient/chat')} className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+           <MessageSquare className="w-5 h-5" />
+           <span className="text-[10px] font-bold">Chat</span>
          </button>
          <button onClick={() => setIsAIModalOpen(true)} className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 relative -top-5 cursor-pointer">
            <div className="w-14 h-14 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl border-4 border-white">
@@ -766,6 +804,13 @@ export default function Dashboard() {
           onClose={() => setSelectedHistoryApt(null)} 
         />
       )}
+
+      <AppointmentReviewModal
+        open={Boolean(reviewTargetAppointment)}
+        appointment={reviewTargetAppointment}
+        onClose={() => setReviewTargetAppointment(null)}
+        onSubmitted={handleReviewSubmitted}
+      />
 
       <ConfirmDialog
         open={Boolean(cancelTargetAppointmentId)}

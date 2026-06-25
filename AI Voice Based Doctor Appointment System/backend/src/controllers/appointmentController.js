@@ -10,6 +10,7 @@ const {
   getWorkingHoursForDate,
 } = require('../utils/doctorAvailability');
 const { formatDoctorName } = require('../utils/doctorName');
+const { getConnectedDoctorIds } = require('../socket/doctorPresenceStore');
 
 const SLOT_FREE_STATUSES = new Set(['CANCELLED', 'REJECTED']);
 const SCHEDULED_APPOINTMENT_TYPE = 'SCHEDULED';
@@ -87,15 +88,30 @@ exports.getDoctors = async (req, res) => {
       where.specialization = { name: { contains: specializationName, mode: 'insensitive' } };
     }
     if (shouldFilterOnlineOnly) {
+      const connectedDoctorIds = getConnectedDoctorIds();
+      if (connectedDoctorIds.length === 0) {
+        return res.json([]);
+      }
+      where.userId = { in: connectedDoctorIds };
       where.isOnline = true;
     }
 
     const doctors = await prisma.doctor.findMany({
       where,
-      include: {
-        user: { select: { name: true, email: true } },
-        specialization: true
-      }
+      select: {
+        userId: true,
+        isOnline: true,
+        fee: true,
+        qualification: true,
+        experienceRange: true,
+        averageRating: true,
+        reviewCount: true,
+        slotDurationMinutesVideo: true,
+        slotDurationMinutesAudio: true,
+        slotDurationMinutesInPerson: true,
+        user: { select: { id: true, name: true, email: true } },
+        specialization: { select: { id: true, name: true } },
+      },
     });
 
     res.json(doctors);
@@ -553,6 +569,7 @@ exports.getUserAppointments = async (req, res) => {
         patient: { select: { id: true, name: true, email: true } },
         familyMember: true,
         consultation: true,
+        review: true,
         invitedDoctors: true,
         messages: {
           orderBy: { createdAt: 'asc' }
@@ -709,6 +726,7 @@ exports.getAppointmentById = async (req, res) => {
         patient: { select: { id: true, name: true, email: true } },
         familyMember: true,
         consultation: true,
+        review: true,
         invitedDoctors: true,
         messages: {
           orderBy: { createdAt: 'asc' }
