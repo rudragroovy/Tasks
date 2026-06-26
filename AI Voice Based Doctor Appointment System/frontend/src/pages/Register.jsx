@@ -13,9 +13,7 @@ export default function Register({ embedded = false, onOpenLogin = null, onAuthS
     name: '',
     email: '',
     password: '',
-    role: 'PATIENT',
-    specializationId: '',
-    fee: ''
+    role: 'PATIENT'
   });
 
   const handleChange = (e) => {

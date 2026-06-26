@@ -13,6 +13,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
+import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '1480fbbff91244f7a77f0a8ed1359c19';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -910,7 +911,7 @@ export default function MeetingRoom() {
                 <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search by name or specialization..."
+                  placeholder="Search by name or practitioner type..."
                   value={inviteSearchQuery}
                   onChange={e => setInviteSearchQuery(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all text-sm font-medium"
@@ -920,7 +921,7 @@ export default function MeetingRoom() {
               <div className="flex-1 overflow-y-auto min-h-[200px]" style={{ scrollbarWidth: 'thin' }}>
                 {doctorsList.filter(d =>
                   d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) ||
-                  d.specialization.name.toLowerCase().includes(inviteSearchQuery.toLowerCase())
+                  String(getPractitionerTypeLabel(d, '')).toLowerCase().includes(inviteSearchQuery.toLowerCase())
                 ).length === 0 ? (
                   <div className="text-center text-slate-500 py-8 font-medium">
                     No doctors available to invite.
@@ -929,7 +930,7 @@ export default function MeetingRoom() {
                   <div className="space-y-3">
                     {doctorsList.filter(d =>
                       d.user.name.toLowerCase().includes(inviteSearchQuery.toLowerCase()) ||
-                      d.specialization.name.toLowerCase().includes(inviteSearchQuery.toLowerCase())
+                      String(getPractitionerTypeLabel(d, '')).toLowerCase().includes(inviteSearchQuery.toLowerCase())
                     ).map(d => (
                       <div key={d.userId} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-primary-100 bg-slate-50 hover:bg-primary-50/50 transition-colors">
                         <div className="flex items-center gap-3">
@@ -938,7 +939,9 @@ export default function MeetingRoom() {
                           </div>
                           <div>
                             <p className="font-bold text-slate-900 text-sm">{formatDoctorName(d.user.name, d.user.name)}</p>
-                            <p className="text-xs text-slate-500 font-medium">{d.specialization.name}</p>
+                            <p className="text-xs text-slate-500 font-medium">
+                              {getPractitionerTypeLabel(d, 'General Practitioner (GP)')}
+                            </p>
                           </div>
                         </div>
                         <button type="button"
@@ -1044,7 +1047,7 @@ export default function MeetingRoom() {
             <p className="text-slate-900 font-heading font-black text-sm leading-tight truncate">
               {otherName || roomTitle}
             </p>
-            <p className="text-slate-500 text-[10px] font-medium">{consultationModeLabel} · {appointment?.doctor?.specialization || 'Consultation Session'}</p>
+            <p className="text-slate-500 text-[10px] font-medium">{consultationModeLabel} · {getPractitionerTypeLabel(appointment?.doctor, 'Consultation Session')}</p>
           </div>
         </div>
 

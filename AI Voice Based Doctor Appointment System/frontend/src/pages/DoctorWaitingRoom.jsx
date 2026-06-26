@@ -27,6 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -228,10 +229,7 @@ export default function DoctorWaitingRoom() {
   const highlightedDoctorProfile = user?.doctorProfile || highlightedPatient?.doctor?.doctorProfile || null;
   const highlightedCardName = doctorDisplayName;
   const highlightedServiceName =
-    highlightedDoctorProfile?.specialization?.name ||
-    highlightedPatient?.doctor?.doctorProfile?.specialization?.name ||
-    highlightedPatient?.doctor?.specialization?.name ||
-    'General Consultation';
+    getPractitionerTypeLabel(highlightedDoctorProfile || highlightedPatient?.doctor, 'General Consultation');
   const highlightedDoctorExperience = normalizeExperienceLabel(
     highlightedDoctorProfile?.experienceRange || highlightedDoctorProfile?.experience
   );
@@ -259,9 +257,7 @@ export default function DoctorWaitingRoom() {
     serviceType: appointment.type || 'ON_DEMAND',
     consultationFor: appointment.familyMember ? 'Family Member' : 'Self',
     serviceName:
-      appointment.doctor?.doctorProfile?.specialization?.name ||
-      appointment.doctor?.specialization?.name ||
-      '-',
+      getPractitionerTypeLabel(appointment.doctor, '-'),
     consultationMode: appointment.consultationMode || '-',
     appointment,
   }));

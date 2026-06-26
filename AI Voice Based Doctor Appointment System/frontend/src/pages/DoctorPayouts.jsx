@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import { getAppointmentConsultationFee, getPractitionerTypeLabel } from '../utils/doctorConsultation';
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -38,8 +39,7 @@ function formatDateTime(rawDate) {
 }
 
 function getPayoutAmount(appointment) {
-  const fee = Number.parseFloat(appointment?.doctor?.doctorProfile?.fee ?? appointment?.doctor?.fee ?? 0);
-  return Number.isFinite(fee) ? fee : 0;
+  return getAppointmentConsultationFee(appointment);
 }
 
 function getPayoutStatus(appointment) {
@@ -161,9 +161,7 @@ export default function DoctorPayouts() {
         const payoutDate = appointment?.updatedAt || appointment?.createdAt || appointmentDate;
         const patientName = appointment?.familyMember?.name || appointment?.patient?.name || 'Unknown Patient';
         const consultationLabel =
-          appointment?.doctor?.doctorProfile?.specialization?.name ||
-          appointment?.doctor?.specialization?.name ||
-          'Standard Consultation';
+          getPractitionerTypeLabel(appointment?.doctor?.doctorProfile || appointment?.doctor, 'Standard Consultation');
 
         return {
           id: appointment.id,

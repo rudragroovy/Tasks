@@ -227,6 +227,15 @@ const doctorsMenuItems = [
   },
 ];
 
+const serviceTypeRouteMap = {
+  'telehealth-consult': 'telehealth-consultation',
+  prescription: 'prescription',
+  'medical-certificates': 'medical-certificates',
+  'pathology-requests': 'pathology-requests',
+  'radiology-requests': 'radiology-requests',
+  'specialist-referral': 'specialist-referral',
+};
+
 function resolvePostAuthPath(user) {
   return user?.role === 'ADMIN' ? '/admin' : '/dashboard';
 }
@@ -364,6 +373,15 @@ export default function LandingNavbar({ activeKey = null }) {
     setIsPatientMenuOpen(false);
     setIsDoctorMenuOpen(false);
     navigate(`/category/${categoryKey}`);
+  };
+
+  const openServiceTypePage = (serviceTypeKey) => {
+    if (!serviceTypeKey) return;
+    const resolvedType = serviceTypeRouteMap[serviceTypeKey] || serviceTypeKey;
+    setIsPatientMenuOpen(false);
+    setIsDoctorMenuOpen(false);
+    setIsProfileMenuOpen(false);
+    navigate(`/service-type/${resolvedType}`);
   };
 
   const openServicePage = (serviceName) => {
@@ -656,7 +674,7 @@ export default function LandingNavbar({ activeKey = null }) {
                       className={`landing-patient-menu__service-type-btn${isActive ? ' is-active' : ''}`}
                       onMouseEnter={() => handlePatientServiceTypeSelect(serviceType.key)}
                       onFocus={() => handlePatientServiceTypeSelect(serviceType.key)}
-                      onClick={() => handlePatientServiceTypeSelect(serviceType.key)}
+                      onClick={() => openServiceTypePage(serviceType.key)}
                     >
                       <span className="landing-patient-menu__service-type-icon">
                         <Icon size={16} />

@@ -13,6 +13,7 @@ import {
 import AppIcon from '../components/branding/AppIcon';
 import LandingNavbar from '../components/LandingNavbar';
 import { useAuth } from '../context/AuthContext';
+import { CATEGORY_GROUP_TO_SERVICE_TYPE_KEY } from '../data/practitionerServiceCatalog';
 import { getPatientCategoryContent } from '../data/patientCategoryContent';
 import './category-page.css';
 
@@ -79,6 +80,10 @@ export default function CategoryPage() {
     const params = new URLSearchParams();
     params.set('category', categoryData.key);
     params.set('service', serviceName || categoryData.label);
+    const serviceTypeKey = CATEGORY_GROUP_TO_SERVICE_TYPE_KEY[categoryData.group];
+    if (serviceTypeKey) {
+      params.set('serviceType', serviceTypeKey);
+    }
     const destination = `/booking?${params.toString()}`;
     if (user) {
       navigate(destination);

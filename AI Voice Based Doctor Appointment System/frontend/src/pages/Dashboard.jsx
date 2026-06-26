@@ -8,6 +8,7 @@ import { TopHeader } from '../components/ui/top-header';
 import { Stethoscope, Mic, FileText, Video, CalendarClock, X, MessageSquare, Phone, PhoneOff, Clock, LayoutDashboard, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDoctorName } from '../utils/doctorName';
+import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 import AppointmentReviewModal from '../components/reviews/AppointmentReviewModal';
 
 const AIVoiceAssistant = lazy(() => import('../components/AIVoiceAssistant'));
@@ -166,7 +167,8 @@ export default function Dashboard() {
   const handleTriageComplete = async (data) => {
     playSuccessSound();
     setIsAIModalOpen(false);
-    navigate(`/booking?specialization=${data.suggested_specialization}`, { state: { aiSummary: data } });
+    const practitionerType = data?.suggested_practitioner_type || 'General Practitioner (GP)';
+    navigate(`/booking?practitionerType=${encodeURIComponent(practitionerType)}`, { state: { aiSummary: data } });
   };
 
   const handleCancelScheduledCall = async (appointmentId) => {
@@ -519,7 +521,7 @@ export default function Dashboard() {
                               {formatDoctorName(apt.doctor?.name, apt.doctor?.name)}
                             </h4>
                             <p className="text-sm font-bold text-slate-500 truncate mt-0.5">
-                              {apt.doctor?.doctorProfile?.specialization?.name || apt.doctor?.specialization?.name || 'Specialist'}
+                              {getPractitionerTypeLabel(apt.doctor, 'Specialist')}
                             </p>
 
                             <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -88,11 +89,7 @@ function getPatientEmail(appointment) {
 }
 
 function getConsultationLabel(appointment) {
-  return (
-    appointment?.doctor?.doctorProfile?.specialization?.name ||
-    appointment?.doctor?.specialization?.name ||
-    'Standard Consultation'
-  );
+  return getPractitionerTypeLabel(appointment?.doctor, 'Standard Consultation');
 }
 
 function resolveDocumentUrl(rawUrl) {

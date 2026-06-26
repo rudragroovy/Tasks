@@ -1,12 +1,15 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../models/prismaClient');
+const {
+  normalizePractitionerType,
+} = require('../utils/doctorCatalog');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role, specializationId, fee } = req.body;
+    const { name, email, password, role, practitionerType } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
 
     const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
@@ -18,13 +21,13 @@ exports.register = async (req, res) => {
       data: { name, email: normalizedEmail, password: hashedPassword, role }
     });
 
-    if (role === 'DOCTOR' && specializationId && fee) {
+    if (role === 'DOCTOR') {
+      const normalizedPractitionerType = normalizePractitionerType(practitionerType);
       await prisma.doctor.create({
         data: {
           userId: user.id,
-          specializationId,
-          fee: parseFloat(fee)
-        }
+          practitionerType: normalizedPractitionerType,
+        },
       });
     }
 

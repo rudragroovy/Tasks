@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import { getAppointmentConsultationFee } from '../utils/doctorConsultation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const WINDOW_OPTIONS = ['All', 'Today', 'This Week'];
@@ -149,8 +150,7 @@ export default function DoctorDashboard() {
   ).size;
   const paidAppointments = filteredAppointments.filter((appointment) => appointment.paymentStatus === 'PAID');
   const paidRevenue = paidAppointments.reduce((sum, appointment) => {
-    const fee = Number.parseFloat(appointment?.doctor?.doctorProfile?.fee ?? 0);
-    return sum + (Number.isFinite(fee) ? fee : 0);
+    return sum + getAppointmentConsultationFee(appointment);
   }, 0);
   const prescriptionsCount = filteredAppointments.filter(
     (appointment) => Boolean(appointment?.consultation?.prescriptionUrl)

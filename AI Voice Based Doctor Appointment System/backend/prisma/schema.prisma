@@ -95,18 +95,9 @@ model FamilyMember {
   appointments Appointment[]
 }
 
-model Specialization {
-  id      String   @id @default(uuid())
-  name    String   @unique
-  doctors Doctor[]
-}
-
 model Doctor {
   userId           String         @id
   user             User           @relation(fields: [userId], references: [id])
-  specializationId String
-  specialization   Specialization @relation(fields: [specializationId], references: [id])
-  fee              Decimal
   isOnline         Boolean        @default(false)
   averageRating    Float          @default(0)
   reviewCount      Int            @default(0)

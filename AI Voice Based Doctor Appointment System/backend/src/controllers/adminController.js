@@ -1,6 +1,9 @@
 const prisma = require('../models/prismaClient');
 const bcrypt = require('bcryptjs');
 const { ensureDefaultWorkingHours, CONSULTATION_MODES } = require('../utils/doctorAvailability');
+const {
+  normalizePractitionerType,
+} = require('../utils/doctorCatalog');
 
 const FINAL_APPOINTMENT_STATUSES = new Set(['COMPLETED', 'CANCELLED', 'REJECTED']);
 const MAX_AUDIT_LOG_ENTRIES = 100;
@@ -58,10 +61,15 @@ exports.getAllDoctors = async (req, res) => {
     const doctors = await prisma.doctor.findMany({
       include: {
         user: { select: { id: true, name: true, email: true, createdAt: true } },
-        specialization: true
-      }
+      },
     });
-    res.json(doctors);
+
+    res.json(
+      doctors.map((doctor) => ({
+        ...doctor,
+        practitionerType: normalizePractitionerType(doctor.practitionerType),
+      }))
+    );
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch doctors' });
   }
@@ -69,7 +77,7 @@ exports.getAllDoctors = async (req, res) => {
 
 exports.addDoctor = async (req, res) => {
   try {
-    const { name, email, password, specializationId, fee } = req.body;
+    const { name, email, password, practitionerType } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return res.status(400).json({ error: 'Email already exists' });
@@ -80,12 +88,12 @@ exports.addDoctor = async (req, res) => {
       data: { name, email, password: hashedPassword, role: 'DOCTOR' }
     });
 
+    const normalizedPractitionerType = normalizePractitionerType(practitionerType);
     const doctor = await prisma.doctor.create({
       data: {
         userId: user.id,
-        specializationId,
-        fee: parseFloat(fee)
-      }
+        practitionerType: normalizedPractitionerType,
+      },
     });
 
     await Promise.all(CONSULTATION_MODES.map((mode) => ensureDefaultWorkingHours(prisma, user.id, mode)));

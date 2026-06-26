@@ -3,6 +3,7 @@ import { X, FileText, MessageSquare, Bot, Download } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { formatDoctorName } from '../../utils/doctorName';
+import { getPractitionerTypeLabel } from '../../utils/doctorConsultation';
 
 export function HistoryModal({ apt, onClose }) {
   const [activeTab, setActiveTab] = useState('ai');
@@ -106,7 +107,7 @@ export function HistoryModal({ apt, onClose }) {
                         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Assigned Doctor</span>
                           <h4 className="text-sm font-bold text-slate-900">{doctorName}</h4>
-                          <p className="text-xs font-medium text-slate-500">{apt.doctor?.doctorProfile?.specialization?.name || apt.doctor?.specialization?.name || 'Specialist'}</p>
+                          <p className="text-xs font-medium text-slate-500">{getPractitionerTypeLabel(apt.doctor, 'Specialist')}</p>
                         </div>
                       </div>
 

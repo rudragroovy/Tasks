@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import { getAppointmentConsultationFee } from '../utils/doctorConsultation';
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -52,8 +53,7 @@ function formatInvoiceDate(rawDate) {
 }
 
 function getInvoiceAmount(appointment) {
-  const fee = Number.parseFloat(appointment?.doctor?.doctorProfile?.fee ?? appointment?.doctor?.fee ?? 0);
-  return Number.isFinite(fee) ? fee : 0;
+  return getAppointmentConsultationFee(appointment);
 }
 
 function generateInvoiceNumber(rawId) {

@@ -392,6 +392,48 @@
   font-weight: 700;
 }
 
+.booking-doctor-service-rate {
+  margin: 6px 0 0;
+  color: #0e7490;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.booking-doctor-service-rate strong {
+  color: #155e75;
+  font-weight: 900;
+}
+
+.booking-doctor-services {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.booking-doctor-service-chip {
+  border: 1px solid #bae6fd;
+  background: #ecfeff;
+  color: #155e75;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.booking-doctor-service-chip--count {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.booking-doctor-services__empty {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
 .booking-share-btn {
   display: inline-flex;
   align-items: center;

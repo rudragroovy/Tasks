@@ -79,8 +79,7 @@ export default function AdminDashboard() {
     name: '',
     email: '',
     password: '',
-    specializationId: '',
-    fee: ''
+    practitionerType: ''
   });
   const [specializations, setSpecializations] = useState([]);
   const [formError, setFormError] = useState('');
@@ -102,7 +101,7 @@ export default function AdminDashboard() {
 
   const fetchSpecializations = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/doctors/specializations`, auth());
+      const res = await axios.get(`${API_URL}/api/doctors/practitioner-types`, auth());
       setSpecializations(res.data);
     } catch (error) {
       console.error(error);
@@ -207,7 +206,7 @@ export default function AdminDashboard() {
     try {
       await axios.post(`${API_URL}/api/admin/doctors`, newDoctor, auth());
       setIsAddDoctorModalOpen(false);
-      setNewDoctor({ name: '', email: '', password: '', specializationId: '', fee: '' });
+      setNewDoctor({ name: '', email: '', password: '', practitionerType: '' });
       await Promise.all([fetchDoctors(), fetchStats()]);
     } catch (error) {
       setFormError(error?.response?.data?.error || 'Failed to create doctor. Please try again.');
@@ -552,9 +551,8 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className="text-xs font-bold px-3 py-1 rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-200">
-                          {doc.specialization?.name || 'General'}
+                          {doc.practitionerType || 'General Practitioner (GP)'}
                         </span>
-                        <span className="text-sm font-black text-slate-800">${parseFloat(doc.fee || 0).toFixed(0)}</span>
                       </div>
                     </div>
                   ))}
@@ -904,7 +902,7 @@ export default function AdminDashboard() {
                   >
                     {reassignOptions.map((doc) => (
                       <option key={doc.userId} value={doc.userId}>
-                        {formatDoctorName(doc.user?.name, doc.user?.name)} - {doc.specialization?.name || 'General'}
+                        {formatDoctorName(doc.user?.name, doc.user?.name)} - {doc.practitionerType || 'General Practitioner (GP)'}
                       </option>
                     ))}
                   </select>
@@ -1098,34 +1096,19 @@ export default function AdminDashboard() {
                 ))}
 
                 <div>
-                  <label htmlFor="new-doctor-specialization" className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">Specialization</label>
+                  <label htmlFor="new-doctor-practitioner-type" className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">Practitioner Type</label>
                   <select
-                    id="new-doctor-specialization"
+                    id="new-doctor-practitioner-type"
                     required
-                    value={newDoctor.specializationId}
-                    onChange={(event) => setNewDoctor({ ...newDoctor, specializationId: event.target.value })}
+                    value={newDoctor.practitionerType}
+                    onChange={(event) => setNewDoctor({ ...newDoctor, practitionerType: event.target.value })}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 font-medium text-sm text-slate-800 outline-none transition-all focus:border-primary-400 focus:ring-2 focus:ring-primary-100 bg-white"
                   >
-                    <option value="">Select specialization...</option>
+                    <option value="">Select practitioner type...</option>
                     {specializations.map((specialization) => (
-                      <option key={specialization.id} value={specialization.id}>{specialization.name}</option>
+                      <option key={specialization.id} value={specialization.name}>{specialization.name}</option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label htmlFor="new-doctor-fee" className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">Consultation Fee ($)</label>
-                  <input
-                    id="new-doctor-fee"
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    placeholder="50.00"
-                    value={newDoctor.fee}
-                    onChange={(event) => setNewDoctor({ ...newDoctor, fee: event.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 font-medium text-sm text-slate-800 outline-none transition-all focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
-                  />
                 </div>
 
                 <button

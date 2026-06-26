@@ -11,7 +11,7 @@ module.exports = function(io) {
 
     // Handshake will happen on connect (JWT verified middleware later, or just simple user identification)
     // For now, client sends 'identify'
-    socket.on('identify', (user) => {
+    socket.on('identify', async (user) => {
       const previousUser = socketUsers.get(socket.id);
       if (previousUser?.role === 'DOCTOR' && previousUser?.id) {
         removeDoctorSocket(previousUser.id, socket.id);
@@ -22,6 +22,25 @@ module.exports = function(io) {
       if (user.role === 'DOCTOR') {
         socket.join('doctors');
         addDoctorSocket(user.id, socket.id);
+        try {
+          const doctor = await prisma.doctor.findUnique({
+            where: { userId: user.id },
+            select: { showOnlineOnLogin: true, isOnline: true },
+          });
+
+          if (!doctor) return;
+
+          const nextOnlineState = Boolean(doctor.showOnlineOnLogin);
+          if (doctor.isOnline !== nextOnlineState) {
+            await prisma.doctor.update({
+              where: { userId: user.id },
+              data: { isOnline: nextOnlineState },
+            });
+            io.emit('doctors:updated');
+          }
+        } catch (error) {
+          console.error('Failed to sync doctor online state on identify:', error);
+        }
       }
     });
 

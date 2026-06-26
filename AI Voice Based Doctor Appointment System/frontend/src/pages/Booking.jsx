@@ -12,7 +12,13 @@ import {
 } from 'lucide-react';
 import LandingNavbar from '../components/LandingNavbar';
 import AppIcon from '../components/branding/AppIcon';
+import { getServiceRate } from '../data/practitionerServiceCatalog';
 import { formatDoctorName } from '../utils/doctorName';
+import {
+  getServiceRateFromMap,
+  normalizeStringArray,
+  parseDoctorServiceSelections,
+} from '../utils/doctorServices';
 import { useSocket } from '../context/SocketContext';
 import './booking-page.css';
 
@@ -73,6 +79,37 @@ const getDoctorReviewCount = (doctor) => {
   return Math.floor(numeric);
 };
 
+const getDoctorServiceRate = (doctor, serviceName) => {
+  if (!serviceName) return null;
+
+  const fromDoctorMap = getServiceRateFromMap(doctor?.offeredServiceRates, serviceName);
+  if (Number.isFinite(Number(fromDoctorMap))) return Number(fromDoctorMap);
+
+  const offeredServices = normalizeStringArray(doctor?.offeredServices);
+  const requested = String(serviceName).trim().toLowerCase();
+  const hasRequestedService = offeredServices.some((name) => String(name).toLowerCase() === requested);
+  if (!hasRequestedService) return null;
+  return getServiceRate(serviceName);
+};
+
+const getDoctorDefaultServiceRate = (doctor) => {
+  const rates = Object.values(doctor?.offeredServiceRates || {})
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (rates.length > 0) {
+    const total = rates.reduce((sum, value) => sum + value, 0);
+    return Number((total / rates.length).toFixed(2));
+  }
+
+  const offeredServices = normalizeStringArray(doctor?.offeredServices);
+  if (offeredServices.length > 0) {
+    return getServiceRate(offeredServices[0]);
+  }
+
+  return 75;
+};
+
 const isDoctorOnline = (doctor) => doctor?.isOnline === true;
 
 const copyTextToClipboard = async (value) => {
@@ -108,7 +145,6 @@ export default function Booking() {
   const [doctorSlots, setDoctorSlots] = useState({});
   const [selectedSlotsByDoctor, setSelectedSlotsByDoctor] = useState({});
   const [expandedSlotsByDoctor, setExpandedSlotsByDoctor] = useState({});
-  const [processingDoctorId, setProcessingDoctorId] = useState(null);
   const [sharedDoctorId, setSharedDoctorId] = useState(null);
 
   const [doctorNameFilter, setDoctorNameFilter] = useState('');
@@ -121,9 +157,25 @@ export default function Booking() {
   const aiSummary = location.state?.aiSummary || {};
   const selectedPatientId =
     typeof aiSummary.selectedPatientId === 'string' ? aiSummary.selectedPatientId : 'self';
-  const specializationQuery = searchParams.get('specialization') || '';
-  const serviceQuery = searchParams.get('service') || '';
+  const practitionerTypeQuery = searchParams.get('practitionerType') || '';
+  const [selectedServiceName] = useState(() => searchParams.get('service') || aiSummary?.serviceName || '');
+  const [selectedServiceType] = useState(() => searchParams.get('serviceType') || aiSummary?.serviceType || '');
   const categoryQuery = searchParams.get('category') || '';
+
+  useEffect(() => {
+    const hasServiceParams = searchParams.has('service') || searchParams.has('serviceType');
+    if (!hasServiceParams) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('service');
+    next.delete('serviceType');
+    const nextSearch = next.toString();
+
+    navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, {
+      replace: true,
+      state: location.state,
+    });
+  }, [location.pathname, location.state, navigate, searchParams]);
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
@@ -133,13 +185,24 @@ export default function Booking() {
         type: futureBooking ? 'SCHEDULED' : 'ON_DEMAND',
         appointmentType: futureBooking ? 'SCHEDULED' : 'ON_DEMAND',
       };
-      if (specializationQuery) params.specializationName = specializationQuery;
+      if (practitionerTypeQuery) {
+        params.practitionerType = practitionerTypeQuery;
+      }
 
       const { data } = await axios.get('http://localhost:5000/api/appointments/doctors', {
         params,
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-      setDoctors(Array.isArray(data) ? data : []);
+      const normalizedDoctors = (Array.isArray(data) ? data : []).map((doctor) => {
+        const selections = parseDoctorServiceSelections(doctor?.services);
+        return {
+          ...doctor,
+          offeredServiceTypes: selections.selectedServiceTypes,
+          offeredServices: selections.selectedServices,
+          offeredServiceRates: selections.selectedServiceRates,
+        };
+      });
+      setDoctors(normalizedDoctors);
     } catch (error) {
       console.error(error);
       setFetchError(error?.response?.data?.error || 'Failed to load doctors.');
@@ -147,7 +210,7 @@ export default function Booking() {
     } finally {
       setLoading(false);
     }
-  }, [futureBooking, specializationQuery]);
+  }, [futureBooking, practitionerTypeQuery]);
 
   useEffect(() => {
     fetchDoctors();
@@ -228,7 +291,7 @@ export default function Booking() {
 
   const specializationOptions = useMemo(() => {
     const names = doctors
-      .map((doctor) => doctor?.specialization?.name)
+      .map((doctor) => doctor?.practitionerType)
       .filter(Boolean);
     return ['ANY', ...Array.from(new Set(names))];
   }, [doctors]);
@@ -244,13 +307,15 @@ export default function Booking() {
       const clinicName = String(
         doctor?.clinicName || doctor?.clinic?.name || doctor?.clinicAddress || 'Online Clinic'
       ).toLowerCase();
-      const specializationName = String(doctor?.specialization?.name || 'General Practitioner');
+      const practitionerType = String(
+        doctor?.practitionerType || 'General Practitioner (GP)'
+      );
       const doctorGender = String(doctor?.user?.gender || 'Unknown').toUpperCase();
       const ratingValue = getDoctorRating(doctor);
 
       if (doctorNameFilter && !doctorName.includes(doctorNameFilter.toLowerCase())) return false;
       if (clinicFilter && !clinicName.includes(clinicFilter.toLowerCase())) return false;
-      if (specializationFilter !== 'ANY' && specializationName !== specializationFilter) return false;
+      if (specializationFilter !== 'ANY' && practitionerType !== specializationFilter) return false;
       if (genderFilter !== 'ANY' && doctorGender !== genderFilter) return false;
       if (ratingFilter !== 'ANY' && ratingValue < Number(ratingFilter)) return false;
       return true;
@@ -266,9 +331,21 @@ export default function Booking() {
 
   const avgFee = useMemo(() => {
     if (!filteredDoctors.length) return 49.25;
-    const total = filteredDoctors.reduce((sum, doctor) => sum + (Number(doctor?.fee) || 150), 0);
+
+    if (selectedServiceName) {
+      const serviceRates = filteredDoctors
+        .map((doctor) => getDoctorServiceRate(doctor, selectedServiceName))
+        .filter((value) => Number.isFinite(Number(value)) && Number(value) > 0);
+
+      if (serviceRates.length > 0) {
+        const total = serviceRates.reduce((sum, value) => sum + Number(value), 0);
+        return Number((total / serviceRates.length).toFixed(2));
+      }
+    }
+
+    const total = filteredDoctors.reduce((sum, doctor) => sum + getDoctorDefaultServiceRate(doctor), 0);
     return Number((total / filteredDoctors.length).toFixed(2));
-  }, [filteredDoctors]);
+  }, [filteredDoctors, selectedServiceName]);
 
   const clearFilters = () => {
     setDoctorNameFilter('');
@@ -284,16 +361,17 @@ export default function Booking() {
     if (!doctor?.userId) return;
 
     const doctorName = formatDoctorName(doctor?.user?.name, 'Doctor');
-    const specialization = doctor?.specialization?.name || 'General Practitioner';
+    const practitionerType = doctor?.practitionerType || 'General Practitioner (GP)';
     const shareUrl = new URL(`${window.location.origin}/booking`);
 
     if (categoryQuery) shareUrl.searchParams.set('category', categoryQuery);
-    if (serviceQuery) shareUrl.searchParams.set('service', serviceQuery);
-    if (specializationQuery) shareUrl.searchParams.set('specialization', specializationQuery);
+    if (practitionerTypeQuery) {
+      shareUrl.searchParams.set('practitionerType', practitionerTypeQuery);
+    }
     shareUrl.searchParams.set('doctorId', doctor.userId);
 
     const shareData = {
-      title: `${doctorName} - ${specialization}`,
+      title: `${doctorName} - ${practitionerType}`,
       text: `Book a consultation with ${doctorName} on CareBridge.`,
       url: shareUrl.toString(),
     };
@@ -324,14 +402,14 @@ export default function Booking() {
 
   const handleOpenDoctorReviews = (doctor) => {
     if (!doctor?.userId) return;
-    navigate(`/doctor/${doctor.userId}/reviews`, {
+    navigate(`/booking/doctor/${doctor.userId}`, {
       state: {
         aiSummary,
         selectedPatientId,
         doctorPreview: {
           id: doctor.userId,
           name: doctor?.user?.name || '',
-          specialization: doctor?.specialization?.name || 'General Practitioner',
+          practitionerType: doctor?.practitionerType || 'General Practitioner (GP)',
           qualification: doctor?.qualification || '',
           yearsExperience: doctor?.yearsExperience || doctor?.years_of_experience || 0,
         },
@@ -353,7 +431,7 @@ export default function Booking() {
     }));
   };
 
-  const handleBookDoctor = async (doctor) => {
+  const handleBookDoctor = (doctor) => {
     if (!doctor?.userId) return;
     const bookingType = futureBooking ? 'SCHEDULED' : 'ON_DEMAND';
     const selectedSlotStart = selectedSlotsByDoctor[doctor.userId];
@@ -363,44 +441,26 @@ export default function Booking() {
       return;
     }
 
-    setProcessingDoctorId(doctor.userId);
-    try {
-      const normalizedAiSummary = {
-        ...(aiSummary || {}),
+    navigate(`/booking/doctor/${doctor.userId}/steps`, {
+      state: {
+        aiSummary,
         selectedPatientId,
-        assigned_doctor_id: doctor.userId,
-        assigned_doctor_name: doctor?.user?.name || '',
-      };
-
-      const { data: appointment } = await axios.post(
-        'http://localhost:5000/api/appointments',
-        {
-          doctorId: doctor.userId,
-          aiSummary: normalizedAiSummary,
-          type: bookingType,
-          consultationMode,
-          scheduledFor: bookingType === 'SCHEDULED' ? selectedSlotStart : null,
-          familyMemberId: selectedPatientId !== 'self' ? selectedPatientId : null,
+        bookingType,
+        futureBooking,
+        consultationMode,
+        selectedDate: bookingDate,
+        selectedSlotStart: bookingType === 'SCHEDULED' ? selectedSlotStart : '',
+        serviceName: selectedServiceName || aiSummary?.serviceName || '',
+        serviceType: selectedServiceType || aiSummary?.serviceType || '',
+        doctorPreview: {
+          id: doctor.userId,
+          name: doctor?.user?.name || '',
+          practitionerType: doctor?.practitionerType || 'General Practitioner (GP)',
+          qualification: doctor?.qualification || '',
+          yearsExperience: doctor?.yearsExperience || doctor?.years_of_experience || 0,
         },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-
-      const { data: session } = await axios.post(
-        'http://localhost:5000/api/payments/create-checkout-session',
-        {
-          doctorId: doctor.userId,
-          appointmentId: appointment.id,
-          type: bookingType,
-        },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-
-      window.location.href = session.url;
-    } catch (error) {
-      console.error(error);
-      window.alert(error?.response?.data?.error || 'Failed to create booking.');
-      setProcessingDoctorId(null);
-    }
+      },
+    });
   };
 
   const { day: bookingDayLabel, date: bookingDateLabel } = formatDateBadges(bookingDate);
@@ -413,7 +473,7 @@ export default function Booking() {
         <div className="booking-breadcrumbs">
           <span>Home</span>
           <span>/</span>
-          <span>{serviceQuery || categoryQuery || 'Booking'}</span>
+          <span>{selectedServiceName || categoryQuery || 'Booking'}</span>
         </div>
 
         <div className="booking-layout">
@@ -460,7 +520,7 @@ export default function Booking() {
             </div>
 
             <div className="booking-filter-block">
-              <p>Specialization</p>
+              <p>Practitioner Type</p>
               <div className="booking-chip-wrap">
                 {specializationOptions.map((option) => (
                   <button
@@ -599,7 +659,7 @@ export default function Booking() {
                 {filteredDoctors.map((doctor) => {
                   const doctorId = doctor.userId;
                   const doctorName = formatDoctorName(doctor?.user?.name, 'Doctor');
-                  const specialization = doctor?.specialization?.name || 'General Practitioner';
+                  const practitionerType = doctor?.practitionerType || 'General Practitioner (GP)';
                   const rating = getDoctorRating(doctor);
                   const reviewCount = getDoctorReviewCount(doctor);
                   const slotsState = doctorSlots[doctorId] || { loading: futureBooking, slots: [], error: '' };
@@ -647,8 +707,7 @@ export default function Booking() {
                               {doctor?.qualification || 'MBBS'}
                             </p>
                             <p className="booking-doctor-meta">
-                              {specialization} | {(doctor?.user?.gender || 'N/A')} |{' '}
-                              {doctor?.yearsExperience || doctor?.years_of_experience || 1} Years experience
+                              Practitioner Type: {practitionerType}
                             </p>
                           </div>
                         </div>
@@ -740,9 +799,9 @@ export default function Booking() {
                         <button
                           type="button"
                           onClick={() => handleBookDoctor(doctor)}
-                          disabled={processingDoctorId === doctorId || (futureBooking && !selectedSlot)}
+                          disabled={futureBooking && !selectedSlot}
                         >
-                          {processingDoctorId === doctorId ? 'Processing...' : futureBooking ? 'Book Appointment' : 'Consult Now'}
+                          {futureBooking ? 'Book Appointment' : 'Consult Now'}
                         </button>
                       </div>
                     </article>

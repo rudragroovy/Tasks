@@ -5,8 +5,20 @@ import { Camera, History, Info, Mail, Smartphone, TriangleAlert } from 'lucide-r
 import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import DoctorSlotSettings from '../components/doctor/DoctorSlotSettings';
+import {
+  PRACTITIONER_TYPE_OPTIONS,
+  SERVICE_TYPE_OPTIONS,
+  buildSelectedServiceRates,
+  getPersistedServiceTypesForPractitioner,
+  getServiceGroupsForSelection,
+  getServiceRate,
+  inferServiceTypesFromServices,
+  isSpecialistPractitionerType,
+  normalizePractitionerType,
+} from '../data/practitionerServiceCatalog';
 import { formatDoctorName } from '../utils/doctorName';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import { normalizeStringArray, parseDoctorServiceSelections } from '../utils/doctorServices';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -20,20 +32,8 @@ const PROFILE_TABS = [
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const QUALIFICATION_OPTIONS = ['MBBS', 'MD', 'MS', 'BDS', 'DM'];
-const PRACTITIONER_TYPES = [
-  'General Practitioner (GP)',
-  'Specialist',
-  'Consultant',
-  'Resident Medical Officer',
-];
+const PRACTITIONER_TYPES = PRACTITIONER_TYPE_OPTIONS;
 const EXPERIENCE_OPTIONS = ['0-1', '2-5', '6-10', '11-15', '16+'];
-const SERVICE_OPTIONS = [
-  'General Consultation',
-  'Follow-up',
-  'Chronic Care Plan',
-  'Mental Health Plan',
-  'Prescription Renewal',
-];
 
 function splitUserName(fullName) {
   const cleaned = String(fullName || '')
@@ -50,6 +50,24 @@ function splitUserName(fullName) {
 
 function buildProfileState(user) {
   const profile = user?.doctorProfile || {};
+  const serviceSelections = parseDoctorServiceSelections(profile?.services);
+  const directServiceSelections = {
+    selectedServiceTypes: normalizeStringArray(profile?.selectedServiceTypes ?? profile?.serviceTypes),
+    selectedServices: normalizeStringArray(profile?.selectedServices),
+    selectedServiceRates:
+      profile?.selectedServiceRates && typeof profile.selectedServiceRates === 'object'
+        ? profile.selectedServiceRates
+        : {},
+  };
+  const selectedServiceTypesSource = directServiceSelections.selectedServiceTypes.length
+    ? directServiceSelections.selectedServiceTypes
+    : serviceSelections.selectedServiceTypes;
+  const selectedServicesSource = directServiceSelections.selectedServices.length
+    ? directServiceSelections.selectedServices
+    : serviceSelections.selectedServices;
+  const selectedServiceTypes = selectedServiceTypesSource.length
+    ? selectedServiceTypesSource
+    : inferServiceTypesFromServices(selectedServicesSource);
   const { givenName: fallbackGivenName, familyName: fallbackFamilyName } = splitUserName(user?.name);
   return {
     givenName: profile.givenName || fallbackGivenName,
@@ -64,8 +82,13 @@ function buildProfileState(user) {
     address: profile.address || '',
     experience: profile.experienceRange || (profile.experienceYears ? String(profile.experienceYears) : '0-1'),
     qualification: profile.qualification || 'MBBS',
-    practitionerType: profile.practitionerType || 'General Practitioner (GP)',
-    services: profile.services || '',
+    practitionerType: normalizePractitionerType(profile.practitionerType),
+    selectedServiceTypes,
+    selectedServices: selectedServicesSource,
+    selectedServiceRates:
+      Object.keys(directServiceSelections.selectedServiceRates).length > 0
+        ? directServiceSelections.selectedServiceRates
+        : serviceSelections.selectedServiceRates,
     about: profile.about || '',
     ahpraNumber: profile.ahpraNumber || '',
     prescriberNumber: profile.prescriberNumber || '',
@@ -176,7 +199,32 @@ export default function DoctorProfile() {
         });
 
         if (!isMounted) return;
-        setProfile((prev) => ({ ...prev, ...(response.data || {}) }));
+        const nextProfile = response.data || {};
+        const nextServiceSelections = parseDoctorServiceSelections(nextProfile.services);
+        const directServiceTypeSelections = normalizeStringArray(
+          nextProfile.selectedServiceTypes ?? nextProfile.serviceTypes
+        );
+        const directServiceSelections = normalizeStringArray(nextProfile.selectedServices);
+        const nextSelectedServices = directServiceSelections.length
+          ? directServiceSelections
+          : nextServiceSelections.selectedServices;
+        const nextSelectedServiceTypes = directServiceTypeSelections.length
+          ? directServiceTypeSelections
+          : nextServiceSelections.selectedServiceTypes.length
+            ? nextServiceSelections.selectedServiceTypes
+            : inferServiceTypesFromServices(nextSelectedServices);
+        setProfile((prev) => ({
+          ...prev,
+          ...nextProfile,
+          practitionerType: normalizePractitionerType(nextProfile.practitionerType || prev.practitionerType),
+          selectedServiceTypes: nextSelectedServiceTypes,
+          selectedServices: nextSelectedServices,
+          selectedServiceRates:
+            nextProfile.selectedServiceRates ||
+            nextServiceSelections.selectedServiceRates ||
+            prev.selectedServiceRates ||
+            {},
+        }));
         if (typeof response.data?.isOnline === 'boolean') {
           setIsOnline(response.data.isOnline);
         }
@@ -250,6 +298,32 @@ export default function DoctorProfile() {
   const hasPhoneChannel = Boolean(String(profile.phoneNumber || '').trim());
   const hiStatusLabel = Boolean(String(profile.hpiIndividualNumber || '').trim()) ? 'Configured' : 'Not Set';
   const mimsStatusLabel = Boolean(String(profile.mimsUserId || '').trim()) ? 'Configured' : 'Not Set';
+  const practitionerType = normalizePractitionerType(profile.practitionerType);
+  const isSpecialistPractitioner = isSpecialistPractitionerType(practitionerType);
+  const selectedServiceTypeKeys = normalizeStringArray(profile.selectedServiceTypes);
+  const selectedServices = useMemo(
+    () => normalizeStringArray(profile.selectedServices),
+    [profile.selectedServices]
+  );
+  const serviceSelectionGroups = useMemo(
+    () => getServiceGroupsForSelection(practitionerType, selectedServiceTypeKeys),
+    [practitionerType, selectedServiceTypeKeys]
+  );
+  const servicesForSelectedTypes = useMemo(
+    () => normalizeStringArray(serviceSelectionGroups.flatMap((group) => group.services)),
+    [serviceSelectionGroups]
+  );
+  const servicesForSelectedTypeLookup = useMemo(
+    () => new Set(servicesForSelectedTypes),
+    [servicesForSelectedTypes]
+  );
+  const hiddenSelectedServices = useMemo(
+    () =>
+      !isSpecialistPractitioner
+        ? selectedServices.filter((serviceName) => !servicesForSelectedTypeLookup.has(serviceName))
+        : [],
+    [isSpecialistPractitioner, selectedServices, servicesForSelectedTypeLookup]
+  );
 
   const doctorNavItems = DOCTOR_NAV_ITEMS;
 
@@ -278,6 +352,59 @@ export default function DoctorProfile() {
 
   const updateField = (field, value) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePractitionerTypeChange = (value) => {
+    const nextPractitionerType = normalizePractitionerType(value);
+    setProfile((prev) => {
+      const wasSpecialistPractitioner = isSpecialistPractitionerType(prev.practitionerType);
+      const isNextSpecialistPractitioner = isSpecialistPractitionerType(nextPractitionerType);
+      const currentServices = normalizeStringArray(prev.selectedServices);
+      const previousServiceTypes = normalizeStringArray(prev.selectedServiceTypes);
+      const inferredServiceTypes = inferServiceTypesFromServices(currentServices);
+      const nextServiceTypes = isNextSpecialistPractitioner
+        ? ['specialist-referral']
+        : wasSpecialistPractitioner
+          ? inferredServiceTypes
+          : previousServiceTypes.length
+            ? previousServiceTypes
+            : inferredServiceTypes;
+
+      return {
+        ...prev,
+        practitionerType: nextPractitionerType,
+        selectedServiceTypes: nextServiceTypes,
+      };
+    });
+  };
+
+  const toggleServiceType = (serviceTypeKey) => {
+    if (isSpecialistPractitioner) return;
+    setProfile((prev) => {
+      const currentTypes = normalizeStringArray(prev.selectedServiceTypes);
+      const hasType = currentTypes.includes(serviceTypeKey);
+      const nextTypes = hasType
+        ? currentTypes.filter((key) => key !== serviceTypeKey)
+        : [...currentTypes, serviceTypeKey];
+
+      return {
+        ...prev,
+        selectedServiceTypes: nextTypes,
+      };
+    });
+  };
+
+  const toggleService = (serviceName) => {
+    setProfile((prev) => {
+      const currentServices = normalizeStringArray(prev.selectedServices);
+      const hasService = currentServices.includes(serviceName);
+      return {
+        ...prev,
+        selectedServices: hasService
+          ? currentServices.filter((name) => name !== serviceName)
+          : [...currentServices, serviceName],
+      };
+    });
   };
 
   const handleProfileTabClick = (tabKey) => {
@@ -327,6 +454,23 @@ export default function DoctorProfile() {
   const handleSaveProfile = async () => {
     setProfileSaving(true);
     setProfileMessage('');
+    const allServiceTypeKeys = SERVICE_TYPE_OPTIONS.map((option) => option.key);
+    const allowedServiceGroups = getServiceGroupsForSelection(
+      practitionerType,
+      isSpecialistPractitioner ? [] : allServiceTypeKeys
+    );
+    const allowedServiceLookup = new Set(
+      normalizeStringArray(allowedServiceGroups.flatMap((group) => group.services))
+    );
+    const selectedServicesForSave = selectedServices.filter((serviceName) =>
+      allowedServiceLookup.has(serviceName)
+    );
+    const selectedServiceTypesForSave = getPersistedServiceTypesForPractitioner(
+      practitionerType,
+      normalizeStringArray(profile.selectedServiceTypes),
+      selectedServicesForSave
+    );
+    const selectedServiceRatesForSave = buildSelectedServiceRates(selectedServicesForSave);
 
     try {
       const response = await axios.put(
@@ -344,8 +488,11 @@ export default function DoctorProfile() {
           address: profile.address,
           experience: profile.experience,
           qualification: profile.qualification,
-          practitionerType: profile.practitionerType,
-          services: profile.services,
+          practitionerType,
+          selectedServiceTypes: selectedServiceTypesForSave,
+          selectedServices: selectedServicesForSave,
+          selectedServiceRates: selectedServiceRatesForSave,
+          services: selectedServicesForSave.join(', '),
           about: profile.about,
           ahpraNumber: profile.ahpraNumber,
           prescriberNumber: profile.prescriberNumber,
@@ -366,7 +513,32 @@ export default function DoctorProfile() {
         }
       );
 
-      setProfile((prev) => ({ ...prev, ...(response.data || {}) }));
+      const nextProfile = response.data || {};
+      const nextServiceSelections = parseDoctorServiceSelections(nextProfile.services);
+      const directServiceTypeSelections = normalizeStringArray(
+        nextProfile.selectedServiceTypes ?? nextProfile.serviceTypes
+      );
+      const directServiceSelections = normalizeStringArray(nextProfile.selectedServices);
+      const nextSelectedServices = directServiceSelections.length
+        ? directServiceSelections
+        : nextServiceSelections.selectedServices;
+      const nextSelectedServiceTypes = directServiceTypeSelections.length
+        ? directServiceTypeSelections
+        : nextServiceSelections.selectedServiceTypes.length
+          ? nextServiceSelections.selectedServiceTypes
+          : inferServiceTypesFromServices(nextSelectedServices);
+      setProfile((prev) => ({
+        ...prev,
+        ...nextProfile,
+        practitionerType: normalizePractitionerType(nextProfile.practitionerType || prev.practitionerType),
+        selectedServiceTypes: nextSelectedServiceTypes,
+        selectedServices: nextSelectedServices,
+        selectedServiceRates:
+          nextProfile.selectedServiceRates ||
+          nextServiceSelections.selectedServiceRates ||
+          prev.selectedServiceRates ||
+          {},
+      }));
       if (typeof response.data?.isOnline === 'boolean') {
         setIsOnline(response.data.isOnline);
       }
@@ -885,8 +1057,8 @@ export default function DoctorProfile() {
                       <span className="mr-1 text-rose-500">*</span>Practitioner type
                     </label>
                     <select
-                      value={profile.practitionerType}
-                      onChange={(event) => updateField('practitionerType', event.target.value)}
+                      value={practitionerType}
+                      onChange={(event) => handlePractitionerTypeChange(event.target.value)}
                       className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[15px] font-semibold text-slate-900 outline-none focus:border-primary-400"
                     >
                       {PRACTITIONER_TYPES.map((option) => (
@@ -898,24 +1070,102 @@ export default function DoctorProfile() {
                   </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <div className="mt-3 space-y-4">
+                  {!isSpecialistPractitioner && (
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-800">Select Service Types</label>
+                      <div className="flex flex-wrap gap-2">
+                        {SERVICE_TYPE_OPTIONS.map((option) => {
+                          const isSelected = selectedServiceTypeKeys.includes(option.key);
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => toggleServiceType(option.key)}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+                                isSelected
+                                  ? 'border-primary-600 bg-primary-600 text-white'
+                                  : 'border-slate-300 bg-white text-slate-700 hover:border-primary-300'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-slate-800">Select Services</label>
-                    <select
-                      value={profile.services}
-                      onChange={(event) => updateField('services', event.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-[15px] font-semibold text-slate-900 outline-none focus:border-primary-400"
-                    >
-                      <option value="">Please select services</option>
-                      {SERVICE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-800">
+                      {isSpecialistPractitioner ? 'Select Specialist Consultations' : 'Select Services'}
+                      <span className="ml-1 text-xs font-medium text-slate-500">
+                        ({selectedServices.length} selected)
+                      </span>
+                    </label>
+                    {serviceSelectionGroups.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                        {isSpecialistPractitioner
+                          ? 'Select specialist consultation services from the list below.'
+                          : 'Select at least one service type to choose services.'}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {hiddenSelectedServices.length > 0 && (
+                          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                            {hiddenSelectedServices.length} service selection(s) are hidden because their service type is
+                            not currently selected. Re-select the type to restore and edit them.
+                          </p>
+                        )}
+
+                        {serviceSelectionGroups.map((serviceTypeOption) => {
+                          const servicesForType = serviceTypeOption.services || [];
+                          const selectedCountForType = servicesForType.filter((serviceName) =>
+                            selectedServices.includes(serviceName)
+                          ).length;
+                          return (
+                            <div
+                              key={serviceTypeOption.key}
+                              className="rounded-xl border border-slate-200 bg-white p-3"
+                            >
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <p className="text-sm font-bold text-slate-800">{serviceTypeOption.label}</p>
+                                <span className="text-xs font-semibold text-slate-500">
+                                  {selectedCountForType}/{servicesForType.length} selected
+                                </span>
+                              </div>
+                              <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                                {servicesForType.map((serviceName) => {
+                                  const isSelected = selectedServices.includes(serviceName);
+                                  return (
+                                    <label
+                                      key={`${serviceTypeOption.key}-${serviceName}`}
+                                      className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => toggleService(serviceName)}
+                                          className="h-4 w-4 rounded border-slate-300 accent-primary-700"
+                                        />
+                                        <span>{serviceName}</span>
+                                      </span>
+                                      <span className="rounded-md bg-cyan-50 px-2 py-0.5 text-xs font-black text-cyan-700">
+                                        ${getServiceRate(serviceName)}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="lg:col-span-2">
+                  <div>
                     <label className="mb-1.5 block text-sm font-semibold text-slate-800">About me</label>
                     <textarea
                       value={profile.about}

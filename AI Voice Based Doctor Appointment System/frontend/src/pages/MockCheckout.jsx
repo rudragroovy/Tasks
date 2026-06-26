@@ -14,7 +14,7 @@ export default function MockCheckout() {
   const sessionId = searchParams.get('session_id');
   const appointmentId = searchParams.get('appointmentId');
   const type = searchParams.get('type');
-  const fee = searchParams.get('fee') || '150.00';
+  const consultationFee = searchParams.get('consultationFee') || '150.00';
 
   const handlePay = async () => {
     setLoading(true);
@@ -96,7 +96,7 @@ export default function MockCheckout() {
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Due</p>
-                  <p className="text-4xl font-heading font-black text-slate-900">${parseFloat(fee).toFixed(2)}</p>
+                  <p className="text-4xl font-heading font-black text-slate-900">${parseFloat(consultationFee).toFixed(2)}</p>
                 </div>
                 <div className="w-14 h-14 bg-health-50 border border-health-100 rounded-2xl flex items-center justify-center">
                   <ShieldCheck className="w-7 h-7 text-health-600" />
@@ -145,7 +145,7 @@ export default function MockCheckout() {
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    Pay ${parseFloat(fee).toFixed(2)}
+                    Pay ${parseFloat(consultationFee).toFixed(2)}
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}

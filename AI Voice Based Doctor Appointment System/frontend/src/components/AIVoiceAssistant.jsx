@@ -41,24 +41,24 @@ function AIVoiceAssistantInner({ onComplete, onClose }) {
   const clientTools = useMemo(
     () => ({
       fetch_doctors: async (parameters) => {
-        const spec = parameters?.specialization || '';
+        const practitionerType = parameters?.practitionerType || parameters?.specialization || '';
         try {
           const res = await fetch(
-            `http://localhost:5000/api/appointments/doctors?specializationName=${encodeURIComponent(spec)}`,
+            `http://localhost:5000/api/appointments/doctors?practitionerType=${encodeURIComponent(practitionerType)}`,
             { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
           );
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const doctors = await res.json();
 
           if (!doctors || doctors.length === 0) {
-            return JSON.stringify({ available: false, message: 'No doctors are currently online for this specialization.' });
+            return JSON.stringify({ available: false, message: 'No doctors are currently online for this practitioner type.' });
           }
 
           const list = doctors.map((d) => ({
             id: d.userId,
             name: d.user?.name || 'Unknown',
-            specialization: d.specialization?.name || spec,
-            fee: d.fee || 150,
+            practitionerType: d.practitionerType || practitionerType,
+            consultationFee: d.consultationFee || 75,
             isOnline: d.isOnline
           }));
 
@@ -70,7 +70,8 @@ function AIVoiceAssistantInner({ onComplete, onClose }) {
       },
 
       save_symptom_session: async (parameters) => {
-        const { summary, specialization, doctorId, doctorName } = parameters || {};
+        const { summary, specialization, practitionerType, doctorId, doctorName } = parameters || {};
+        const resolvedPractitionerType = practitionerType || specialization || 'General Practitioner (GP)';
 
         if (!doctorId || !doctorName) {
           return 'Error: Doctor information is missing. Please ask the patient to select a doctor first.';
@@ -78,7 +79,7 @@ function AIVoiceAssistantInner({ onComplete, onClose }) {
 
         triageDataRef.current = {
           status: 'complete',
-          suggested_specialization: specialization || 'General Physician',
+          suggested_practitioner_type: resolvedPractitionerType,
           summary: summary || 'Symptoms recorded via AI voice triage.',
           assigned_doctor_id: doctorId,
           assigned_doctor_name: doctorName,

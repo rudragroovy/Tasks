@@ -36,6 +36,8 @@ const CategoryPage = lazy(() => import('./pages/CategoryPage'));
 const ServiceDetailPage = lazy(() => import('./pages/ServiceDetailPage'));
 const PatientDoctorReviews = lazy(() => import('./pages/PatientDoctorReviews'));
 const PatientAccount = lazy(() => import('./pages/PatientAccount'));
+const ServiceTypePage = lazy(() => import('./pages/ServiceTypePage'));
+const BookingFlowPage = lazy(() => import('./pages/BookingFlowPage'));
 
 function getDefaultPostAuthPath(user) {
   return user?.role === 'ADMIN' ? '/admin' : '/dashboard';
@@ -98,8 +100,10 @@ function AppRoutes() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/home" element={<LandingPage />} />
           <Route path="/category/:categoryKey" element={<CategoryPage />} />
+          <Route path="/service-type/:serviceTypeKey" element={<ServiceTypePage />} />
           <Route path="/services/:serviceSlug" element={<ServiceDetailPage />} />
-          <Route path="/doctor/:doctorId/reviews" element={<ProtectedRoute><PatientDoctorReviews /></ProtectedRoute>} />
+          <Route path="/booking/doctor/:doctorId" element={<ProtectedRoute><PatientDoctorReviews /></ProtectedRoute>} />
+          <Route path="/booking/doctor/:doctorId/steps" element={<ProtectedRoute><BookingFlowPage /></ProtectedRoute>} />
           <Route path="/login" element={<AuthRouteRedirect mode="login" />} />
           <Route path="/register" element={<AuthRouteRedirect mode="register" />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

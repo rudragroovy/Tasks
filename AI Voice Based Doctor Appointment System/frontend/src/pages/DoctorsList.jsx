@@ -31,8 +31,9 @@ export default function DoctorsList() {
 
   const filteredDoctors = doctors.filter(doc => {
     const nameMatch = typeof doc.user?.name === 'string' ? doc.user.name.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-    const specMatch = typeof doc.specialization?.name === 'string' ? doc.specialization.name.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-    return nameMatch || specMatch;
+    const practitionerType = String(doc.practitionerType || '').toLowerCase();
+    const practitionerMatch = practitionerType.includes(searchTerm.toLowerCase());
+    return nameMatch || practitionerMatch;
   });
 
   return (
@@ -84,7 +85,7 @@ export default function DoctorsList() {
                 key={doc.userId || `${doc.user?.name || 'doctor'}-${idx}`}
                 doctor={doc} 
                 onBook={() => navigate(
-                  `/booking?specialization=${encodeURIComponent(doc.specialization?.name || '')}&doctorId=${encodeURIComponent(doc.userId || '')}`,
+                  `/booking?practitionerType=${encodeURIComponent(doc.practitionerType || '')}&doctorId=${encodeURIComponent(doc.userId || '')}`,
                   { state: { selectedDoctorId: doc.userId } }
                 )} 
               />

@@ -3,21 +3,79 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_mock'
 const { authenticate } = require('../middlewares/authMiddleware');
 const prisma = require('../models/prismaClient');
 const { formatDoctorName } = require('../utils/doctorName');
+const {
+  getDefaultConsultationFeeFromServicesSelection,
+  getServiceRateFromMap,
+  parseDoctorServicesSelection,
+} = require('../utils/doctorCatalog');
 
 const router = express.Router();
+
+function parseAiSummary(value) {
+  if (value && typeof value === 'object') return value;
+  try {
+    return JSON.parse(value || '{}');
+  } catch (error) {
+    return {};
+  }
+}
+
+function resolveRequestedServiceName(aiSummary, body) {
+  const direct = typeof body?.serviceName === 'string' ? body.serviceName.trim() : '';
+  if (direct) return direct;
+
+  const candidates = [
+    aiSummary?.serviceName,
+    aiSummary?.service,
+    aiSummary?.selected_service,
+    aiSummary?.suggested_service,
+  ];
+
+  for (const candidate of candidates) {
+    const text = String(candidate || '').trim();
+    if (!text) continue;
+    return text;
+  }
+
+  return '';
+}
 
 router.post('/create-checkout-session', authenticate, async (req, res) => {
   try {
     const { doctorId, appointmentId, type } = req.body;
     
-    const doctor = await prisma.doctor.findUnique({
-      where: { userId: doctorId },
-      include: { user: true }
-    });
+    const [doctor, appointment] = await Promise.all([
+      prisma.doctor.findUnique({
+        where: { userId: doctorId },
+        include: { user: true }
+      }),
+      prisma.appointment.findUnique({
+        where: { id: appointmentId },
+        select: { id: true, aiSummary: true },
+      }),
+    ]);
+
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
 
     if (!doctor) {
       return res.status(404).json({ error: 'Doctor not found' });
     }
+
+    const aiSummary = parseAiSummary(appointment.aiSummary);
+    const servicesSelection = parseDoctorServicesSelection(doctor.services);
+    const requestedServiceName = resolveRequestedServiceName(aiSummary, req.body);
+    const requestedServiceRate = getServiceRateFromMap(
+      servicesSelection.selectedServiceRates,
+      requestedServiceName
+    );
+    const fallbackRate = getDefaultConsultationFeeFromServicesSelection(servicesSelection);
+    const consultationFee = Number.isFinite(Number(requestedServiceRate)) && Number(requestedServiceRate) > 0
+      ? Number(requestedServiceRate)
+      : fallbackRate;
+
+    const normalizedFee = Number(consultationFee.toFixed(2));
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -27,9 +85,11 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Consultation with ${formatDoctorName(doctor.user.name, doctor.user.name)}`,
+              name: requestedServiceName
+                ? `${requestedServiceName} with ${formatDoctorName(doctor.user.name, doctor.user.name)}`
+                : `Consultation with ${formatDoctorName(doctor.user.name, doctor.user.name)}`,
             },
-            unit_amount: Math.round((parseFloat(doctor.fee) || 150) * 100),
+            unit_amount: Math.round(normalizedFee * 100),
           },
           quantity: 1,
         },
@@ -39,10 +99,20 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
       client_reference_id: appointmentId,
     });
 
+    const nextAiSummary = {
+      ...aiSummary,
+      consultationFee: normalizedFee,
+    };
+    if (requestedServiceName) nextAiSummary.serviceName = requestedServiceName;
+
     // Update appointment with stripe session ID
     await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { stripeSessionId: session.id, paymentStatus: 'PENDING_PAYMENT' }
+      data: {
+        stripeSessionId: session.id,
+        paymentStatus: 'PENDING_PAYMENT',
+        aiSummary: nextAiSummary,
+      }
     });
 
     res.json({ url: session.url });
@@ -51,16 +121,50 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
     // For demo purposes, if Stripe key is invalid, we will return a mock success URL
     if (error.message.includes('Invalid API Key') || error.message.includes('sk_test_mock')) {
       console.log('Using mock payment success due to missing Stripe key');
-      const { appointmentId, type } = req.body;
+      const { appointmentId, doctorId, type } = req.body;
+      const appointment = await prisma.appointment.findUnique({
+        where: { id: appointmentId },
+        select: { aiSummary: true, doctorId: true },
+      });
+      const parsedAiSummary = parseAiSummary(appointment?.aiSummary);
+      const requestedServiceName = resolveRequestedServiceName(parsedAiSummary, req.body);
+      const resolvedDoctorId = doctorId || appointment?.doctorId;
+      const doctor = resolvedDoctorId
+        ? await prisma.doctor.findUnique({
+          where: { userId: resolvedDoctorId },
+          select: { services: true },
+        })
+        : null;
+      const servicesSelection = parseDoctorServicesSelection(doctor?.services);
+      const requestedServiceRate = requestedServiceName
+        ? getServiceRateFromMap(servicesSelection.selectedServiceRates, requestedServiceName)
+        : null;
+      const fallbackRate = getDefaultConsultationFeeFromServicesSelection(servicesSelection);
+      const summaryFee = Number(parsedAiSummary?.consultationFee);
+      const consultationFee = Number.isFinite(summaryFee) && summaryFee > 0
+        ? summaryFee
+        : Number.isFinite(Number(requestedServiceRate)) && Number(requestedServiceRate) > 0
+          ? Number(requestedServiceRate)
+          : fallbackRate;
+      const normalizedFee = Number(consultationFee.toFixed(2));
       const mockSessionId = 'cs_test_mock_' + Math.random().toString(36).substring(7);
+      const nextAiSummary = {
+        ...parsedAiSummary,
+        consultationFee: normalizedFee,
+      };
+      if (requestedServiceName) nextAiSummary.serviceName = requestedServiceName;
       
       await prisma.appointment.update({
         where: { id: appointmentId },
-        data: { stripeSessionId: mockSessionId, paymentStatus: 'PENDING_PAYMENT' }
+        data: {
+          stripeSessionId: mockSessionId,
+          paymentStatus: 'PENDING_PAYMENT',
+          aiSummary: nextAiSummary,
+        }
       });
 
       return res.json({ 
-        url: `http://localhost:5173/mock-checkout?session_id=${mockSessionId}&appointmentId=${appointmentId}&type=${type}&fee=${parseFloat(doctor.fee) || 150}` 
+        url: `http://localhost:5173/mock-checkout?session_id=${mockSessionId}&appointmentId=${appointmentId}&type=${type}&consultationFee=${normalizedFee}` 
       });
     }
     res.status(500).json({ error: 'Failed to create payment session' });

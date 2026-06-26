@@ -1,6 +1,11 @@
 const prisma = require('../models/prismaClient');
 const { generatePrescriptionPDF } = require('../services/pdfService');
 const {
+  getDefaultConsultationFeeFromServicesSelection,
+  normalizePractitionerType,
+  parseDoctorServicesSelection,
+} = require('../utils/doctorCatalog');
+const {
   DEFAULT_CONSULTATION_MODE,
   normalizeConsultationMode,
   getSlotDurationForMode,
@@ -79,13 +84,32 @@ async function releaseBookedSlot(tx, appointmentId) {
 
 exports.getDoctors = async (req, res) => {
   try {
-    const { specializationName } = req.query;
+    const practitionerTypeParam = typeof req.query?.practitionerType === 'string' ? req.query.practitionerType.trim() : '';
+    const serviceName = typeof req.query?.serviceName === 'string' ? req.query.serviceName.trim() : '';
+    const serviceType = typeof req.query?.serviceType === 'string' ? req.query.serviceType.trim() : '';
     const appointmentType = String(req.query?.type || req.query?.appointmentType || '').toUpperCase();
     const shouldFilterOnlineOnly = appointmentType !== SCHEDULED_APPOINTMENT_TYPE;
+    const practitionerTypeFilter = practitionerTypeParam;
 
     const where = {};
-    if (specializationName) {
-      where.specialization = { name: { contains: specializationName, mode: 'insensitive' } };
+    const andFilters = [];
+    if (practitionerTypeFilter) {
+      andFilters.push({
+        practitionerType: { contains: practitionerTypeFilter, mode: 'insensitive' },
+      });
+    }
+    if (serviceName) {
+      andFilters.push({
+        services: { contains: serviceName, mode: 'insensitive' },
+      });
+    }
+    if (serviceType) {
+      andFilters.push({
+        services: { contains: serviceType, mode: 'insensitive' },
+      });
+    }
+    if (andFilters.length > 0) {
+      where.AND = andFilters;
     }
     if (shouldFilterOnlineOnly) {
       const connectedDoctorIds = getConnectedDoctorIds();
@@ -101,20 +125,30 @@ exports.getDoctors = async (req, res) => {
       select: {
         userId: true,
         isOnline: true,
-        fee: true,
         qualification: true,
         experienceRange: true,
+        practitionerType: true,
+        services: true,
         averageRating: true,
         reviewCount: true,
         slotDurationMinutesVideo: true,
         slotDurationMinutesAudio: true,
         slotDurationMinutesInPerson: true,
         user: { select: { id: true, name: true, email: true } },
-        specialization: { select: { id: true, name: true } },
       },
     });
 
-    res.json(doctors);
+    const normalizedDoctors = doctors.map((doctor) => {
+      const servicesSelection = parseDoctorServicesSelection(doctor.services);
+      const normalizedPractitionerType = normalizePractitionerType(doctor.practitionerType);
+      return {
+        ...doctor,
+        practitionerType: normalizedPractitionerType,
+        consultationFee: getDefaultConsultationFeeFromServicesSelection(servicesSelection),
+      };
+    });
+
+    res.json(normalizedDoctors);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch doctors' });
@@ -245,6 +279,8 @@ exports.getDoctorAvailableSlots = async (req, res) => {
 exports.createAppointment = async (req, res) => {
   try {
     const { doctorId, aiSummary, type, scheduledFor, familyMemberId } = req.body;
+    const serviceName = typeof req.body?.serviceName === 'string' ? req.body.serviceName.trim() : '';
+    const serviceType = typeof req.body?.serviceType === 'string' ? req.body.serviceType.trim() : '';
     const patientId = req.user.id; // from authMiddleware
     const normalizedType = type || 'ON_DEMAND';
     const consultationMode = normalizeConsultationMode(
@@ -266,6 +302,8 @@ exports.createAppointment = async (req, res) => {
     const normalizedAiSummary = parseAiSummary(aiSummary);
     if (normalizedAiSummary && typeof normalizedAiSummary === 'object') {
       normalizedAiSummary.assigned_doctor_id = doctorId;
+      if (serviceName) normalizedAiSummary.serviceName = serviceName;
+      if (serviceType) normalizedAiSummary.serviceType = serviceType;
       if (doctorProfile.user?.name) {
         normalizedAiSummary.assigned_doctor_name = formatDoctorName(
           doctorProfile.user.name,
@@ -565,7 +603,7 @@ exports.getUserAppointments = async (req, res) => {
     const appointments = await prisma.appointment.findMany({
       where: whereClause,
       include: {
-        doctor: { select: { id: true, name: true, email: true, doctorProfile: { include: { specialization: true } } } },
+        doctor: { select: { id: true, name: true, email: true, doctorProfile: { select: { practitionerType: true, services: true } } } },
         patient: { select: { id: true, name: true, email: true } },
         familyMember: true,
         consultation: true,
@@ -722,7 +760,7 @@ exports.getAppointmentById = async (req, res) => {
     const appointment = await prisma.appointment.findUnique({
       where: { id },
       include: {
-        doctor: { select: { id: true, name: true, email: true, doctorProfile: { include: { specialization: true } } } },
+        doctor: { select: { id: true, name: true, email: true, doctorProfile: { select: { practitionerType: true, services: true } } } },
         patient: { select: { id: true, name: true, email: true } },
         familyMember: true,
         consultation: true,

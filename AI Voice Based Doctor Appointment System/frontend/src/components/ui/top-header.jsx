@@ -44,7 +44,8 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
     setIsAIModalOpen(false);
     // Include selected patient in summary
     const aiSummaryWithPatient = { ...data, selectedPatientId };
-    navigate(`/booking?specialization=${data.suggested_specialization}`, { state: { aiSummary: aiSummaryWithPatient } });
+    const practitionerType = data?.suggested_practitioner_type || 'General Practitioner (GP)';
+    navigate(`/booking?practitionerType=${encodeURIComponent(practitionerType)}`, { state: { aiSummary: aiSummaryWithPatient } });
   };
 
   return (

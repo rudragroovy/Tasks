@@ -20,6 +20,12 @@ const {
   sanitizeDoctorSettingsPayload,
   buildDoctorSettingsResponse,
 } = require('../services/doctorProfileService');
+const {
+  getDefaultConsultationFeeFromServicesSelection,
+  getPractitionerTypeListAsSpecializationItems,
+  normalizePractitionerType,
+  parseDoctorServicesSelection,
+} = require('../utils/doctorCatalog');
 
 const router = express.Router();
 const DAY_COUNT = 7;
@@ -269,41 +275,53 @@ function buildCrossModeConflictMessage(conflict) {
   return `${selectedLabel} slot ${minutesToHHMM(conflict.selectedSegment.startMinutes)}-${minutesToHHMM(conflict.selectedSegment.endMinutes)} on ${dayLabel} overlaps with ${otherLabel} slot ${minutesToHHMM(conflict.otherSegment.startMinutes)}-${minutesToHHMM(conflict.otherSegment.endMinutes)}. Shared calendar does not allow overlap across consultation modes.`;
 }
 
-router.get('/specializations', async (req, res) => {
+const sendPractitionerTypes = (req, res) => {
   try {
-    const specs = await prisma.specialization.findMany();
-    res.json(specs);
+    res.json(getPractitionerTypeListAsSpecializationItems());
   } catch (err) {
-    console.error("Error fetching specializations:", err);
-    res.status(500).json({ error: 'Failed to fetch specializations' });
+    console.error('Error fetching practitioner types:', err);
+    res.status(500).json({ error: 'Failed to fetch practitioner types' });
   }
-});
+};
+
+router.get('/practitioner-types', sendPractitionerTypes);
+router.get('/specializations', sendPractitionerTypes);
 
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { specialization } = req.query;
+    const practitionerType = typeof req.query?.practitionerType === 'string' ? req.query.practitionerType.trim() : '';
+    const practitionerTypeFilter = practitionerType;
     
     let whereClause = {};
-    if (specialization) {
-      whereClause.specialization = { name: { equals: specialization, mode: 'insensitive' } };
+    if (practitionerTypeFilter) {
+      whereClause.practitionerType = { equals: practitionerTypeFilter, mode: 'insensitive' };
     }
 
     const doctors = await prisma.doctor.findMany({
       where: whereClause,
-      include: {
+      select: {
+        userId: true,
+        isOnline: true,
+        practitionerType: true,
+        services: true,
+        averageRating: true,
+        reviewCount: true,
+        slotDurationMinutesVideo: true,
+        slotDurationMinutesAudio: true,
+        slotDurationMinutesInPerson: true,
         user: { select: { id: true, name: true } },
-        specialization: { select: { name: true } }
-      }
+      },
     });
 
     const formattedDoctors = doctors.map(d => ({
       userId: d.userId,
       user: { name: d.user.name },
-      specialization: { name: d.specialization.name },
+      practitionerType: normalizePractitionerType(d.practitionerType),
       isOnline: d.isOnline,
-      fee: parseFloat(d.fee) || 150.00,
+      consultationFee: getDefaultConsultationFeeFromServicesSelection(parseDoctorServicesSelection(d.services)),
       averageRating: Number(d.averageRating || 0),
       reviewCount: Number(d.reviewCount || 0),
+      services: d.services,
       slotDurationMinutes: getSlotDurationForMode(d, 'VIDEO'),
       slotDurationsByMode: {
         VIDEO: getSlotDurationForMode(d, 'VIDEO'),

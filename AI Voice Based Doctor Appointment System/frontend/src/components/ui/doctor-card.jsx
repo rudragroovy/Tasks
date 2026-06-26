@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Check, Video, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { formatDoctorName } from "../../utils/doctorName";
+import { getDoctorConsultationFeeFromDoctorRecord, getPractitionerTypeLabel } from "../../utils/doctorConsultation";
 
 export function DoctorCard({
   doctor,
@@ -14,9 +15,9 @@ export function DoctorCard({
   const shouldAnimate = enableAnimations && !shouldReduceMotion;
 
   const name = formatDoctorName(doctor.user?.name, 'Dr. Unknown');
-  const description = doctor.specialization?.name || 'Specialist';
+  const description = getPractitionerTypeLabel(doctor, 'Specialist');
   const isVerified = true;
-  const fee = doctor.fee || '150';
+  const fee = getDoctorConsultationFeeFromDoctorRecord(doctor);
   
   // Array of modern medical/abstract backgrounds
   const backgrounds = [
@@ -216,7 +217,7 @@ export function DoctorCard({
             <span className="text-slate-400 text-sm font-medium">(120+ reviews)</span>
           </div>
           <div className="text-right">
-            <span className="font-black text-health-600 text-xl">${fee}</span>
+            <span className="font-black text-health-600 text-xl">${fee.toFixed(2)}</span>
           </div>
         </motion.div>
 

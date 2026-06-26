@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import AppIcon from '../components/branding/AppIcon';
 import LandingNavbar from '../components/LandingNavbar';
+import { CATEGORY_GROUP_TO_SERVICE_TYPE_KEY } from '../data/practitionerServiceCatalog';
 import { getPatientCategoryContent } from '../data/patientCategoryContent';
 import { getServiceBySlug } from '../data/servicePageContent';
 import { useAuth } from '../context/AuthContext';
@@ -128,7 +129,17 @@ export default function ServiceDetailPage() {
     );
   }
 
-  const bookingPath = `/booking?service=${encodeURIComponent(serviceRecord.name)}`;
+  const categoryProcessContent = getPatientCategoryContent(serviceRecord.categoryKey);
+  const bookingParams = new URLSearchParams();
+  bookingParams.set('service', serviceRecord.name);
+  if (serviceRecord.categoryKey) {
+    bookingParams.set('category', serviceRecord.categoryKey);
+  }
+  const serviceTypeKey = CATEGORY_GROUP_TO_SERVICE_TYPE_KEY[categoryProcessContent?.group || ''];
+  if (serviceTypeKey) {
+    bookingParams.set('serviceType', serviceTypeKey);
+  }
+  const bookingPath = `/booking?${bookingParams.toString()}`;
 
   const handleBookNow = () => {
     if (user) {
@@ -174,7 +185,6 @@ export default function ServiceDetailPage() {
     },
   ];
 
-  const categoryProcessContent = getPatientCategoryContent(serviceRecord.categoryKey);
   const processModes = categoryProcessContent?.processModes?.length
     ? categoryProcessContent.processModes
     : defaultProcessModes;

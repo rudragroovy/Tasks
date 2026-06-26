@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Phone, Star, Video } from 'lucide-react';
 import LandingNavbar from '../components/LandingNavbar';
 import AppIcon from '../components/branding/AppIcon';
+import { getServiceRate } from '../data/practitionerServiceCatalog';
 import { formatDoctorName } from '../utils/doctorName';
+import { getDoctorConsultationFeeFromDoctorRecord, getPractitionerTypeLabel } from '../utils/doctorConsultation';
+import {
+  getServiceRateFromMap,
+  normalizeStringArray,
+  parseDoctorServiceSelections,
+} from '../utils/doctorServices';
 import './patient-doctor-reviews.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -90,11 +97,19 @@ function sortReviews(reviews, sortKey) {
   return next.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
+function findMatchingServiceName(services, candidate) {
+  const target = String(candidate || '').trim().toLowerCase();
+  if (!target) return '';
+  return services.find((service) => String(service).trim().toLowerCase() === target) || '';
+}
+
 export default function PatientDoctorReviews() {
   const { doctorId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const preview = location.state?.doctorPreview || null;
   const aiSummary = location.state?.aiSummary || {};
+  const aiServiceName = String(aiSummary?.serviceName || '').trim();
   const selectedPatientId =
     typeof location.state?.selectedPatientId === 'string' ? location.state.selectedPatientId : 'self';
 
@@ -103,10 +118,12 @@ export default function PatientDoctorReviews() {
   const [doctor, setDoctor] = useState({
     id: doctorId,
     name: preview?.name || '',
-    specialization: preview?.specialization || '',
+    practitionerType: preview?.practitionerType || '',
     qualification: preview?.qualification || '',
     yearsExperience: Number(preview?.yearsExperience || 0),
-    fee: 49.25,
+    consultationFee: 75,
+    offeredServices: [],
+    offeredServiceRates: {},
     isOnline: false,
   });
   const [summary, setSummary] = useState({
@@ -120,13 +137,13 @@ export default function PatientDoctorReviews() {
   const [activeTab, setActiveTab] = useState('availability');
   const [futureBooking, setFutureBooking] = useState(true);
   const [consultationMode, setConsultationMode] = useState('VIDEO');
+  const [selectedServiceName, setSelectedServiceName] = useState(aiServiceName);
   const [rangeStartDate, setRangeStartDate] = useState(getDateWithOffset(0));
   const [selectedDate, setSelectedDate] = useState(getDateWithOffset(0));
   const [selectedSlotStart, setSelectedSlotStart] = useState('');
   const [slotMapByDate, setSlotMapByDate] = useState({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState('');
-  const [processingBooking, setProcessingBooking] = useState(false);
 
   const token = localStorage.getItem('token');
 
@@ -163,17 +180,31 @@ export default function PatientDoctorReviews() {
 
         const doctors = Array.isArray(doctorListResponse.data) ? doctorListResponse.data : [];
         const targetDoctor = doctors.find((item) => String(item.userId) === String(doctorId));
+        const parsedServices = parseDoctorServiceSelections(targetDoctor?.services);
+        const offeredServices = normalizeStringArray(parsedServices.selectedServices);
 
         setDoctor((current) => ({
           ...current,
           id: doctorId,
           name: targetDoctor?.user?.name || reviewsResponse?.data?.doctor?.name || current.name,
-          specialization: targetDoctor?.specialization?.name || current.specialization || 'General Practitioner',
+          practitionerType: getPractitionerTypeLabel(targetDoctor, current.practitionerType || 'General Practitioner (GP)'),
           qualification: targetDoctor?.qualification || current.qualification || 'MBBS, MD',
           yearsExperience: Number(targetDoctor?.yearsExperience || targetDoctor?.years_of_experience || current.yearsExperience || 1),
-          fee: Number(targetDoctor?.fee || current.fee || 49.25),
+          consultationFee: getDoctorConsultationFeeFromDoctorRecord(targetDoctor, current.consultationFee || 75),
+          offeredServices,
+          offeredServiceRates: parsedServices.selectedServiceRates || {},
           isOnline: Boolean(targetDoctor?.isOnline),
         }));
+        setSelectedServiceName((current) => {
+          if (offeredServices.length === 0) {
+            return current || aiServiceName || 'General Consultation';
+          }
+          const matchingCurrent = findMatchingServiceName(offeredServices, current);
+          if (matchingCurrent) return matchingCurrent;
+          const matchingAiService = findMatchingServiceName(offeredServices, aiServiceName);
+          if (matchingAiService) return matchingAiService;
+          return offeredServices[0];
+        });
 
         setSummary(
           reviewsResponse?.data?.summary || {
@@ -193,7 +224,7 @@ export default function PatientDoctorReviews() {
     };
 
     fetchDoctorScreenData();
-  }, [doctorId, token]);
+  }, [aiServiceName, doctorId, token]);
 
   useEffect(() => {
     if (!doctorId || !futureBooking) {
@@ -234,6 +265,37 @@ export default function PatientDoctorReviews() {
   const reviewCount = Number(summary?.reviewCount || 0);
   const formattedDoctorName = formatDoctorName(doctor.name, 'Doctor');
   const selectedSlotLabel = selectedSlotStart ? parseTimeTo12Hour(selectedSlotStart) : '';
+  const offeredServiceOptions = useMemo(() => {
+    const services = normalizeStringArray(doctor?.offeredServices);
+    if (services.length > 0) return services;
+    return ['General Consultation'];
+  }, [doctor?.offeredServices]);
+  const resolvedServiceName = useMemo(() => {
+    const matching = findMatchingServiceName(offeredServiceOptions, selectedServiceName);
+    if (matching) return matching;
+    return offeredServiceOptions[0] || 'General Consultation';
+  }, [offeredServiceOptions, selectedServiceName]);
+  const resolvedConsultationFee = useMemo(() => {
+    const mappedRate = Number(getServiceRateFromMap(doctor?.offeredServiceRates, resolvedServiceName));
+    if (Number.isFinite(mappedRate) && mappedRate > 0) {
+      return Number(mappedRate.toFixed(2));
+    }
+
+    const offeredServices = normalizeStringArray(doctor?.offeredServices);
+    const hasService = offeredServices.some(
+      (service) => String(service).trim().toLowerCase() === String(resolvedServiceName).trim().toLowerCase()
+    );
+    if (hasService) {
+      return Number(getServiceRate(resolvedServiceName).toFixed(2));
+    }
+
+    const fallback = Number(doctor?.consultationFee);
+    if (Number.isFinite(fallback) && fallback > 0) {
+      return Number(fallback.toFixed(2));
+    }
+
+    return 75;
+  }, [doctor?.consultationFee, doctor?.offeredServiceRates, doctor?.offeredServices, resolvedServiceName]);
 
   const selectedDatePretty = useMemo(
     () =>
@@ -247,61 +309,43 @@ export default function PatientDoctorReviews() {
 
   const bookingType = futureBooking ? 'SCHEDULED' : 'ON_DEMAND';
 
-  const handleBookAppointment = async () => {
+  const handleBookAppointment = () => {
     if (!doctorId) return;
     if (futureBooking && !selectedSlotStart) {
       window.alert('Please select a slot before booking.');
       return;
     }
 
-    setProcessingBooking(true);
-    try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-      const normalizedAiSummary = {
-        ...(aiSummary || {}),
+    const serviceName = String(resolvedServiceName || '').trim();
+
+    navigate(`/booking/doctor/${doctorId}/steps`, {
+      state: {
+        aiSummary,
         selectedPatientId,
-        assigned_doctor_id: doctorId,
-        assigned_doctor_name: doctor?.name || '',
-      };
-
-      const { data: appointment } = await axios.post(
-        `${API_URL}/api/appointments`,
-        {
-          doctorId,
-          aiSummary: normalizedAiSummary,
-          type: bookingType,
-          consultationMode,
-          scheduledFor: bookingType === 'SCHEDULED' ? selectedSlotStart : null,
-          familyMemberId: selectedPatientId !== 'self' ? selectedPatientId : null,
+        bookingType,
+        futureBooking,
+        consultationMode,
+        selectedDate,
+        selectedSlotStart: bookingType === 'SCHEDULED' ? selectedSlotStart : '',
+        serviceName: serviceName || aiServiceName || '',
+        doctorPreview: {
+          id: doctorId,
+          name: doctor?.name || '',
+          practitionerType: doctor?.practitionerType || 'General Practitioner (GP)',
+          qualification: doctor?.qualification || '',
+          yearsExperience: doctor?.yearsExperience || 0,
         },
-        { headers }
-      );
-
-      const { data: session } = await axios.post(
-        `${API_URL}/api/payments/create-checkout-session`,
-        {
-          doctorId,
-          appointmentId: appointment.id,
-          type: bookingType,
-        },
-        { headers }
-      );
-
-      window.location.href = session.url;
-    } catch (bookError) {
-      console.error(bookError);
-      window.alert(bookError?.response?.data?.error || 'Failed to continue booking.');
-      setProcessingBooking(false);
-    }
+      },
+    });
   };
 
   const renderAvailability = () => (
     <div className="doctor-detail-availability">
       <div className="doctor-detail-select-row">
-        <select value={consultationMode} onChange={(event) => setConsultationMode(event.target.value)}>
-          {MODE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
+        <select value={resolvedServiceName} onChange={(event) => setSelectedServiceName(event.target.value)}>
+          {offeredServiceOptions.map((service) => (
+            <option key={service} value={service}>
+              {service}
             </option>
           ))}
         </select>
@@ -320,8 +364,7 @@ export default function PatientDoctorReviews() {
       </div>
 
       <p className="doctor-detail-text">
-        {doctor.specialization || 'General practitioner'} consultations are available with secure online booking and
-        verified telehealth workflow.
+        {resolvedServiceName} appointments are available with secure online booking and verified telehealth workflow.
       </p>
 
       <div className="doctor-detail-date-range">
@@ -443,7 +486,7 @@ export default function PatientDoctorReviews() {
                 <CheckCircle2 size={14} />
               </div>
               <p>
-                {doctor.specialization || 'Specialist'} | {doctor?.gender || 'Male'} | {doctor.yearsExperience || 1} Years Of
+                {doctor.practitionerType || 'Specialist'} | {doctor?.gender || 'Male'} | {doctor.yearsExperience || 1} Years Of
                 Experience
               </p>
               <div className="doctor-detail-qualification-row">
@@ -494,7 +537,7 @@ export default function PatientDoctorReviews() {
           {activeTab === 'availability' ? renderAvailability() : null}
           {activeTab === 'service' ? (
             <div className="doctor-detail-tab-content">
-              <h3>{doctor.specialization || 'General Practitioner'} consultation</h3>
+              <h3>{resolvedServiceName} consultation</h3>
               <p>
                 This service includes assessment, treatment guidance, prescription support, and follow-up planning based on
                 symptoms and medical context.
@@ -589,7 +632,7 @@ export default function PatientDoctorReviews() {
 
       <div className="doctor-detail-booking-bar">
         <div>
-          <strong>${Number(doctor.fee || 49.25).toFixed(2)}</strong>
+          <strong>${resolvedConsultationFee.toFixed(2)}</strong>
           <p>
             {futureBooking && selectedSlotLabel
               ? `${selectedDatePretty}, ${selectedSlotLabel}`
@@ -597,10 +640,10 @@ export default function PatientDoctorReviews() {
                 ? `Select a slot to continue`
                 : 'Instant consultation'}
           </p>
-          <span>{doctor.specialization || 'General Consultation'} | {consultationMode}</span>
+          <span>{resolvedServiceName} | {consultationMode}</span>
         </div>
-        <button type="button" onClick={handleBookAppointment} disabled={processingBooking || (futureBooking && !selectedSlotStart)}>
-          {processingBooking ? 'Processing...' : 'Book Appointment'}
+        <button type="button" onClick={handleBookAppointment} disabled={futureBooking && !selectedSlotStart}>
+          Book Appointment
         </button>
       </div>
 

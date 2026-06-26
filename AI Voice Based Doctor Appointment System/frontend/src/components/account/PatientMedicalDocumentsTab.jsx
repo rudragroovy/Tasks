@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, FileBadge2, FileText, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getPractitionerTypeLabel } from '../../utils/doctorConsultation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const PAGE_SIZE = 9;
@@ -70,8 +71,7 @@ function getServiceLabel(appointment) {
     summary?.service_name ||
     summary?.consultation_type ||
     summary?.primary_symptom ||
-    appointment?.doctor?.doctorProfile?.specialization?.name ||
-    appointment?.doctor?.specialization?.name ||
+    getPractitionerTypeLabel(appointment?.doctor, '') ||
     'Standard Consultation'
   );
 }

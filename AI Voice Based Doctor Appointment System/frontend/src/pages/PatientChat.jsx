@@ -15,6 +15,7 @@ import LandingNavbar from '../components/LandingNavbar';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { formatDoctorName } from '../utils/doctorName';
+import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -139,10 +140,7 @@ export default function PatientChat() {
         groupedByDoctor.set(key, {
           id: key,
           doctorName: fallbackDoctorName,
-          doctorSpecialization:
-            appointment?.doctor?.doctorProfile?.specialization?.name ||
-            appointment?.doctor?.specialization?.name ||
-            'General Practitioner',
+          doctorSpecialization: getPractitionerTypeLabel(appointment?.doctor, 'General Practitioner'),
           avatarSeed: fallbackDoctorName,
           messages: [],
         });

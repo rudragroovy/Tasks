@@ -6,6 +6,7 @@ import { TopHeader } from '../components/ui/top-header';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDoctorName } from '../utils/doctorName';
+import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 import {
   ArrowLeft, Stethoscope, Video, Phone, PhoneOff,
   ShieldCheck, Wifi, CheckCircle2, Loader2, CalendarClock, MessageSquare
@@ -236,7 +237,7 @@ export default function PatientWaitingRoom() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-white font-heading font-black text-base sm:text-lg lg:text-xl truncate leading-tight">{doctorName}</p>
-                    <p className="text-primary-300 text-xs font-medium truncate">{appointment?.doctor?.specialization || 'Specialist'}</p>
+                    <p className="text-primary-300 text-xs font-medium truncate">{getPractitionerTypeLabel(appointment?.doctor, 'Specialist')}</p>
                   </div>
                   <span className={`shrink-0 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${step >= 2
                       ? 'bg-health-500/20 text-health-300 border border-health-500/30'
