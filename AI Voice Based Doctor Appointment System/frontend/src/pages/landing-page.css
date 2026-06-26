@@ -896,8 +896,15 @@
 
 .landing-nav-v2__profile-name {
   color: #0f172a;
-  font-family: var(--font-heading, inherit);
-  letter-spacing: -.01em;
+  /* Small-size heading font + negative tracking looked jagged on hero overlay.
+     Use body font metrics for consistent readability across routes. */
+  font-family: var(--font-sans, inherit);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
   min-width: 0;
   max-width: 112px;
   overflow: hidden;
@@ -920,6 +927,8 @@
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
   overflow: hidden;
   z-index: 1300;
+  padding: 2px 0;
+  transform: translateZ(0);
 }
 
 .landing-nav-v2__profile-item {
@@ -933,10 +942,13 @@
   gap: 10px;
   text-align: left;
   padding: 10px 12px;
+  min-height: 44px;
+  line-height: 1.2;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color .18s ease, color .18s ease;
+  -webkit-font-smoothing: antialiased;
 }
 
 .landing-nav-v2__profile-item:last-child {
