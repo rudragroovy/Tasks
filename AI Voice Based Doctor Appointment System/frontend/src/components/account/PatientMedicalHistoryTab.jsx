@@ -69,15 +69,19 @@ function filterByTab(appointment, activeTab) {
   }
 
   if (activeTab === 'upcoming') {
-    if (!['PENDING', 'ACCEPTED'].includes(status)) return false;
-    if (!scheduledAt) return status === 'PENDING';
+    if (!['PENDING', 'PAID', 'ACCEPTED'].includes(status)) return false;
+    if (!scheduledAt) return ['PENDING', 'PAID'].includes(status);
     return scheduledAt > now;
   }
 
   return isPastAppointment(appointment);
 }
 
-export default function PatientMedicalHistoryTab({ userFirstName = 'Patient' }) {
+export default function PatientMedicalHistoryTab({
+  userFirstName = 'Patient',
+  autoReviewAppointmentId = null,
+  onAutoReviewHandled,
+}) {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('past');
@@ -88,6 +92,7 @@ export default function PatientMedicalHistoryTab({ userFirstName = 'Patient' }) 
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedHistoryApt, setSelectedHistoryApt] = useState(null);
   const [reviewTargetAppointment, setReviewTargetAppointment] = useState(null);
+  const [autoReviewAttemptedId, setAutoReviewAttemptedId] = useState(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -113,9 +118,13 @@ export default function PatientMedicalHistoryTab({ userFirstName = 'Patient' }) 
     setCurrentPage(1);
   }, [activeTab, searchQuery, statusFilter, startDate, endDate]);
 
+  useEffect(() => {
+    setAutoReviewAttemptedId(null);
+  }, [autoReviewAppointmentId]);
+
   const statusOptions = useMemo(() => {
     if (activeTab === 'current') return ['ALL', 'ACCEPTED'];
-    if (activeTab === 'upcoming') return ['ALL', 'PENDING', 'ACCEPTED'];
+    if (activeTab === 'upcoming') return ['ALL', 'PENDING', 'PAID', 'ACCEPTED'];
     return ['ALL', 'COMPLETED', 'CANCELLED', 'REJECTED'];
   }, [activeTab]);
 
@@ -169,6 +178,59 @@ export default function PatientMedicalHistoryTab({ userFirstName = 'Patient' }) 
       )
     );
   };
+
+  useEffect(() => {
+    const targetId = String(autoReviewAppointmentId || '').trim();
+    if (!targetId) return;
+
+    setActiveTab('past');
+
+    const targetAppointment = appointments.find((appointment) => appointment.id === targetId);
+    const targetStatus = String(targetAppointment?.status || '').toUpperCase();
+    const isCompleted = targetStatus === 'COMPLETED';
+
+    if (targetAppointment && isCompleted) {
+      setReviewTargetAppointment(targetAppointment);
+      if (typeof onAutoReviewHandled === 'function') onAutoReviewHandled();
+      return;
+    }
+
+    if (loading || autoReviewAttemptedId === targetId) return;
+
+    setAutoReviewAttemptedId(targetId);
+    let cancelled = false;
+    const fetchTargetAppointment = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/appointments/${targetId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (cancelled || !payload?.id) return;
+
+        setAppointments((previous) => {
+          const exists = previous.some((appointment) => appointment.id === payload.id);
+          if (exists) {
+            return previous.map((appointment) => (appointment.id === payload.id ? payload : appointment));
+          }
+          return [payload, ...previous];
+        });
+
+        if (String(payload.status || '').toUpperCase() === 'COMPLETED') {
+          setReviewTargetAppointment(payload);
+          if (typeof onAutoReviewHandled === 'function') onAutoReviewHandled();
+        }
+      } catch (error) {
+        console.error('Failed to fetch appointment for auto-review prompt', error);
+      }
+    };
+
+    fetchTargetAppointment();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appointments, autoReviewAppointmentId, autoReviewAttemptedId, loading, onAutoReviewHandled]);
 
   return (
     <>

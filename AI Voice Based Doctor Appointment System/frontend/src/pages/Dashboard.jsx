@@ -740,65 +740,109 @@ export default function Dashboard() {
 
 
       {/* Call Incoming Modal */}
-      {incomingCall && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center p-4">
-           {/* Pulsing avatar */}
-           <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-4 border-health-400 animate-ping opacity-75"></div>
-              <div className="absolute inset-2 rounded-full border-4 border-health-500 animate-pulse"></div>
-              
-              <div className="absolute inset-4 rounded-full bg-slate-100 border-4 border-white shadow-lg overflow-hidden z-10">
-                 <img 
-                   src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${incomingCall.doctorName || 'Loading'}`} 
-                   alt="Doctor" 
-                   className="w-full h-full object-cover"
-                 />
+      <AnimatePresence>
+        {incomingCall && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+            style={{ background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(16px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Incoming consultation call"
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: -20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+              className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 flex flex-col items-center backdrop-blur-sm shadow-2xl"
+            >
+              <div className="relative w-32 h-32 mb-8">
+                <div className="absolute inset-0 rounded-full border-2 border-health-400/40 animate-ping" />
+                <div className="absolute inset-3 rounded-full border-2 border-health-300/30 animate-pulse" />
+                <div className="absolute inset-4 rounded-full bg-slate-100 border-4 border-white shadow-xl overflow-hidden z-10">
+                  <img
+                    src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${incomingCall.doctorName || 'Doctor'}`}
+                    alt="Doctor"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute bottom-1 right-1 w-8 h-8 bg-health-500 rounded-full border-4 border-slate-900/80 flex items-center justify-center z-20">
+                  {incomingCallMode === 'AUDIO' ? (
+                    <Phone className="w-3.5 h-3.5 text-white" />
+                  ) : incomingCallMode === 'IN_PERSON' ? (
+                    <MessageSquare className="w-3.5 h-3.5 text-white" />
+                  ) : (
+                    <Video className="w-3.5 h-3.5 text-white" />
+                  )}
+                </div>
               </div>
-           </div>
 
-           <h2 className="text-white font-heading font-black text-3xl mb-2 text-center animate-pulse flex items-center justify-center gap-2">
-             {incomingCallMode === 'AUDIO' ? (
-               <Phone className="w-7 h-7" />
-             ) : incomingCallMode === 'IN_PERSON' ? (
-               <MessageSquare className="w-7 h-7" />
-             ) : (
-               <Video className="w-7 h-7" />
-             )}
-             Incoming {incomingCallLabel} Call...
-           </h2>
-           <p className="text-slate-300 font-medium text-lg text-center mb-10">
-             {formatDoctorName(incomingCall.doctorName, incomingCall.doctorName)} is calling you
-           </p>
+              <p className="text-health-400 text-xs font-black uppercase tracking-widest mb-3">
+                Incoming {incomingCallLabel} Call
+              </p>
+              <h2 className="text-white font-heading font-black text-2xl sm:text-3xl text-center mb-1">
+                {formatDoctorName(incomingCall.doctorName, incomingCall.doctorName)}
+              </h2>
+              <p className="text-slate-400 font-medium text-sm text-center mb-8">
+                is calling you for your appointment
+              </p>
 
-           <div className="flex items-center gap-10">
-              <button 
-                onClick={handleDeclineCall}
-                className="flex flex-col items-center gap-3 group cursor-pointer"
-              >
-                 <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/40 group-hover:bg-red-600 transition-colors">
+              <div className="mb-8 flex flex-col items-center gap-2">
+                <div className="relative w-16 h-16">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      fill="none"
+                      stroke="#06B6D4"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 28}`}
+                      strokeDashoffset={`${2 * Math.PI * 28 * (1 - (timeLeft / 120))}`}
+                      style={{ transition: 'stroke-dashoffset 1s linear' }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-white font-heading font-black text-sm">
+                      {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-white/40 text-xs font-medium">Auto-declining in</p>
+              </div>
+
+              <div className="flex items-center gap-8 sm:gap-12">
+                <button
+                  type="button"
+                  onClick={handleDeclineCall}
+                  className="flex flex-col items-center gap-3 group cursor-pointer"
+                >
+                  <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 group-hover:bg-red-600 transition-colors">
                     <PhoneOff className="w-7 h-7 text-white" />
-                 </div>
-                 <span className="text-white font-bold tracking-wider uppercase text-xs">Decline</span>
-              </button>
+                  </div>
+                  <span className="text-white/60 font-bold tracking-wider uppercase text-xs">Decline</span>
+                </button>
 
-              <button 
-                onClick={handleAcceptCall}
-                className="flex flex-col items-center gap-3 group cursor-pointer"
-              >
-                 <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/40 group-hover:bg-green-600 transition-colors animate-bounce">
+                <button
+                  type="button"
+                  onClick={handleAcceptCall}
+                  className="flex flex-col items-center gap-3 group cursor-pointer"
+                >
+                  <div className="w-16 h-16 bg-health-500 rounded-full flex items-center justify-center shadow-lg shadow-health-500/30 group-hover:bg-health-600 transition-colors">
                     <Phone className="w-7 h-7 text-white" />
-                 </div>
-                 <span className="text-white font-bold tracking-wider uppercase text-xs">Accept</span>
-              </button>
-           </div>
-
-           {/* Timer */}
-           <div className="mt-12 flex items-center gap-2 text-white/50 font-medium">
-              <Clock className="w-4 h-4" />
-              <span>Auto-declining in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
-           </div>
-        </div>
-      )}
+                  </div>
+                  <span className="text-white font-bold tracking-wider uppercase text-xs">Accept</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {selectedHistoryApt && (
         <HistoryModal 

@@ -10,6 +10,7 @@ const {
 } = require('../utils/doctorCatalog');
 
 const router = express.Router();
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173';
 
 function parseAiSummary(value) {
   if (value && typeof value === 'object') return value;
@@ -94,8 +95,8 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}&appointmentId=${appointmentId}&type=${type}`,
-      cancel_url: `http://localhost:5173/dashboard`,
+      success_url: `${FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}&appointmentId=${appointmentId}&type=${type}`,
+      cancel_url: `${FRONTEND_URL}/dashboard`,
       client_reference_id: appointmentId,
     });
 
@@ -164,7 +165,7 @@ router.post('/create-checkout-session', authenticate, async (req, res) => {
       });
 
       return res.json({ 
-        url: `http://localhost:5173/mock-checkout?session_id=${mockSessionId}&appointmentId=${appointmentId}&type=${type}&consultationFee=${normalizedFee}` 
+        url: `${FRONTEND_URL}/mock-checkout?session_id=${mockSessionId}&appointmentId=${appointmentId}&type=${type}&consultationFee=${normalizedFee}` 
       });
     }
     res.status(500).json({ error: 'Failed to create payment session' });
@@ -179,7 +180,7 @@ router.post('/confirm', authenticate, async (req, res) => {
 
     const existingAppointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      select: { id: true, doctorId: true, type: true }
+      select: { id: true, doctorId: true, type: true, aiSummary: true }
     });
 
     if (!existingAppointment) {
@@ -191,9 +192,16 @@ router.post('/confirm', authenticate, async (req, res) => {
     // - SCHEDULED: auto-confirm directly in doctor's schedule (ACCEPTED after payment)
     const nextStatus = existingAppointment.type === 'SCHEDULED' ? 'ACCEPTED' : 'PENDING';
 
+    const summary = parseAiSummary(existingAppointment.aiSummary);
+    const nextAiSummary = {
+      ...summary,
+      paymentConfirmedAt: new Date().toISOString(),
+      queueType: existingAppointment.type === 'ON_DEMAND' ? (summary?.queueType || 'DOCTOR_SPECIFIC') : (summary?.queueType || ''),
+    };
+
     const appointment = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: 'PAID', status: nextStatus }
+      data: { paymentStatus: 'PAID', status: nextStatus, aiSummary: nextAiSummary }
     });
 
     // Notify doctor

@@ -158,24 +158,9 @@ export default function Booking() {
   const selectedPatientId =
     typeof aiSummary.selectedPatientId === 'string' ? aiSummary.selectedPatientId : 'self';
   const practitionerTypeQuery = searchParams.get('practitionerType') || '';
-  const [selectedServiceName] = useState(() => searchParams.get('service') || aiSummary?.serviceName || '');
-  const [selectedServiceType] = useState(() => searchParams.get('serviceType') || aiSummary?.serviceType || '');
+  const selectedServiceName = searchParams.get('service') || aiSummary?.serviceName || '';
+  const selectedServiceType = searchParams.get('serviceType') || aiSummary?.serviceType || '';
   const categoryQuery = searchParams.get('category') || '';
-
-  useEffect(() => {
-    const hasServiceParams = searchParams.has('service') || searchParams.has('serviceType');
-    if (!hasServiceParams) return;
-
-    const next = new URLSearchParams(searchParams);
-    next.delete('service');
-    next.delete('serviceType');
-    const nextSearch = next.toString();
-
-    navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, {
-      replace: true,
-      state: location.state,
-    });
-  }, [location.pathname, location.state, navigate, searchParams]);
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
@@ -185,9 +170,6 @@ export default function Booking() {
         type: futureBooking ? 'SCHEDULED' : 'ON_DEMAND',
         appointmentType: futureBooking ? 'SCHEDULED' : 'ON_DEMAND',
       };
-      if (practitionerTypeQuery) {
-        params.practitionerType = practitionerTypeQuery;
-      }
 
       const { data } = await axios.get('http://localhost:5000/api/appointments/doctors', {
         params,
@@ -210,7 +192,7 @@ export default function Booking() {
     } finally {
       setLoading(false);
     }
-  }, [futureBooking, practitionerTypeQuery]);
+  }, [futureBooking]);
 
   useEffect(() => {
     fetchDoctors();
@@ -310,24 +292,43 @@ export default function Booking() {
       const practitionerType = String(
         doctor?.practitionerType || 'General Practitioner (GP)'
       );
-      const doctorGender = String(doctor?.user?.gender || 'Unknown').toUpperCase();
+      const genderRaw = String(doctor?.gender || doctor?.user?.gender || '').trim().toUpperCase();
+      const doctorGender = genderRaw.startsWith('M')
+        ? 'MALE'
+        : genderRaw.startsWith('F')
+          ? 'FEMALE'
+          : 'UNKNOWN';
       const ratingValue = getDoctorRating(doctor);
+      const reviewCount = getDoctorReviewCount(doctor);
+      const normalizedPractitionerType = String(practitionerType).trim().toLowerCase();
+      const normalizedTypeFilter = String(specializationFilter || '').trim().toLowerCase();
 
       if (doctorNameFilter && !doctorName.includes(doctorNameFilter.toLowerCase())) return false;
       if (clinicFilter && !clinicName.includes(clinicFilter.toLowerCase())) return false;
-      if (specializationFilter !== 'ANY' && practitionerType !== specializationFilter) return false;
+      if (specializationFilter !== 'ANY' && normalizedPractitionerType !== normalizedTypeFilter) return false;
       if (genderFilter !== 'ANY' && doctorGender !== genderFilter) return false;
-      if (ratingFilter !== 'ANY' && ratingValue < Number(ratingFilter)) return false;
+      if (ratingFilter !== 'ANY' && (reviewCount <= 0 || ratingValue < Number(ratingFilter))) return false;
+      if (futureBooking && availabilityFilter !== 'ANY') {
+        const slotState = doctorSlots[doctorId];
+        if (slotState?.loading) return true;
+        const hasAvailableSlot = Array.isArray(slotState?.slots)
+          ? slotState.slots.some((slot) => slot?.available)
+          : false;
+        if (!hasAvailableSlot) return false;
+      }
       return true;
     });
   }, [
+    availabilityFilter,
     clinicFilter,
     doctorNameFilter,
-      visibleDoctors,
-      genderFilter,
-      ratingFilter,
-      specializationFilter,
-    ]);
+    doctorSlots,
+    futureBooking,
+    genderFilter,
+    ratingFilter,
+    specializationFilter,
+    visibleDoctors,
+  ]);
 
   const avgFee = useMemo(() => {
     if (!filteredDoctors.length) return 49.25;

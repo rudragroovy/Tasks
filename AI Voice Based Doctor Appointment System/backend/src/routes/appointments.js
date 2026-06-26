@@ -7,7 +7,8 @@ const {
   getUserAppointments,
   inviteDoctor,
   submitDoctorNote,
-  getAppointmentById
+  getAppointmentById,
+  moveToGeneralQueue,
 } = require('../controllers/appointmentController');
 const { authenticate } = require('../middlewares/authMiddleware');
 
@@ -19,6 +20,7 @@ router.get('/doctors/:doctorId/slots', authenticate, getDoctorAvailableSlots);
 router.get('/:id', authenticate, getAppointmentById);
 router.post('/', authenticate, createAppointment);
 router.put('/:id/status', authenticate, updateStatus);
+router.post('/:id/move-to-general', authenticate, moveToGeneralQueue);
 router.post('/:id/invite', authenticate, inviteDoctor);
 router.post('/:id/notes', authenticate, submitDoctorNote);
 

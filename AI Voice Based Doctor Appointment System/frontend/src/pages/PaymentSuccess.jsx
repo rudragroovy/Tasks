@@ -5,10 +5,14 @@ import { CheckCircle, LayoutDashboard, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TopHeader } from '../components/ui/top-header';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [verifying, setVerifying] = useState(true);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   const sessionId = searchParams.get('session_id');
   const appointmentId = searchParams.get('appointmentId');
@@ -21,23 +25,36 @@ export default function PaymentSuccess() {
       return;
     }
 
+    let countdownInterval;
+    let redirectTimeout;
+    let isActive = true;
+
     const confirmPayment = async () => {
       try {
-        await axios.post('http://localhost:5000/api/payments/confirm', {
+        await axios.post(`${API_URL}/api/payments/confirm`, {
           sessionId,
           appointmentId
         }, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
 
+        if (!isActive) return;
         setVerifying(false);
+        setShowSuccessPopup(true);
+        setRedirectCountdown(3);
 
-        setTimeout(() => {
-          if (isOnDemand) {
-            navigate(`/waiting-room?id=${appointmentId}`);
-          } else {
-            navigate('/dashboard');
-          }
+        countdownInterval = setInterval(() => {
+          setRedirectCountdown((current) => {
+            if (current <= 1) {
+              clearInterval(countdownInterval);
+              return 0;
+            }
+            return current - 1;
+          });
+        }, 1000);
+
+        redirectTimeout = setTimeout(() => {
+          navigate(`/waiting-room?id=${appointmentId}`);
         }, 3000);
       } catch (error) {
         console.error('Payment confirmation failed:', error);
@@ -47,11 +64,36 @@ export default function PaymentSuccess() {
     };
 
     confirmPayment();
+
+    return () => {
+      isActive = false;
+      if (countdownInterval) clearInterval(countdownInterval);
+      if (redirectTimeout) clearTimeout(redirectTimeout);
+    };
   }, [sessionId, appointmentId, isOnDemand, navigate]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col overflow-hidden">
       <TopHeader />
+
+      {showSuccessPopup ? (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/45 px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+            className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-6 text-center shadow-2xl"
+          >
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+              <CheckCircle className="h-8 w-8 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-heading font-black text-slate-900">Payment Successful</h2>
+            <p className="mt-2 text-sm font-semibold text-slate-600">
+              Redirecting you to waiting room in {redirectCountdown}s...
+            </p>
+          </motion.div>
+        </div>
+      ) : null}
 
       {/* Background blobs */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-health-100 rounded-full blur-[120px] opacity-30 pointer-events-none" />
@@ -96,13 +138,13 @@ export default function PaymentSuccess() {
                     <p className="text-sm font-bold text-health-700">
                       {isOnDemand
                         ? 'Your consultation request is now in doctor queue.'
-                        : 'Your scheduled appointment is confirmed and added to doctor schedule.'}
+                        : 'Your scheduled appointment is confirmed.'}
                     </p>
                   </div>
 
                   <div className="flex items-center justify-center gap-2 text-sm font-bold text-slate-400">
                     <div className="w-4 h-4 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
-                    {isOnDemand ? 'Redirecting you to waiting room...' : 'Redirecting you to dashboard...'}
+                    Redirecting you to waiting room...
                   </div>
                 </div>
               )}
@@ -114,14 +156,12 @@ export default function PaymentSuccess() {
                 >
                   <LayoutDashboard className="w-4 h-4" /> Dashboard
                 </button>
-                {isOnDemand && (
-                  <button
-                    onClick={() => navigate(`/waiting-room?id=${appointmentId}`)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 text-white font-bold hover:bg-primary-700 transition-colors text-sm shadow-md shadow-primary-600/20"
-                  >
-                    <Clock className="w-4 h-4" /> Go to Waiting Room
-                  </button>
-                )}
+                <button
+                  onClick={() => navigate(`/waiting-room?id=${appointmentId}`)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 text-white font-bold hover:bg-primary-700 transition-colors text-sm shadow-md shadow-primary-600/20"
+                >
+                  <Clock className="w-4 h-4" /> Go to Waiting Room
+                </button>
               </div>
             </div>
           </div>

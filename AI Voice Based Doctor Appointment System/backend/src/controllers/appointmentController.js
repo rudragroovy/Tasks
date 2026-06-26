@@ -19,6 +19,42 @@ const { getConnectedDoctorIds } = require('../socket/doctorPresenceStore');
 
 const SLOT_FREE_STATUSES = new Set(['CANCELLED', 'REJECTED']);
 const SCHEDULED_APPOINTMENT_TYPE = 'SCHEDULED';
+const GENERAL_QUEUE_WAIT_MINUTES = 30;
+
+function getGeneralQueueCutoffDate() {
+  return new Date(Date.now() - GENERAL_QUEUE_WAIT_MINUTES * 60 * 1000);
+}
+
+function getQueueTypeFromAiSummary(aiSummary) {
+  const parsed = parseAiSummary(aiSummary);
+  const queueType = String(parsed?.queueType || '').trim().toUpperCase();
+  return queueType || 'DOCTOR_SPECIFIC';
+}
+
+function isGeneralQueueAppointment(appointment) {
+  const queueType = getQueueTypeFromAiSummary(appointment?.aiSummary);
+  if (queueType === 'GENERAL') return true;
+  if (
+    appointment?.type === 'ON_DEMAND' &&
+    appointment?.status === 'PENDING' &&
+    appointment?.paymentStatus === 'PAID'
+  ) {
+    const createdAt = new Date(appointment?.createdAt || 0);
+    if (!Number.isNaN(createdAt.getTime()) && createdAt <= getGeneralQueueCutoffDate()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function withQueueType(aiSummary, queueType) {
+  const parsed = parseAiSummary(aiSummary);
+  return {
+    ...parsed,
+    queueType,
+    queueUpdatedAt: new Date().toISOString(),
+  };
+}
 
 function parseAiSummary(aiSummary) {
   return typeof aiSummary === 'object' ? aiSummary : JSON.parse(aiSummary || '{}');
@@ -125,6 +161,7 @@ exports.getDoctors = async (req, res) => {
       select: {
         userId: true,
         isOnline: true,
+        gender: true,
         qualification: true,
         experienceRange: true,
         practitionerType: true,
@@ -302,6 +339,7 @@ exports.createAppointment = async (req, res) => {
     const normalizedAiSummary = parseAiSummary(aiSummary);
     if (normalizedAiSummary && typeof normalizedAiSummary === 'object') {
       normalizedAiSummary.assigned_doctor_id = doctorId;
+      normalizedAiSummary.queueType = 'DOCTOR_SPECIFIC';
       if (serviceName) normalizedAiSummary.serviceName = serviceName;
       if (serviceType) normalizedAiSummary.serviceType = serviceType;
       if (doctorProfile.user?.name) {
@@ -442,9 +480,49 @@ exports.updateStatus = async (req, res) => {
     }
 
     const isPrimaryDoctor = appointmentCheck.doctorId === req.user.id;
+    const isDoctor = req.user.role === 'DOCTOR';
     const isPatient = appointmentCheck.patientId === req.user.id;
+    const isGeneralQueue = isGeneralQueueAppointment(appointmentCheck);
+    const canDoctorHandleGeneralQueue =
+      isDoctor &&
+      !isPrimaryDoctor &&
+      ['ACCEPTED', 'REJECTED'].includes(status) &&
+      isGeneralQueue;
 
-    if (!isPrimaryDoctor && ['ACCEPTED', 'REJECTED', 'COMPLETED'].includes(status)) {
+    if (status === 'REJECTED' && canDoctorHandleGeneralQueue) {
+      await prisma.invitedDoctor.upsert({
+        where: {
+          appointmentId_doctorId: {
+            appointmentId: id,
+            doctorId: req.user.id,
+          },
+        },
+        create: {
+          appointmentId: id,
+          doctorId: req.user.id,
+          status: 'REJECTED',
+        },
+        update: {
+          status: 'REJECTED',
+        },
+      });
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user:${req.user.id}`).emit('appointment:updated', { id, status: 'REJECTED' });
+      }
+
+      return res.json({ id, status: 'REJECTED', handledAs: 'GENERAL_QUEUE_DECLINE' });
+    }
+
+    const canPatientComplete = status === 'COMPLETED' && isPatient;
+
+    if (
+      !isPrimaryDoctor &&
+      !canDoctorHandleGeneralQueue &&
+      !canPatientComplete &&
+      ['ACCEPTED', 'REJECTED', 'COMPLETED'].includes(status)
+    ) {
       return res.status(403).json({ error: 'Not authorized to change status' });
     }
 
@@ -463,6 +541,17 @@ exports.updateStatus = async (req, res) => {
         return res.status(400).json({ error: 'Decline reason must be at least 5 characters long.' });
       }
       dataToUpdate.declineReason = normalizedReason;
+    }
+
+    if (status === 'ACCEPTED' && canDoctorHandleGeneralQueue) {
+      const currentSummary = parseAiSummary(appointmentCheck.aiSummary);
+      dataToUpdate.doctorId = req.user.id;
+      dataToUpdate.aiSummary = {
+        ...currentSummary,
+        assigned_doctor_id: req.user.id,
+        queueType: 'DOCTOR_SPECIFIC',
+        queueUpdatedAt: new Date().toISOString(),
+      };
     }
 
     if (status === 'COMPLETED') {
@@ -561,6 +650,17 @@ exports.updateStatus = async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.to(`user:${appointment.patientId}`).to(`user:${appointment.doctorId}`).emit('appointment:updated', appointment);
+      if (status === 'ACCEPTED') {
+        // ponytail: emit call popup from the shared ACCEPTED path so all doctor-accept flows behave the same.
+        const doctorUser = await prisma.user.findUnique({
+          where: { id: appointment.doctorId },
+          select: { name: true },
+        });
+        io.to(`user:${appointment.patientId}`).emit('call:incoming', {
+          appointmentId: id,
+          doctorName: formatDoctorName(doctorUser?.name, doctorUser?.name || 'Doctor'),
+        });
+      }
     }
 
     res.json(appointment);
@@ -590,10 +690,29 @@ exports.getUserAppointments = async (req, res) => {
     let whereClause = {};
 
     if (role === 'DOCTOR') {
+      const generalQueueCutoff = getGeneralQueueCutoffDate();
       whereClause = {
         OR: [
           { doctorId: userId },
-          { invitedDoctors: { some: { doctorId: userId, status: { not: 'REJECTED' } } } }
+          { invitedDoctors: { some: { doctorId: userId, status: { not: 'REJECTED' } } } },
+          {
+            AND: [
+              { type: 'ON_DEMAND' },
+              { status: 'PENDING' },
+              { paymentStatus: 'PAID' },
+              { createdAt: { lte: generalQueueCutoff } },
+              { invitedDoctors: { none: { doctorId: userId, status: 'REJECTED' } } },
+            ],
+          },
+          {
+            AND: [
+              { type: 'ON_DEMAND' },
+              { status: 'PENDING' },
+              { paymentStatus: 'PAID' },
+              { aiSummary: { path: ['queueType'], equals: 'GENERAL' } },
+              { invitedDoctors: { none: { doctorId: userId, status: 'REJECTED' } } },
+            ],
+          },
         ]
       };
     } else {
@@ -603,8 +722,43 @@ exports.getUserAppointments = async (req, res) => {
     const appointments = await prisma.appointment.findMany({
       where: whereClause,
       include: {
-        doctor: { select: { id: true, name: true, email: true, doctorProfile: { select: { practitionerType: true, services: true } } } },
-        patient: { select: { id: true, name: true, email: true } },
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            doctorProfile: {
+              select: {
+                practitionerType: true,
+                services: true,
+                qualification: true,
+                providerNumber: true,
+                phoneCode: true,
+                phone: true,
+                address: true,
+              },
+            },
+          },
+        },
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            patientProfile: {
+              select: {
+                medicareIrn: true,
+                medicareCardNumber: true,
+                healthIdentifierType: true,
+                dateOfBirth: true,
+                gender: true,
+                phoneCode: true,
+                phone: true,
+                address: true,
+              },
+            },
+          },
+        },
         familyMember: true,
         consultation: true,
         review: true,
@@ -754,14 +908,98 @@ exports.submitDoctorNote = async (req, res) => {
   }
 };
 
+exports.moveToGeneralQueue = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const isOwnerPatient = appointment.patientId === req.user.id;
+    if (!isOwnerPatient && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Not authorized to move this request.' });
+    }
+
+    if (appointment.type !== 'ON_DEMAND') {
+      return res.status(400).json({ error: 'Only on-demand requests can be moved to general queue.' });
+    }
+
+    if (appointment.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Only pending requests can be moved to general queue.' });
+    }
+
+    if (appointment.paymentStatus !== 'PAID') {
+      return res.status(400).json({ error: 'Payment must be completed before moving to general queue.' });
+    }
+
+    const updated = await prisma.appointment.update({
+      where: { id },
+      data: {
+        aiSummary: withQueueType(appointment.aiSummary, 'GENERAL'),
+      },
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${updated.patientId}`).to(`user:${updated.doctorId}`).emit('appointment:updated', updated);
+      io.emit('appointment:updated', updated);
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to move request to general queue.' });
+  }
+};
+
 exports.getAppointmentById = async (req, res) => {
   try {
     const { id } = req.params;
     const appointment = await prisma.appointment.findUnique({
       where: { id },
       include: {
-        doctor: { select: { id: true, name: true, email: true, doctorProfile: { select: { practitionerType: true, services: true } } } },
-        patient: { select: { id: true, name: true, email: true } },
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            doctorProfile: {
+              select: {
+                practitionerType: true,
+                services: true,
+                qualification: true,
+                providerNumber: true,
+                phoneCode: true,
+                phone: true,
+                address: true,
+              },
+            },
+          },
+        },
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            patientProfile: {
+              select: {
+                medicareIrn: true,
+                medicareCardNumber: true,
+                healthIdentifierType: true,
+                dateOfBirth: true,
+                gender: true,
+                phoneCode: true,
+                phone: true,
+                address: true,
+              },
+            },
+          },
+        },
         familyMember: true,
         consultation: true,
         review: true,

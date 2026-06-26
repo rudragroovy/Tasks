@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Avatar,
+  Button,
   Card,
   ConfigProvider,
   Empty,
@@ -78,6 +79,7 @@ export default function DoctorChat() {
   const [chatScope, setChatScope] = useState('chat');
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [isOnline, setIsOnline] = useState(Boolean(user?.doctorProfile?.isOnline));
+  const [newMessage, setNewMessage] = useState('');
 
   useEffect(() => {
     setIsOnline(Boolean(user?.doctorProfile?.isOnline));
@@ -179,11 +181,28 @@ export default function DoctorChat() {
           patientEmail: appointment?.patient?.email || '',
           avatarSeed: appointment?.patient?.name || fallbackPatientName,
           messages: [],
+          latestConsultedAppointmentId: null,
+          latestConsultedAt: null,
+          latestAppointmentId: null,
+          latestAppointmentAt: null,
         });
       }
 
       const group = groupedByPatient.get(key);
       const messages = Array.isArray(appointment?.messages) ? appointment.messages : [];
+      const appointmentActivityAt = appointment?.updatedAt || appointment?.createdAt || null;
+      const appointmentActivityTs = getTimestampValue(appointmentActivityAt);
+
+      if (appointment?.id && appointmentActivityTs >= getTimestampValue(group.latestAppointmentAt)) {
+        group.latestAppointmentId = appointment.id;
+        group.latestAppointmentAt = appointmentActivityAt;
+      }
+
+      const isConsultedAppointment = ['ACCEPTED', 'COMPLETED'].includes(String(appointment?.status || '').toUpperCase());
+      if (isConsultedAppointment && appointment?.id && appointmentActivityTs >= getTimestampValue(group.latestConsultedAt)) {
+        group.latestConsultedAppointmentId = appointment.id;
+        group.latestConsultedAt = appointmentActivityAt;
+      }
 
       messages.forEach((message) => {
         group.messages.push({
@@ -199,17 +218,21 @@ export default function DoctorChat() {
           return getTimestampValue(a?.createdAt || a?.updatedAt) - getTimestampValue(b?.createdAt || b?.updatedAt);
         });
         const lastMessage = sortedMessages[sortedMessages.length - 1];
-        const lastActivity = lastMessage?.createdAt || lastMessage?.updatedAt;
+        const lastActivity = lastMessage?.createdAt || lastMessage?.updatedAt || group.latestConsultedAt || group.latestAppointmentAt;
+        const targetAppointmentId = group.latestConsultedAppointmentId || group.latestAppointmentId || null;
+        const hasConsultedHistory = Boolean(group.latestConsultedAppointmentId);
 
         return {
           ...group,
           messages: sortedMessages,
-          lastMessageText: (lastMessage?.text || '').trim(),
+          lastMessageText: (lastMessage?.text || '').trim() || (hasConsultedHistory ? 'Start a new conversation' : ''),
           lastActivity,
           timeLabel: formatMessageTime(lastActivity),
+          targetAppointmentId,
+          hasConsultedHistory,
         };
       })
-      .filter((conversation) => conversation.messages.length > 0 && Boolean(conversation.lastMessageText))
+      .filter((conversation) => conversation.messages.length > 0 || conversation.hasConsultedHistory)
       .sort((a, b) => getTimestampValue(b.lastActivity) - getTimestampValue(a.lastActivity));
   }, [appointments]);
 
@@ -240,6 +263,23 @@ export default function DoctorChat() {
     }
   }, [conversations, selectedConversationId]);
 
+  useEffect(() => {
+    setNewMessage('');
+  }, [selectedConversationId]);
+
+  const sendMessage = () => {
+    const text = String(newMessage || '').trim();
+    if (!text || !socket || !selectedConversation?.targetAppointmentId) return;
+    socket.emit('chat:send', {
+      appointmentId: selectedConversation.targetAppointmentId,
+      senderId: user?.id,
+      senderRole: user?.role,
+      senderName: user?.name,
+      text,
+    });
+    setNewMessage('');
+  };
+
   const pendingCount = appointments.filter((appointment) => appointment.status === 'PENDING').length;
 
   return (
@@ -261,7 +301,7 @@ export default function DoctorChat() {
         },
       }}
     >
-      <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
+      <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#f5f8ff] text-slate-900">
         <SharedNavbar
           user={user}
           brandLabel="CareBridge"
@@ -277,10 +317,10 @@ export default function DoctorChat() {
           showMobileTabs
         />
 
-        <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-          <Card bordered={false} className="shadow-sm">
-            <div className="grid min-h-[620px] gap-3 lg:grid-cols-[290px_minmax(0,1fr)]">
-              <aside className="flex h-full min-h-[600px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <main className="mx-auto flex min-h-0 w-full max-w-[1500px] flex-1 overflow-hidden px-4 py-3 sm:px-6 lg:px-8">
+          <Card bordered={false} className="h-full w-full shadow-sm [&_.ant-card-body]:h-full [&_.ant-card-body]:overflow-hidden [&_.ant-card-body]:p-0">
+            <div className="grid h-full min-h-0 gap-3 p-3 lg:grid-cols-[290px_minmax(0,1fr)]">
+              <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 <div className="p-3">
                   <Input
                     allowClear
@@ -362,8 +402,8 @@ export default function DoctorChat() {
                 </div>
               </aside>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-3">
-                <div className="flex h-full min-h-[600px] flex-col overflow-hidden rounded-xl border border-slate-200">
+              <section className="min-h-0 rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200">
                   {!selectedConversation ? (
                     <div className="flex h-full items-center justify-center p-8 text-center">
                       <Text className="!text-[34px] !font-semibold !text-primary-900">
@@ -453,6 +493,28 @@ export default function DoctorChat() {
                             })}
                           </div>
                         )}
+                      </div>
+                      <div className="border-t border-slate-200 bg-white px-4 py-3">
+                        <div className="flex items-end gap-2">
+                          <Input.TextArea
+                            value={newMessage}
+                            onChange={(event) => setNewMessage(event.target.value)}
+                            autoSize={{ minRows: 1, maxRows: 4 }}
+                            placeholder="Type a message..."
+                            onPressEnter={(event) => {
+                              if (event.shiftKey) return;
+                              event.preventDefault();
+                              sendMessage();
+                            }}
+                          />
+                          <Button
+                            type="primary"
+                            onClick={sendMessage}
+                            disabled={!String(newMessage || '').trim() || !selectedConversation?.targetAppointmentId}
+                          >
+                            Send
+                          </Button>
+                        </div>
                       </div>
                     </>
                   )}

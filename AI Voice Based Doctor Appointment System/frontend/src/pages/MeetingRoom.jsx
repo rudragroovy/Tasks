@@ -12,11 +12,24 @@ import { useSocket } from '../context/SocketContext';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import SharedNavbar from '../components/SharedNavbar';
+import LandingNavbar from '../components/LandingNavbar';
 import { formatDoctorName } from '../utils/doctorName';
 import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
+import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
 
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '1480fbbff91244f7a77f0a8ed1359c19';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+function parseAiSummary(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 export default function MeetingRoom() {
   const { appointmentId } = useParams();
@@ -40,6 +53,7 @@ export default function MeetingRoom() {
   // For notifications while in meeting
   const [incomingCall, setIncomingCall] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [isOnline, setIsOnline] = useState(Boolean(user?.doctorProfile?.isOnline));
   const consultationMode = appointment?.consultationMode || 'VIDEO';
   const isAudioMode = consultationMode === 'AUDIO';
   const isInPersonMode = consultationMode === 'IN_PERSON';
@@ -49,6 +63,11 @@ export default function MeetingRoom() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+  const showComingSoon = (feature) => showToast(`${feature} will be available here soon.`);
+
+  useEffect(() => {
+    setIsOnline(Boolean(user?.doctorProfile?.isOnline));
+  }, [user?.doctorProfile?.isOnline]);
 
   const localVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
@@ -65,6 +84,13 @@ export default function MeetingRoom() {
   const [notes, setNotes] = useState('');
   const [prescription, setPrescription] = useState([]);
   const [medInput, setMedInput] = useState({ name: '', dosage: '', frequency: '', duration: '' });
+  const [medicalCertForm, setMedicalCertForm] = useState({ startDate: '', endDate: '', reason: '', advice: '' });
+  const [referralForm, setReferralForm] = useState({ doctorName: '', doctorEmail: '', doctorAddress: '', phoneNo: '', condition: '' });
+  const [pathologyTestInput, setPathologyTestInput] = useState('');
+  const [pathologyTests, setPathologyTests] = useState([]);
+  const [radiologyTestInput, setRadiologyTestInput] = useState('');
+  const [radiologyTests, setRadiologyTests] = useState([]);
+  const [patientRequestNote, setPatientRequestNote] = useState('');
 
   const [userNames, setUserNames] = useState({});
   const myUidRef = useRef(null);
@@ -76,6 +102,7 @@ export default function MeetingRoom() {
   // Completion confirmation flow
   const [waitingForPatientConfirmation, setWaitingForPatientConfirmation] = useState(false);
   const [showPatientEndConfirm, setShowPatientEndConfirm] = useState(false);
+  const [showLeaveCallOptions, setShowLeaveCallOptions] = useState(false);
   const notesRef = useRef('');
   const prescriptionRef = useRef([]);
   useEffect(() => { notesRef.current = notes; }, [notes]);
@@ -162,23 +189,31 @@ export default function MeetingRoom() {
         const { data } = await axios.get(`${API_URL}/api/appointments/${appointmentId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
-        setAppointment(data);
-        if (data.consultationMode === 'IN_PERSON') {
-          setActiveTab((prev) => prev || 'chat');
+        if (data?.consultationMode === 'IN_PERSON') {
+          // ponytail: route in-person sessions to dedicated pages.
+          const inPersonRoute = user?.role === 'DOCTOR'
+            ? `/doctor/in-person/${appointmentId}`
+            : `/patient/in-person/${appointmentId}`;
+          navigate(inPersonRoute, { replace: true });
+          return;
         }
+        setAppointment(data);
         if (data.messages) {
           setMessages(data.messages.map(m => ({
             ...m,
             senderName: m.senderRole === 'DOCTOR' ? data.doctor.name : (data.familyMember?.name || data.patient.name)
           })));
         }
+        if (Array.isArray(data?.consultation?.prescription)) {
+          setPrescription(data.consultation.prescription);
+        }
       } catch (err) { console.error(err); }
     };
     fetchAppt();
-  }, [appointmentId]);
+  }, [appointmentId, navigate, user?.role]);
 
   useEffect(() => {
-    if (!showInviteModal && !showPatientEndConfirm && !waitingForPatientConfirmation && !activeTab) return undefined;
+    if (!showInviteModal && !showPatientEndConfirm && !waitingForPatientConfirmation && !showLeaveCallOptions && !activeTab) return undefined;
     const handleEscape = (event) => {
       if (event.key !== 'Escape') return;
       if (showInviteModal) {
@@ -193,13 +228,17 @@ export default function MeetingRoom() {
         setWaitingForPatientConfirmation(false);
         return;
       }
+      if (showLeaveCallOptions) {
+        setShowLeaveCallOptions(false);
+        return;
+      }
       if (activeTab) {
         setActiveTab(null);
       }
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [showInviteModal, showPatientEndConfirm, waitingForPatientConfirmation, activeTab]);
+  }, [showInviteModal, showPatientEndConfirm, waitingForPatientConfirmation, showLeaveCallOptions, activeTab]);
 
   // â”€â”€ Socket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
@@ -539,7 +578,7 @@ export default function MeetingRoom() {
   // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  async function leaveCall(skipNavigate = false) {
+  async function leaveCall(skipNavigate = false, navigationState = null) {
     localTracks.forEach(t => { if (t) { t.stop(); t.close(); } });
     setLocalTracks([]);
     clearInterval(timerRef.current);
@@ -549,7 +588,16 @@ export default function MeetingRoom() {
     }
     setInCall(false);
     if (skipNavigate !== true) {
-      navigate('/dashboard');
+      if (navigationState && typeof navigationState === 'object') {
+        const redirectTo = typeof navigationState.redirectTo === 'string' && navigationState.redirectTo.trim()
+          ? navigationState.redirectTo.trim()
+          : '/dashboard';
+        const nextState = { ...navigationState };
+        delete nextState.redirectTo;
+        navigate(redirectTo, { state: Object.keys(nextState).length > 0 ? nextState : null });
+      } else {
+        navigate('/dashboard');
+      }
     }
   }
 
@@ -569,9 +617,24 @@ export default function MeetingRoom() {
   };
 
   const addMedicine = () => {
-    if (!medInput.name) return;
-    setPrescription(p => [...p, medInput]);
+    const nextName = String(medInput.name || '').trim();
+    if (!nextName) return;
+    setPrescription((current) => [...current, { ...medInput, name: nextName }]);
     setMedInput({ name: '', dosage: '', frequency: '', duration: '' });
+  };
+
+  const addPathologyTest = () => {
+    const next = pathologyTestInput.trim();
+    if (!next || pathologyTests.length >= 10) return;
+    setPathologyTests((current) => [...current, next]);
+    setPathologyTestInput('');
+  };
+
+  const addRadiologyTest = () => {
+    const next = radiologyTestInput.trim();
+    if (!next || radiologyTests.length >= 10) return;
+    setRadiologyTests((current) => [...current, next]);
+    setRadiologyTestInput('');
   };
 
   const completeConsultation = async () => {
@@ -632,11 +695,35 @@ export default function MeetingRoom() {
 
   const isDoctor = user?.role === 'DOCTOR';
   const isPrimaryDoctor = isDoctor && appointment?.doctorId === user?.id;
+  const toggleTab = (tabKey) => setActiveTab((prev) => (prev === tabKey ? null : tabKey));
+  const summary = parseAiSummary(appointment?.aiSummary);
+  const medicalConditions = Array.isArray(summary?.medicalConditions) ? summary.medicalConditions : [];
+  const attachedFileNames = Array.isArray(summary?.attachedFileNames) ? summary.attachedFileNames : [];
+  const patientProfile = appointment?.patient?.patientProfile || null;
+  const hasGpMedicationHistory = ['yes', 'y', 'true', '1'].includes(String(summary?.gpMedicationHistory || '').trim().toLowerCase());
 
   const otherName = isDoctor
     ? (appointment?.familyMember?.name || appointment?.patient?.name)
     : formatDoctorName(appointment?.doctor?.name, appointment?.doctor?.name);
   const patientName = appointment?.familyMember?.name || appointment?.patient?.name || 'Patient';
+  const patientEmail = appointment?.patient?.email || '';
+  const doctorDisplayName = formatDoctorName(appointment?.doctor?.name, appointment?.doctor?.name || 'Doctor');
+  const doctorEmail = appointment?.doctor?.email || '';
+  const doctorProfile = appointment?.doctor?.doctorProfile || null;
+  const doctorQualification = doctorProfile?.qualification || 'MBBS';
+  const doctorSpecialization = getPractitionerTypeLabel(appointment?.doctor, 'General Practitioner');
+  const doctorAddress = String(doctorProfile?.address || '').trim();
+  const doctorContact = String([doctorProfile?.phoneCode, doctorProfile?.phone].filter(Boolean).join(' ')).trim();
+  const doctorProviderNumber = String(doctorProfile?.providerNumber || '').trim();
+  const patientDateOfBirth = String(summary?.patientDateOfBirth || patientProfile?.dateOfBirth || '').trim();
+  const patientGender = String(appointment?.familyMember?.gender || patientProfile?.gender || '').trim();
+  const patientContact = String(summary?.patientPhone || [patientProfile?.phoneCode, patientProfile?.phone].filter(Boolean).join(' ') || patientEmail || '').trim();
+  const patientAddress = String(appointment?.familyMember?.address || patientProfile?.address || summary?.patient_address || summary?.address || '').trim();
+  const queueTypeLabel = String(summary?.queueType || '').trim().toUpperCase() === 'GENERAL' ? 'General Queue' : 'Doctor Specific';
+  const currentDateLabel = new Date().toLocaleDateString('en-GB');
+  const referralValidUntilDate = new Date();
+  referralValidUntilDate.setFullYear(referralValidUntilDate.getFullYear() + 1);
+  const referralValidUntilLabel = referralValidUntilDate.toLocaleDateString('en-GB');
   const activeRemoteUser = remoteUsers.find((u) => u.uid === activeRemoteUid) || remoteUsers[0] || null;
   const stackedRemoteUsers = activeRemoteUser
     ? remoteUsers.filter((u) => u.uid !== activeRemoteUser.uid)
@@ -666,35 +753,177 @@ export default function MeetingRoom() {
   const sidebarOpen = activeTab !== null;
   const consultationModeLabel = isInPersonMode ? 'In-Person' : (isAudioMode ? 'Audio' : 'Video');
   const roomTitle = isInPersonMode ? `${consultationModeLabel} Consultation Room` : `${consultationModeLabel} Consultation`;
+  const patientVisiblePrescription = Array.isArray(appointment?.consultation?.prescription) ? appointment.consultation.prescription : [];
+  const patientRequestTabs = {
+    'request-medical-certificate': {
+      tabLabel: 'Medical Cert Request',
+      title: 'Request Medical Certificate',
+      requestLabel: 'Medical Certificate',
+      description: 'Ask your doctor to issue a medical certificate.',
+    },
+    'request-specialist-referral': {
+      tabLabel: 'Referral Request',
+      title: 'Request Specialist Referral Letter',
+      requestLabel: 'Specialist Referral Letter',
+      description: 'Ask your doctor to issue a specialist referral letter.',
+    },
+    'request-pathology': {
+      tabLabel: 'Pathology Request',
+      title: 'Request Pathology Form',
+      requestLabel: 'Pathology Request',
+      description: 'Ask your doctor to issue a pathology test request.',
+    },
+    'request-radiology': {
+      tabLabel: 'Radiology Request',
+      title: 'Request Radiology Form',
+      requestLabel: 'Radiology Request',
+      description: 'Ask your doctor to issue a radiology request.',
+    },
+  };
+  const activePatientRequest = !isDoctor ? patientRequestTabs[activeTab] : null;
+
+  const sendPatientCertificateRequest = (requestLabel) => {
+    if (!socket) {
+      showToast('Chat is not connected yet.');
+      return;
+    }
+    const normalizedRequestLabel = String(requestLabel || '').trim();
+    if (!normalizedRequestLabel) {
+      showToast('Unable to send request.');
+      return;
+    }
+    const extraNote = String(patientRequestNote || '').trim();
+    const text = `[Patient Document Request] ${normalizedRequestLabel}${extraNote ? ` | Note: ${extraNote}` : ''}`;
+    socket.emit('chat:send', { appointmentId, senderId: user.id, senderRole: user.role, text, senderName: user.name });
+    setPatientRequestNote('');
+    showToast('Request sent to doctor.');
+    setActiveTab('chat');
+  };
+
+  const handleLeaveOnly = () => {
+    setShowLeaveCallOptions(false);
+    leaveCall();
+  };
+
+  const getSessionRouteByMode = (targetAppointmentId, modeValue) => {
+    const mode = String(modeValue || '').toUpperCase();
+    if (mode !== 'IN_PERSON') return `/room/${targetAppointmentId}`;
+    if (user?.role === 'DOCTOR') return `/doctor/in-person/${targetAppointmentId}`;
+    if (user?.role === 'PATIENT') return `/patient/in-person/${targetAppointmentId}`;
+    return `/room/${targetAppointmentId}`;
+  };
+
+  const resolveSessionRouteForAppointment = async (targetAppointmentId) => {
+    if (!targetAppointmentId) return '/dashboard';
+
+    if (String(targetAppointmentId) === String(appointmentId) && appointment?.consultationMode) {
+      return getSessionRouteByMode(targetAppointmentId, appointment.consultationMode);
+    }
+
+    try {
+      const { data } = await axios.get(`${API_URL}/api/appointments/${targetAppointmentId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return getSessionRouteByMode(targetAppointmentId, data?.consultationMode);
+    } catch {
+      return `/room/${targetAppointmentId}`;
+    }
+  };
+
+  const completeConsultationFromPatient = async () => {
+    try {
+      await axios.put(
+        `${API_URL}/api/appointments/${appointmentId}/status`,
+        { status: 'COMPLETED' },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+    } catch (err) {
+      if (err?.response?.status === 400 || err?.response?.status === 403) {
+        showToast(err.response?.data?.error || 'Unable to end consultation right now.');
+      } else {
+        showToast('Failed to end consultation');
+      }
+      return false;
+    }
+
+    if (socket) {
+      socket.emit('call:accept_complete', { appointmentId });
+    }
+
+    leaveCall(false, {
+      redirectTo: '/patient/account?tab=medical-history',
+      promptReviewAppointmentId: appointmentId,
+    });
+    return true;
+  };
+
+  const handleEndMeetingFromPrompt = async () => {
+    setShowLeaveCallOptions(false);
+    if (isDoctor) {
+      if (isPrimaryDoctor) {
+        await requestCompleteConsultation();
+      } else {
+        await submitInvitedDoctorNotes();
+      }
+      return;
+    }
+    await completeConsultationFromPatient();
+  };
+
+  const doctorNavItems = DOCTOR_NAV_ITEMS;
+
+  const handleDoctorNavbarClick = async (key) => {
+    await leaveCall(true);
+    navigateDoctorNavClick(key, navigate);
+  };
+
+  const handleToggleOnline = async () => {
+    const nextStatus = !isOnline;
+    setIsOnline(nextStatus);
+    try {
+      await axios.put(
+        `${API_URL}/api/doctors/me/online`,
+        { isOnline: nextStatus },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Failed to update doctor online status', error);
+      setIsOnline(!nextStatus);
+    }
+  };
   // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex flex-col font-sans select-none overflow-hidden">
+    <div className="h-[100dvh] bg-slate-50 flex flex-col font-sans select-none overflow-hidden">
 
-      {/* â”€â”€ Top Nav â€” matches patient TopHeader exactly â”€â”€ */}
-      <SharedNavbar
-        className="bg-white border-b border-slate-200 shrink-0 z-40"
-        user={user}
-        onLogoClick={() => leaveCall()}
-        navItems={[
-          { key: 'queue', icon: LayoutDashboard, label: 'Queue' },
-          { key: 'schedule', icon: Calendar, label: 'Schedule' },
-          { key: 'history', icon: Clock, label: 'History' }
-        ]}
-        activeTab={null}
-        onTabClick={() => leaveCall()}
-        statusOverride={{
-          text: 'In Call',
-          color: '#059669',
-          bg: '#f0fdf4',
-          borderColor: '#bbf7d0',
-          ping: true,
-          dotColor: '#059669'
-        }}
-        pendingCount={0}
-        doctorName={user?.name}
-        isDoctor={isDoctor}
-        onLogout={() => { leaveCall(true).then(() => { if (typeof logout === 'function') logout(); else navigate('/'); }) }}
-      />
+      {isDoctor ? (
+        <SharedNavbar
+          className="bg-white border-b border-slate-200 shrink-0 z-40"
+          user={user}
+          brandLabel="CareBridge"
+          onLogoClick={() => handleDoctorNavbarClick('dashboard')}
+          navItems={doctorNavItems}
+          activeTab=""
+          onTabClick={handleDoctorNavbarClick}
+          isOnline={isOnline}
+          onToggleOnline={handleToggleOnline}
+          pendingCount={0}
+          doctorName={user?.name}
+          isDoctor
+          showMobileTabs
+          onLogout={() => {
+            leaveCall(true).then(() => {
+              if (typeof logout === 'function') logout();
+              else navigate('/');
+            });
+          }}
+        />
+      ) : (
+        <LandingNavbar activeKey="patient" />
+      )}
 
       {/* â”€â”€ Joining overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
@@ -720,34 +949,86 @@ export default function MeetingRoom() {
       <AnimatePresence>
         {incomingCall && (
           <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="fixed bottom-6 right-6 z-[100] bg-white p-6 rounded-3xl shadow-2xl border border-primary-100 max-w-sm w-full"
-            style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-4"
+            style={{ background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(16px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Incoming consultation call"
           >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-health-600 animate-pulse" style={{ background: 'rgba(5,150,105,0.1)' }}>
-                <Video className="w-5 h-5" />
+            <motion.div
+              initial={{ scale: 0.85, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: -20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+              className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 flex flex-col items-center backdrop-blur-sm shadow-2xl"
+            >
+              <div className="relative w-32 h-32 mb-8">
+                <div className="absolute inset-0 rounded-full border-2 border-health-400/40 animate-ping" />
+                <div className="absolute inset-3 rounded-full border-2 border-health-300/30 animate-pulse" />
+                <div className="absolute inset-4 rounded-full bg-slate-100 border-4 border-white shadow-xl overflow-hidden z-10">
+                  <img
+                    src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${incomingCall.doctorName || 'Doctor'}`}
+                    alt="Doctor"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute bottom-1 right-1 w-8 h-8 bg-health-500 rounded-full border-4 border-slate-900/80 flex items-center justify-center z-20">
+                  <Video className="w-3.5 h-3.5 text-white" />
+                </div>
               </div>
-              <div>
-                <h3 className="font-black text-lg text-slate-900 leading-tight">Joining Request</h3>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">{incomingCall.doctorName} is waiting</p>
+
+              <p className="text-health-400 text-xs font-black uppercase tracking-widest mb-3">
+                Incoming Consultation Call
+              </p>
+              <h3 className="text-white font-heading font-black text-2xl sm:text-3xl text-center mb-1">
+                {formatDoctorName(incomingCall.doctorName, incomingCall.doctorName)}
+              </h3>
+              <p className="text-slate-400 font-medium text-sm text-center mb-8">
+                is asking you to join another consultation
+              </p>
+
+              <div className="mb-8 flex flex-col items-center gap-2">
+                <div className="relative w-16 h-16">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      fill="none"
+                      stroke="#06B6D4"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 28}`}
+                      strokeDashoffset={`${2 * Math.PI * 28 * (1 - (timeLeft / 30))}`}
+                      style={{ transition: 'stroke-dashoffset 1s linear' }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-white font-heading font-black text-sm">
+                      {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-white/40 text-xs font-medium">Auto-dismiss in</p>
               </div>
-            </div>
-            <p className="text-slate-600 mb-6 text-sm font-medium">You have been requested to join another consultation.</p>
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                <button type="button"
+
+              <div className="grid w-full grid-cols-2 gap-3">
+                <button
+                  type="button"
                   onClick={() => {
                     socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: false });
                     setIncomingCall(null);
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors cursor-pointer"
                 >
                   Decline
                 </button>
-                <button type="button"
+                <button
+                  type="button"
                   onClick={() => {
                     socket.emit('call:tentative_join', {
                       appointmentId: incomingCall.appointmentId,
@@ -762,32 +1043,28 @@ export default function MeetingRoom() {
                     } catch { /* no-op */ }
                     setIncomingCall(null);
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-orange-100 text-orange-600 font-bold text-sm hover:bg-orange-200 transition-colors cursor-pointer"
+                  className="py-2.5 rounded-xl bg-orange-500/90 text-white font-bold text-sm hover:bg-orange-600 transition-colors cursor-pointer"
                 >
                   +5 Mins
                 </button>
               </div>
-              <button type="button"
-                onClick={() => {
+
+              <button
+                type="button"
+                onClick={async () => {
                   socket.emit('call:response', { appointmentId: incomingCall.appointmentId, accepted: true });
+                  const sessionRoute = await resolveSessionRouteForAppointment(incomingCall.appointmentId);
                   leaveCall(true).then(() => {
                     // Force a full unmount/remount to cleanly initialize the new WebRTC connection
-                    window.location.href = `/room/${incomingCall.appointmentId}`;
+                    window.location.href = sessionRoute;
                   });
                 }}
-                className="w-full py-2.5 rounded-xl text-slate-900 font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full mt-3 py-3 rounded-xl text-white font-black text-sm transition-transform hover:scale-[1.01] shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 cursor-pointer"
                 style={{ background: 'linear-gradient(135deg, #0e7490, #059669)' }}
               >
                 <Check className="w-4 h-4" /> End Current & Join
               </button>
-            </div>
-            <div className="w-full bg-slate-100 h-1 mt-4 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: '100%' }}
-                animate={{ width: `${(timeLeft / 30) * 100}%` }}
-                className="h-full bg-primary-500"
-              />
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -825,9 +1102,11 @@ export default function MeetingRoom() {
                   Continue Call
                 </button>
                 <button type="button"
-                  onClick={() => {
-                    socket.emit('call:accept_complete', { appointmentId });
-                    setShowPatientEndConfirm(false);
+                  onClick={async () => {
+                    const completed = await completeConsultationFromPatient();
+                    if (completed) {
+                      setShowPatientEndConfirm(false);
+                    }
                   }}
                   className="flex-1 py-3.5 rounded-xl font-bold text-sm text-slate-900 transition-transform hover:scale-105 cursor-pointer"
                   style={{ background: 'linear-gradient(135deg,#0e7490,#059669)', boxShadow: '0 8px 20px rgba(14,116,144,0.3)' }}
@@ -841,6 +1120,53 @@ export default function MeetingRoom() {
       </AnimatePresence>
 
       {/* â”€â”€ Doctor Waiting Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <AnimatePresence>
+        {showLeaveCallOptions && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Leave or end consultation"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center"
+            >
+              <h2 className="text-2xl font-black text-slate-900 mb-2">Leave Call?</h2>
+              <p className="text-slate-500 font-medium leading-relaxed mb-8">
+                You can leave just for yourself, or end this meeting for everyone.
+              </p>
+              <div className="grid grid-cols-1 gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={handleLeaveOnly}
+                  className="w-full py-3 rounded-xl font-bold text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                >
+                  Leave Call Only
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEndMeetingFromPrompt}
+                  className="w-full py-3 rounded-xl font-bold text-sm text-white transition-transform hover:scale-[1.01] cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg,#ea4335,#dc2626)' }}
+                >
+                  End Meeting
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveCallOptions(false)}
+                  className="w-full py-3 rounded-xl font-semibold text-sm text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {waitingForPatientConfirmation && (
           <motion.div
@@ -984,13 +1310,18 @@ export default function MeetingRoom() {
               <p className="text-slate-500 text-sm mb-8 relative z-10 leading-relaxed">
                 {isDoctor
                   ? "The patient has confirmed and ended this consultation. You will now be redirected to your dashboard."
-                  : "The doctor has ended this consultation. You will now be redirected to your dashboard."}
+                  : "The doctor has ended this consultation. You will now be redirected to My Appointments so you can rate your doctor."}
               </p>
               <button type="button"
-                onClick={leaveCall}
+                onClick={() => leaveCall(false, isDoctor
+                  ? null
+                  : {
+                      redirectTo: '/patient/account?tab=medical-history',
+                      promptReviewAppointmentId: appointmentId,
+                    })}
                 className="w-full py-4 bg-health-500 hover:bg-health-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-health-500/20 relative z-10 active:scale-95"
               >
-                Return to Dashboard
+                {isDoctor ? 'Return to Dashboard' : 'Go to My Appointments'}
               </button>
             </motion.div>
           </motion.div>
@@ -1068,9 +1399,9 @@ export default function MeetingRoom() {
       </div>
 
       {/* Main area */}
-      <div className="flex-1 relative flex overflow-hidden min-h-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-20 sm:pb-20">
+      <div className="flex-1 relative flex overflow-hidden min-h-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-24 gap-3 sm:gap-4">
         {/* Video section */}
-        <div className="flex-1 flex flex-col relative overflow-hidden w-full max-w-[1180px] mx-auto border rounded-2xl">
+        <div className={`flex-1 h-full min-w-0 min-h-0 flex flex-col relative overflow-hidden w-full border rounded-2xl ${sidebarOpen ? 'max-w-none mx-0' : 'max-w-[1180px] mx-auto'}`}>
           <div className="flex-1 relative overflow-hidden min-h-0">
             <div className="absolute inset-0 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-sm">
               {isInPersonMode ? (
@@ -1280,10 +1611,10 @@ export default function MeetingRoom() {
                     />
                   )}
                   <button type="button"
-                    onClick={() => leaveCall()}
+                    onClick={() => setShowLeaveCallOptions(true)}
                     className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-lg"
                     style={{ background: '#ea4335', boxShadow: '0 4px 16px rgba(234,67,53,0.45)' }}
-                    title="End call"
+                    title="Leave or end meeting"
                   >
                     <PhoneOff className="w-5 h-5 text-white" />
                   </button>
@@ -1294,21 +1625,50 @@ export default function MeetingRoom() {
 
           {/* Tabs row — below video, horizontal scrollable */}
           <div
-            className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm flex items-stretch justify-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm flex items-stretch justify-start overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden px-2 sm:px-4"
             style={{ scrollbarWidth: 'none' }}
           >
-            <TabBtn icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={activeTab === 'chat'} onClick={() => setActiveTab(activeTab === 'chat' ? null : 'chat')} badge={messages.length || null} />
+            <TabBtn icon={<Calendar className="w-5 h-5" />} label="Booking Details" active={activeTab === 'booking'} onClick={() => toggleTab('booking')} />
+            <TabBtn icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={activeTab === 'chat'} onClick={() => toggleTab('chat')} badge={messages.length || null} />
+            <TabBtn
+              icon={<Pill className="w-5 h-5" />}
+              label="Prescription"
+              active={activeTab === 'prescription'}
+              onClick={() => toggleTab('prescription')}
+            />
+            <TabBtn
+              icon={<FileText className="w-5 h-5" />}
+              label="Call Notes"
+              active={isDoctor && activeTab === 'notes'}
+              onClick={isDoctor ? () => toggleTab('notes') : () => showComingSoon('Call notes')}
+            />
+            {isDoctor ? (
+              <>
+                <TabBtn icon={<FileText className="w-5 h-5" />} label="Medical Certificate" active={activeTab === 'medical-certificate'} onClick={() => toggleTab('medical-certificate')} />
+                <TabBtn icon={<FileText className="w-5 h-5" />} label="Specialist Referral Letter" active={activeTab === 'specialist-referral'} onClick={() => toggleTab('specialist-referral')} />
+                <TabBtn icon={<Activity className="w-5 h-5" />} label="Medical History" active={activeTab === 'medical-history'} onClick={() => toggleTab('medical-history')} />
+                <TabBtn icon={<Search className="w-5 h-5" />} label="Pathology Request" active={activeTab === 'pathology-request'} onClick={() => toggleTab('pathology-request')} />
+                <TabBtn icon={<LayoutDashboard className="w-5 h-5" />} label="Radiology Request" active={activeTab === 'radiology-request'} onClick={() => toggleTab('radiology-request')} />
+              </>
+            ) : (
+              <>
+                <TabBtn icon={<FileText className="w-5 h-5" />} label="Medical Cert Request" active={activeTab === 'request-medical-certificate'} onClick={() => toggleTab('request-medical-certificate')} />
+                <TabBtn icon={<FileText className="w-5 h-5" />} label="Referral Request" active={activeTab === 'request-specialist-referral'} onClick={() => toggleTab('request-specialist-referral')} />
+                <TabBtn icon={<Search className="w-5 h-5" />} label="Pathology Request" active={activeTab === 'request-pathology'} onClick={() => toggleTab('request-pathology')} />
+                <TabBtn icon={<LayoutDashboard className="w-5 h-5" />} label="Radiology Request" active={activeTab === 'request-radiology'} onClick={() => toggleTab('request-radiology')} />
+              </>
+            )}
+
             {isDoctor && (
               <>
-                <TabBtn icon={<FileText className="w-5 h-5" />} label="Prescription" active={activeTab === 'notes'} onClick={() => setActiveTab(activeTab === 'notes' ? null : 'notes')} />
-                <TabBtn icon={<Activity className="w-5 h-5" />} label="AI Triage" active={activeTab === 'triage'} onClick={() => setActiveTab(activeTab === 'triage' ? null : 'triage')} />
+                <TabBtn icon={<Activity className="w-5 h-5" />} label="AI Triage" active={activeTab === 'triage'} onClick={() => toggleTab('triage')} />
                 {isPrimaryDoctor && (
                   <TabBtn icon={<UserPlus className="w-5 h-5" />} label="Invite Doctor" active={showInviteModal} onClick={openInviteModal} />
                 )}
                 {isPrimaryDoctor ? (
-                  <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Complete" active={false} onClick={requestCompleteConsultation} accent />
+                  <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Complete" onClick={requestCompleteConsultation} accent />
                 ) : (
-                  <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Submit & Leave" active={false} onClick={() => setActiveTab('notes')} accent />
+                  <TabBtn icon={<CheckCircle2 className="w-5 h-5" />} label="Submit & Leave" onClick={() => setActiveTab('notes')} accent />
                 )}
               </>
             )}
@@ -1322,15 +1682,23 @@ export default function MeetingRoom() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 380, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute top-0 right-0 z-40 h-full w-[min(92vw,360px)] flex flex-col overflow-hidden min-h-0"
+              className="absolute top-0 right-0 z-40 h-full w-[min(92vw,360px)] flex flex-col overflow-hidden min-h-0 lg:static lg:z-auto lg:self-stretch lg:h-full lg:min-h-0 lg:max-h-full lg:w-[360px] lg:shrink-0"
               style={{ background: '#f8fafc', borderLeft: '1px solid rgba(0,0,0,0.05)' }} role="dialog" aria-label="Consultation sidebar"
             >
               {/* Sidebar header */}
               <div className="shrink-0 flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                 <h3 className="text-slate-900 font-heading font-black text-base flex items-center gap-2">
+                  {activeTab === 'booking' && <><Calendar className="w-4 h-4 text-primary-600" /> Booking Details</>}
                   {activeTab === 'chat' && <><MessageSquare className="w-4 h-4 text-primary-600" /> Live Chat</>}
                   {activeTab === 'triage' && <><Activity className="w-4 h-4 text-health-600" /> AI Triage</>}
+                  {activeTab === 'prescription' && <><Pill className="w-4 h-4 text-primary-600" /> Prescription</>}
                   {activeTab === 'notes' && <><FileText className="w-4 h-4 text-health-600" /> Clinical Notes</>}
+                  {activePatientRequest && <><FileText className="w-4 h-4 text-primary-600" /> {activePatientRequest.title}</>}
+                  {activeTab === 'medical-certificate' && <><FileText className="w-4 h-4 text-primary-600" /> Medical Certificate</>}
+                  {activeTab === 'specialist-referral' && <><FileText className="w-4 h-4 text-primary-600" /> Specialist Referral Letter</>}
+                  {activeTab === 'medical-history' && <><Activity className="w-4 h-4 text-primary-600" /> Medical History</>}
+                  {activeTab === 'pathology-request' && <><Search className="w-4 h-4 text-primary-600" /> Pathology Request</>}
+                  {activeTab === 'radiology-request' && <><LayoutDashboard className="w-4 h-4 text-primary-600" /> Radiology Request</>}
                 </h3>
                 <button
                   type="button"
@@ -1341,6 +1709,148 @@ export default function MeetingRoom() {
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
+
+              {activeTab === 'booking' && (
+                <div
+                  className="flex-1 overflow-y-auto p-5 space-y-3"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
+                >
+                  <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Primary concern</p>
+                    <p className="mt-1 text-[15px] font-semibold leading-6 text-slate-900">
+                      {String(summary?.patientReason || '').trim() || 'Not provided'}
+                    </p>
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Clinical context</p>
+                    <div className="mt-2.5 space-y-2.5 text-sm">
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Allergies</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.allergies || '').trim() || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Medical conditions</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">
+                          {summary?.noMedicalCondition
+                            ? 'No medical condition selected'
+                            : medicalConditions.length > 0
+                              ? medicalConditions.join(', ')
+                              : 'Not provided'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Supporting files</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">
+                          {attachedFileNames.length > 0 ? attachedFileNames.join(', ') : 'No files uploaded'}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Consultation history</p>
+                    <div className="mt-2.5 space-y-2.5 text-sm">
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Seen any doctor/clinic in last 12 months?</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.recentConsultationResponse || '').trim() || 'Not answered'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Currently seeing GP or on medication?</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.gpMedicationHistory || '').trim() || 'Not answered'}</p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">GP / medication details</p>
+                    {hasGpMedicationHistory ? (
+                      <div className="mt-2.5 border-l-2 border-slate-300 pl-3 space-y-2.5 text-sm">
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-500">Current GP Name</p>
+                          <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.currentGpName || '').trim() || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-500">Current GP Email</p>
+                          <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.currentGpEmail || '').trim() || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-500">Medicine Name</p>
+                          <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.medicineName || '').trim() || 'Not provided'}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-[14px] font-medium text-slate-600">No GP/medication sub-details provided.</p>
+                    )}
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Patient identity</p>
+                    <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 text-sm">
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Patient Name</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{patientName}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Patient Email</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{patientEmail || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">User Type</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{appointment?.familyMember ? 'Family Member' : 'Self'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Address</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{patientAddress || 'Not provided'}</p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Appointment details</p>
+                    <div className="mt-2.5 border-l-2 border-slate-300 pl-3 space-y-2.5 text-sm">
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Reason for request</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.patientReason || '').trim() || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Service Name</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.serviceName || '').trim() || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Service Type</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.serviceType || appointment?.type || '').trim() || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Consultation Mode</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{consultationModeLabel}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Queue Type</p>
+                          <p className="text-[14px] font-medium leading-5 text-slate-900">{queueTypeLabel}</p>
+                        </div>
+                      </div>
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Health identifiers</p>
+                    <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 text-sm">
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Medicare Card Number</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(patientProfile?.medicareCardNumber || '').trim() || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Medicare IRN</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(patientProfile?.medicareIrn || '').trim() || 'Not provided'}</p>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <p className="text-[12px] font-semibold text-slate-500">Health Identifier Type</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(patientProfile?.healthIdentifierType || '').trim() || 'Not provided'}</p>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              )}
 
               {/* â”€â”€ CHAT TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {activeTab === 'chat' && (
@@ -1561,6 +2071,119 @@ export default function MeetingRoom() {
               )}
 
               {/* â”€â”€ PRESCRIPTION / NOTES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {activeTab === 'prescription' && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                  {isDoctor ? (
+                    <div className="flex h-full flex-col gap-4">
+                      <section className="min-h-0 flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <h4 className="text-sm font-black text-slate-900">Prescription</h4>
+                          <span className="rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-bold text-primary-700">
+                            {prescription.length} medicine{prescription.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1 space-y-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                          {prescription.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">
+                              No medicine added yet.
+                            </div>
+                          ) : (
+                            prescription.map((med, i) => (
+                              <motion.div
+                                key={`${med.name}-${i}`}
+                                initial={{ opacity: 0, x: -8 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex items-start justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 p-3.5"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold leading-tight text-slate-900">{med.name}</p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                    {med.dosage && <span className="rounded-full border border-primary-100 bg-white px-2 py-0.5 text-[10px] font-bold text-primary-700">{med.dosage}</span>}
+                                    {med.frequency && <span className="rounded-full border border-primary-100 bg-white px-2 py-0.5 text-[10px] font-bold text-primary-700">{med.frequency}</span>}
+                                    {med.duration && <span className="rounded-full border border-primary-100 bg-white px-2 py-0.5 text-[10px] font-bold text-primary-700">{med.duration}</span>}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPrescription((current) => current.filter((_, j) => j !== i))}
+                                  className="mt-0.5 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-100"
+                                  aria-label="Remove medicine"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </motion.div>
+                            ))
+                          )}
+                        </div>
+                      </section>
+
+                      <section className="shrink-0 space-y-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Add Medicine</p>
+                        <input
+                          type="text"
+                          placeholder="Medicine name *"
+                          value={medInput.name}
+                          onChange={(e) => setMedInput({ ...medInput, name: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Dosage (e.g. 500mg)"
+                            value={medInput.dosage}
+                            onChange={(e) => setMedInput({ ...medInput, dosage: e.target.value })}
+                            className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Frequency"
+                            value={medInput.frequency}
+                            onChange={(e) => setMedInput({ ...medInput, frequency: e.target.value })}
+                            className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Duration (e.g. 7 days)"
+                            value={medInput.duration}
+                            onChange={(e) => setMedInput({ ...medInput, duration: e.target.value })}
+                            className="flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                          <button
+                            type="button"
+                            onClick={addMedicine}
+                            disabled={!String(medInput.name || '').trim()}
+                            className="shrink-0 rounded-xl bg-primary-700 px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <p className="text-[11px] font-medium text-slate-500">
+                          Prescription is submitted with notes when the consultation is completed.
+                        </p>
+                      </section>
+                    </div>
+                  ) : (
+                    <section className="rounded-2xl border border-primary-100 bg-white p-4 space-y-3">
+                      <h4 className="text-sm font-black text-primary-800">Prescription</h4>
+                      {patientVisiblePrescription.length === 0 ? (
+                        <p className="text-sm font-medium text-slate-600">No prescription available yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {patientVisiblePrescription.map((med, idx) => (
+                            <div key={`${med?.name || 'med'}-${idx}`} className="rounded-xl border border-primary-100 bg-primary-50/60 p-3">
+                              <p className="text-sm font-bold text-slate-900">{med?.name || 'Medicine'}</p>
+                              <p className="text-xs text-slate-600 mt-1">{[med?.dosage, med?.frequency, med?.duration].filter(Boolean).join(' - ') || 'Details not provided'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  )}
+                </div>
+              )}
+
               {activeTab === 'notes' && isDoctor && (
                 <div
                   className="flex-1 flex flex-col overflow-y-auto"
@@ -1583,91 +2206,6 @@ export default function MeetingRoom() {
                       />
                     </div>
 
-                    {/* Prescription */}
-                    <div>
-                      <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">
-                        <Pill className="w-3 h-3" /> Prescription Rx
-                      </label>
-
-                      {/* Added meds list */}
-                      {prescription.length > 0 && (
-                        <div className="space-y-2 mb-4">
-                          {prescription.map((med, i) => (
-                            <motion.div
-                              key={i}
-                              initial={{ opacity: 0, x: -8 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              className="flex items-start justify-between p-3.5 rounded-xl gap-3"
-                              style={{ background: 'rgba(5,150,105,0.1)', border: '1px solid rgba(5,150,105,0.2)' }}
-                            >
-                              <div className="min-w-0">
-                                <p className="text-health-300 font-bold text-sm leading-tight">{med.name}</p>
-                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                  {med.dosage && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#059669' }}>{med.dosage}</span>}
-                                  {med.frequency && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#059669' }}>{med.frequency}</span>}
-                                  {med.duration && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(5,150,105,0.2)', color: '#059669' }}>{med.duration}</span>}
-                                </div>
-                              </div>
-                              <button type="button"
-                                onClick={() => setPrescription(p => p.filter((_, j) => j !== i))}
-                                className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer mt-0.5"
-                              >
-                                <Plus className="w-3.5 h-3.5 rotate-45" />
-                              </button>
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Add medicine form */}
-                      <div className="space-y-2.5 p-4 rounded-2xl" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.05)' }}>
-                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Add Medicine</p>
-                        <input
-                          type="text"
-                          placeholder="Medicine name *"
-                          value={medInput.name}
-                          onChange={e => setMedInput({ ...medInput, name: e.target.value })}
-                          className="w-full text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                          style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            placeholder="Dosage (e.g. 500mg)"
-                            value={medInput.dosage}
-                            onChange={e => setMedInput({ ...medInput, dosage: e.target.value })}
-                            className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Frequency"
-                            value={medInput.frequency}
-                            onChange={e => setMedInput({ ...medInput, frequency: e.target.value })}
-                            className="text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Duration (e.g. 7 days)"
-                            value={medInput.duration}
-                            onChange={e => setMedInput({ ...medInput, duration: e.target.value })}
-                            className="flex-1 text-sm px-3.5 py-2.5 rounded-xl outline-none text-slate-900 placeholder-slate-600 transition-all"
-                            style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)' }}
-                          />
-                          <button type="button"
-                            onClick={addMedicine}
-                            disabled={!medInput.name.trim()}
-                            className="px-4 rounded-xl text-slate-900 cursor-pointer hover:scale-105 transition-all disabled:opacity-30 flex items-center gap-1.5 font-bold text-xs shrink-0"
-                            style={{ background: 'linear-gradient(135deg,#059669,#06b6d4)' }}
-                          >
-                            <Plus className="w-4 h-4" /> Add
-                          </button>
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Sign & Complete â€” sticky bottom */}
@@ -1690,6 +2228,384 @@ export default function MeetingRoom() {
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+
+              {activePatientRequest && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                  <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <h4 className="text-sm font-black text-slate-900">{activePatientRequest.title}</h4>
+                    <p className="text-xs text-slate-600">{activePatientRequest.description}</p>
+                    <textarea
+                      rows={4}
+                      value={patientRequestNote}
+                      onChange={(e) => setPatientRequestNote(e.target.value)}
+                      placeholder="Add note (optional)"
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => sendPatientCertificateRequest(activePatientRequest.requestLabel)}
+                      className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white"
+                    >
+                      Send Request to Doctor
+                    </button>
+                  </section>
+                </div>
+              )}
+
+              {activeTab === 'medical-certificate' && isDoctor && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                  <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <h4 className="text-sm font-black text-slate-900">Add Medical Certificate</h4>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-600 mb-1.5">Select start and end dates for certificate validity</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="date" value={medicalCertForm.startDate} onChange={(e) => setMedicalCertForm((c) => ({ ...c, startDate: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                        <input type="date" value={medicalCertForm.endDate} onChange={(e) => setMedicalCertForm((c) => ({ ...c, endDate: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      value={medicalCertForm.reason}
+                      onChange={(e) => setMedicalCertForm((c) => ({ ...c, reason: e.target.value }))}
+                      placeholder="Reason for certificate"
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none"
+                    />
+                    <textarea
+                      value={medicalCertForm.advice}
+                      onChange={(e) => setMedicalCertForm((c) => ({ ...c, advice: e.target.value }))}
+                      placeholder="Any necessary instructions..."
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none"
+                    />
+                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                      Upload Signature
+                    </button>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+                      <p className="text-lg font-black text-slate-900 mb-2">Medical Certificate</p>
+                      <div className="h-px bg-slate-300 mb-3" />
+                      <p><strong>{doctorDisplayName}</strong></p>
+                      <p>Email: {doctorEmail || 'Not provided'}</p>
+                      <p>Address: {doctorAddress || 'Not provided'}</p>
+                      <p>Date: {currentDateLabel}</p>
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                        <p><strong>To Whom It May Concern:</strong></p>
+                        <p>
+                          This is to certify that <strong>{patientName}</strong>
+                          {patientDateOfBirth ? <> , born on <strong>{patientDateOfBirth}</strong></> : null}
+                          {patientEmail ? <> , with the email address <strong>{patientEmail}</strong></> : null}
+                          {patientAddress ? <> , and residing at <strong>{patientAddress}</strong></> : null}, was examined by me on <strong>{currentDateLabel}</strong>.
+                        </p>
+                        <p>
+                          The patient is unfit for work from <strong>{medicalCertForm.startDate || '[start date]'}</strong> to <strong>{medicalCertForm.endDate || '[end date]'}</strong> due to <strong>{medicalCertForm.reason || '[reason for certificate]'}</strong>.
+                        </p>
+                        <p>
+                          I have recommended the patient to <strong>{medicalCertForm.advice || '[any necessary instructions, such as rest or medication]'}</strong>.
+                        </p>
+                        <p>Should you require further details, I am available to provide additional information.</p>
+                        <p>Best regards,</p>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <div className="text-right">
+                          <p className="font-bold text-slate-900">{doctorDisplayName}</p>
+                          <p className="text-xs text-slate-600">{doctorSpecialization}</p>
+                          <p className="text-xs text-slate-600">{doctorEmail || 'No email'}</p>
+                          <p className="text-xs text-slate-600">Provider Number - {doctorProviderNumber || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600">
+                      Please ensure all details are accurate, patient information is complete, and the certificate is formatted correctly before submitting.
+                    </p>
+                    <button type="button" onClick={() => showToast('Medical certificate saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
+                      Save & Send
+                    </button>
+                  </section>
+                </div>
+              )}
+
+              {activeTab === 'specialist-referral' && isDoctor && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                  <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <h4 className="text-sm font-black text-slate-900">Add Specialist Referral Letter</h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      <input type="text" placeholder="Search Specialist / Referred Doctor Name" value={referralForm.doctorName} onChange={(e) => setReferralForm((c) => ({ ...c, doctorName: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                      <input type="email" placeholder="Referred Doctor Email" value={referralForm.doctorEmail} onChange={(e) => setReferralForm((c) => ({ ...c, doctorEmail: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                      <input type="text" placeholder="Referred Doctor Address" value={referralForm.doctorAddress} onChange={(e) => setReferralForm((c) => ({ ...c, doctorAddress: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                      <input type="text" placeholder="Phone No" value={referralForm.phoneNo} onChange={(e) => setReferralForm((c) => ({ ...c, phoneNo: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                      <input type="text" placeholder="Medical condition for referral" value={referralForm.condition} onChange={(e) => setReferralForm((c) => ({ ...c, condition: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                    </div>
+                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                      Upload Signature
+                    </button>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+                      <p className="text-lg font-black text-slate-900 mb-2">Specialist Referral Letter</p>
+                      <div className="h-px bg-slate-300 mb-3" />
+                      <p>To,</p>
+                      <p><strong>{referralForm.doctorName || '[Referred Doctor Name]'}</strong></p>
+                      <p>{referralForm.doctorEmail || '[Referred Doctor Email]'}</p>
+                      <p>{referralForm.doctorAddress || '[Referred Doctor Address]'}</p>
+                      <p>{referralForm.phoneNo || '[Phone No]'}</p>
+                      <p className="mt-3">Date: {currentDateLabel}</p>
+                      <p className="mt-2"><strong>Subject: Referral of {patientName}</strong></p>
+                      <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                        <p>
+                          I am referring <strong>{patientName}</strong>
+                          {patientDateOfBirth ? <> , born on <strong>{patientDateOfBirth}</strong></> : null}
+                          {patientAddress ? <> , residing at <strong>{patientAddress}</strong></> : null}, for specialized medical care.
+                        </p>
+                        <p>
+                          The patient requires evaluation and treatment for <strong>{referralForm.condition || '[medical condition]'}</strong>. Please undertake the necessary assessment and treatment.
+                        </p>
+                        <p>Please contact me for any further information.</p>
+                        <p className="text-right text-[12px] font-semibold text-slate-700">
+                          Valid: {currentDateLabel} to {referralValidUntilLabel}
+                        </p>
+                        <p>Sincerely,</p>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <div className="text-right">
+                          <p className="font-bold text-slate-900">{doctorDisplayName}</p>
+                          <p className="text-xs text-slate-600">{doctorSpecialization}</p>
+                          <p className="text-xs text-slate-600">{doctorEmail || 'No email'}</p>
+                          <p className="text-xs text-slate-600">Provider Number - {doctorProviderNumber || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600">
+                      Please ensure all details are accurate, patient information is complete, and the referral letter is formatted correctly before submitting.
+                    </p>
+                    <button type="button" onClick={() => showToast('Specialist referral saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
+                      Save & Send
+                    </button>
+                  </section>
+                </div>
+              )}
+
+              {activeTab === 'medical-history' && isDoctor && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-3" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                  <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Medical history snapshot</p>
+                    <div className="mt-2.5 space-y-2.5">
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Medical conditions</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">
+                          {summary?.noMedicalCondition
+                            ? 'No medical condition selected'
+                            : medicalConditions.length > 0
+                              ? medicalConditions.join(', ')
+                              : 'Not provided'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Allergies</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.allergies || '').trim() || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Recent consultation response</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.recentConsultationResponse || '').trim() || 'Not answered'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">GP / medication history</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.gpMedicationHistory || '').trim() || 'Not answered'}</p>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              )}
+
+              {activeTab === 'pathology-request' && isDoctor && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                  <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-black text-slate-900">Pathology Request</h4>
+                      <button type="button" onClick={addPathologyTest} className="rounded-lg bg-primary-800 px-3 py-1.5 text-xs font-black text-white">Add New Test</button>
+                    </div>
+                    <p className="text-xs text-slate-600">Please select the test from dropdown/input that needs to be performed in pathology lab.</p>
+                    <input type="text" value={pathologyTestInput} onChange={(e) => setPathologyTestInput(e.target.value)} placeholder="Choose Pathology Test (Max 10)" className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                    {pathologyTests.length === 0 && (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                        Please select at least one pathology service from the dropdown above to create a letter.
+                      </div>
+                    )}
+                    {pathologyTests.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {pathologyTests.map((test, idx) => (
+                          <span key={`${test}-${idx}`} className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+                            {test}
+                            <button type="button" onClick={() => setPathologyTests((current) => current.filter((_, i) => i !== idx))} className="text-red-600">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                      Upload Signature
+                    </button>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+                      <p className="text-lg font-black text-slate-900 mb-2">Pathology Test Request</p>
+                      <div className="h-px bg-slate-300 mb-3" />
+
+                      <section className="rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Doctor information</p>
+                        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
+                          <p><strong>Name:</strong> {doctorDisplayName}</p>
+                          <p><strong>Date:</strong> {currentDateLabel}</p>
+                          <p><strong>Qualification:</strong> {doctorQualification}</p>
+                          <p><strong>Contact:</strong> {doctorContact || 'Not provided'}</p>
+                          <p><strong>Specialization:</strong> {doctorSpecialization}</p>
+                          <p><strong>Address:</strong> {doctorAddress || 'Not provided'}</p>
+                        </div>
+                      </section>
+
+                      <p className="mt-3"><strong>To Pathology Center</strong></p>
+                      <p className="mt-2">
+                        I am referring the following patient for diagnostic evaluation through the specified pathology tests.
+                        Kindly conduct the requested investigations and share the results at your earliest convenience.
+                      </p>
+
+                      <section className="mt-3 rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Patient information</p>
+                        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
+                          <p><strong>Name:</strong> {patientName}</p>
+                          <p><strong>Gender:</strong> {patientGender || 'Not provided'}</p>
+                          <p><strong>Date of Birth:</strong> {patientDateOfBirth || 'Not provided'}</p>
+                          <p><strong>Contact:</strong> {patientContact || 'Not provided'}</p>
+                          <p className="col-span-2"><strong>Address:</strong> {patientAddress || 'Not provided'}</p>
+                        </div>
+                      </section>
+
+                      <section className="mt-3 rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Patient medical information</p>
+                        <div className="mt-2 space-y-1 text-[12px]">
+                          <p><strong>Allergies:</strong> {String(summary?.allergies || '').trim() || '[Allergies]'}</p>
+                          <p><strong>Medical Condition:</strong> {summary?.noMedicalCondition ? 'No medical condition selected' : (medicalConditions.length > 0 ? medicalConditions.join(', ') : '[Medical Condition]')}</p>
+                        </div>
+                      </section>
+
+                      <section className="mt-3 rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Requested tests</p>
+                        <div className="mt-2 space-y-1 text-[12px]">
+                          <p><strong>Tests:</strong> {pathologyTests.length > 0 ? pathologyTests.join(', ') : '[No tests added]'}</p>
+                          <p><strong>Additional Instructions:</strong> Please ensure fasting before tests where necessary.</p>
+                        </div>
+                      </section>
+
+                      <p className="mt-3">Thank you for your cooperation.</p>
+                      <div className="mt-4 flex justify-end">
+                        <div className="text-right">
+                          <p className="font-bold text-slate-900">{doctorDisplayName}</p>
+                          <p className="text-xs text-slate-600">{doctorSpecialization}</p>
+                          <p className="text-xs text-slate-600">Provider Number - {doctorProviderNumber || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600">
+                      Please ensure all details are accurate, patient information is complete, and the pathology letter is formatted correctly before submitting.
+                    </p>
+                    <button type="button" onClick={() => showToast('Pathology request saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
+                      Save & Send
+                    </button>
+                  </section>
+                </div>
+              )}
+
+              {activeTab === 'radiology-request' && isDoctor && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                  <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-black text-slate-900">Radiology Request</h4>
+                      <button type="button" onClick={addRadiologyTest} className="rounded-lg bg-primary-800 px-3 py-1.5 text-xs font-black text-white">Add New Test</button>
+                    </div>
+                    <p className="text-xs text-slate-600">Please select tests required in radiology. For each selected service, a report will be provided.</p>
+                    <input type="text" value={radiologyTestInput} onChange={(e) => setRadiologyTestInput(e.target.value)} placeholder="Choose Radiology Tests (Max 10)" className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                    {radiologyTests.length === 0 && (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                        Please select at least one radiology service from the dropdown above to create a letter.
+                      </div>
+                    )}
+                    {radiologyTests.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {radiologyTests.map((test, idx) => (
+                          <span key={`${test}-${idx}`} className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+                            {test}
+                            <button type="button" onClick={() => setRadiologyTests((current) => current.filter((_, i) => i !== idx))} className="text-red-600">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                      Upload Signature
+                    </button>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+                      <p className="text-lg font-black text-slate-900 mb-2">Radiology Test Request</p>
+                      <div className="h-px bg-slate-300 mb-3" />
+
+                      <section className="rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Doctor information</p>
+                        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
+                          <p><strong>Name:</strong> {doctorDisplayName}</p>
+                          <p><strong>Date:</strong> {currentDateLabel}</p>
+                          <p><strong>Qualification:</strong> {doctorQualification}</p>
+                          <p><strong>Contact:</strong> {doctorContact || 'Not provided'}</p>
+                          <p><strong>Specialization:</strong> {doctorSpecialization}</p>
+                          <p><strong>Address:</strong> {doctorAddress || 'Not provided'}</p>
+                        </div>
+                      </section>
+
+                      <p className="mt-3"><strong>To Radiology Center</strong></p>
+                      <p className="mt-2">
+                        I am referring the following patient for diagnostic evaluation through the specified radiology tests.
+                        Kindly conduct the requested investigations and share the results at your earliest convenience.
+                      </p>
+
+                      <section className="mt-3 rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Patient information</p>
+                        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
+                          <p><strong>Name:</strong> {patientName}</p>
+                          <p><strong>Gender:</strong> {patientGender || 'Not provided'}</p>
+                          <p><strong>Date of Birth:</strong> {patientDateOfBirth || 'Not provided'}</p>
+                          <p><strong>Contact:</strong> {patientContact || 'Not provided'}</p>
+                          <p className="col-span-2"><strong>Address:</strong> {patientAddress || 'Not provided'}</p>
+                        </div>
+                      </section>
+
+                      <section className="mt-3 rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Patient medical information</p>
+                        <div className="mt-2 space-y-1 text-[12px]">
+                          <p><strong>Allergies:</strong> {String(summary?.allergies || '').trim() || '[Allergies]'}</p>
+                          <p><strong>Medical Condition:</strong> {summary?.noMedicalCondition ? 'No medical condition selected' : (medicalConditions.length > 0 ? medicalConditions.join(', ') : '[Medical Condition]')}</p>
+                        </div>
+                      </section>
+
+                      <section className="mt-3 rounded-lg border border-slate-300 bg-white p-3">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Requested tests</p>
+                        <div className="mt-2 space-y-1 text-[12px]">
+                          <p><strong>Tests:</strong> {radiologyTests.length > 0 ? radiologyTests.join(', ') : '[No tests added]'}</p>
+                          <p><strong>Additional Instructions:</strong> Please mention clinical notes if any special protocol is required.</p>
+                        </div>
+                      </section>
+
+                      <p className="mt-3">Thank you for your cooperation.</p>
+                      <div className="mt-4 flex justify-end">
+                        <div className="text-right">
+                          <p className="font-bold text-slate-900">{doctorDisplayName}</p>
+                          <p className="text-xs text-slate-600">{doctorSpecialization}</p>
+                          <p className="text-xs text-slate-600">Provider Number - {doctorProviderNumber || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600">
+                      Please ensure all details are accurate, patient information is complete, and the radiology letter is formatted correctly before submitting.
+                    </p>
+                    <button type="button" onClick={() => showToast('Radiology request saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
+                      Save & Send
+                    </button>
+                  </section>
                 </div>
               )}
 
@@ -1726,18 +2642,23 @@ function TabBtn({ icon, label, active, onClick, badge, accent }) {
   return (
     <button type="button"
       onClick={onClick}
-      className="relative w-28 sm:w-32 flex flex-col items-center justify-center gap-1.5 py-3 shrink-0 cursor-pointer transition-all group hover:scale-100 hover:overflow-hidden"
+      className="relative min-w-[150px] sm:min-w-[165px] flex flex-col items-center justify-center gap-2 px-3 py-3.5 shrink-0 cursor-pointer transition-all group"
       style={{
-        border: active ? '1px solid rgba(14,116,144,0.35)' : '1px solid rgba(100,116,139,0.2)',
-        background: active ? 'rgba(14,116,144,0.08)' : 'transparent',
-        borderBottom: active ? '2px solid #0e7490' : '2px solid transparent',
+        border: active ? '1px solid rgba(14,116,144,0.35)' : '1px solid rgba(100,116,139,0.18)',
+        background: active ? 'rgba(14,116,144,0.06)' : '#ffffff',
+        borderBottom: active ? '2px solid #0e7490' : '2px solid rgba(100,116,139,0.12)',
         color: active ? '#0e7490' : accent ? '#059669' : '#64748b'
       }}
     >
-      <span className="group-hover:scale-110 transition-transform">{icon}</span>
-      <span className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap">{label}</span>
+      <span
+        className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform"
+        style={{ background: active ? 'rgba(14,116,144,0.1)' : 'rgba(100,116,139,0.08)' }}
+      >
+        {icon}
+      </span>
+      <span className="text-[12px] font-extrabold leading-[1.05rem] text-center whitespace-normal">{label}</span>
       {badge && (
-        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500 text-slate-900 text-[9px] font-black flex items-center justify-center">
+        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
         </div>
       )}

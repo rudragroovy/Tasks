@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -9,16 +9,19 @@ import {
   Col,
   ConfigProvider,
   Empty,
+  Input,
+  Modal,
   Row,
   Segmented,
   Statistic,
   Table,
   Tag,
+  Tabs,
   Typography,
+  message,
 } from 'antd';
 import {
   CheckCircle,
-  ChevronRight,
   Clock3,
   TimerReset,
   Users,
@@ -30,7 +33,9 @@ import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from
 import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const GENERAL_QUEUE_WAIT_MINUTES = 30;
 
 function normalizeExperienceLabel(value) {
   const raw = String(value || '').trim();
@@ -65,6 +70,43 @@ function parseAppointmentAiSummary(appointment) {
   } catch {
     return {};
   }
+}
+
+function getQueueTypeFromAppointment(appointment) {
+  const aiSummary = parseAppointmentAiSummary(appointment);
+  return String(aiSummary?.queueType || '').trim().toUpperCase() || 'DOCTOR_SPECIFIC';
+}
+
+function isAutoGeneralEligible(appointment) {
+  if (!appointment) return false;
+  if (appointment.type !== 'ON_DEMAND') return false;
+  if (appointment.status !== 'PENDING') return false;
+  if (appointment.paymentStatus !== 'PAID') return false;
+  const createdAt = new Date(appointment.createdAt || 0);
+  if (Number.isNaN(createdAt.getTime())) return false;
+  const threshold = Date.now() - GENERAL_QUEUE_WAIT_MINUTES * 60 * 1000;
+  return createdAt.getTime() <= threshold;
+}
+
+function isGeneralQueueRecord(appointment, viewerDoctorId) {
+  const queueType = getQueueTypeFromAppointment(appointment);
+  if (queueType === 'GENERAL') return true;
+  if (!isAutoGeneralEligible(appointment)) return false;
+  // ponytail: auto-general visibility is for non-assigned doctors; assigned doctor keeps it in doctor-specific tab until explicit GENERAL.
+  return appointment?.doctorId !== viewerDoctorId;
+}
+
+function isDoctorSpecificRecord(appointment, doctorId) {
+  if (!appointment || !doctorId) return false;
+  const isPrimaryDoctor = appointment.doctorId === doctorId;
+  const hasLegacyAssignedDoctor =
+    appointment.assignedDoctorId === doctorId || appointment.invitedDoctorId === doctorId;
+  const isInvitedDoctor = Array.isArray(appointment.invitedDoctors)
+    ? appointment.invitedDoctors.some(
+        (invite) => invite?.doctorId === doctorId && invite?.status !== 'REJECTED'
+      )
+    : false;
+  return isPrimaryDoctor || hasLegacyAssignedDoctor || isInvitedDoctor;
 }
 
 function pickFirstNonEmpty(values) {
@@ -148,13 +190,33 @@ function getModeTag(mode) {
   return <Tag color="default">{mode || '-'}</Tag>;
 }
 
+function getQueueTag(appointment, viewerDoctorId) {
+  return isGeneralQueueRecord(appointment, viewerDoctorId)
+    ? <Tag color="cyan">GENERAL</Tag>
+    : <Tag color="geekblue">DOCTOR SPECIFIC</Tag>;
+}
+
+function canDoctorRespondToRequest(appointment, doctorId) {
+  if (!appointment || !doctorId) return false;
+  if (appointment.status !== 'PENDING') return false;
+  if (appointment.doctorId === doctorId) return true;
+  return isGeneralQueueRecord(appointment, doctorId);
+}
+
 export default function DoctorWaitingRoom() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const seenPendingIdsRef = useRef(new Set());
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [waitingTab, setWaitingTab] = useState('general');
   const [isOnline, setIsOnline] = useState(Boolean(user?.doctorProfile?.isOnline));
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [declineModalOpen, setDeclineModalOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [submittingAction, setSubmittingAction] = useState(false);
 
   const today = useMemo(() => new Date(), []);
   const todayLabel = formatDateLabel(today);
@@ -164,50 +226,85 @@ export default function DoctorWaitingRoom() {
     setIsOnline(Boolean(user?.doctorProfile?.isOnline));
   }, [user?.doctorProfile?.isOnline]);
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/api/appointments`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        setAppointments(Array.isArray(response.data) ? response.data : []);
-      } catch (error) {
-        console.error('Failed to fetch waiting room data', error);
-        setAppointments([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAppointments();
+  const fetchAppointments = useCallback(async ({ keepLoading = false } = {}) => {
+    if (!keepLoading) setLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/appointments`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      setAppointments(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Failed to fetch waiting room data', error);
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+    const intervalId = setInterval(() => {
+      fetchAppointments({ keepLoading: true });
+    }, 15000);
+    return () => clearInterval(intervalId);
+  }, [fetchAppointments]);
+
+  const enrichedAppointments = useMemo(() => appointments.map((appointment) => ({
+    ...appointment,
+    __isGeneralQueue: isGeneralQueueRecord(appointment, user?.id),
+    __isDoctorSpecific: isDoctorSpecificRecord(appointment, user?.id),
+  })), [appointments, user?.id]);
+
+  const generalQueueRecords = useMemo(
+    () => enrichedAppointments.filter((appointment) => appointment.__isGeneralQueue),
+    [enrichedAppointments]
+  );
 
   const doctorSpecificRecords = useMemo(
     () =>
-      appointments.filter(
-        (appointment) => {
-          const isPrimaryDoctor = appointment.doctorId === user?.id;
-          const hasLegacyAssignedDoctor =
-            appointment.assignedDoctorId === user?.id || appointment.invitedDoctorId === user?.id;
-          const isInvitedDoctor = Array.isArray(appointment.invitedDoctors)
-            ? appointment.invitedDoctors.some(
-                (invite) => invite?.doctorId === user?.id && invite?.status !== 'REJECTED'
-              )
-            : false;
-          return isPrimaryDoctor || hasLegacyAssignedDoctor || isInvitedDoctor;
-        }
+      enrichedAppointments.filter(
+        (appointment) => appointment.__isDoctorSpecific && !appointment.__isGeneralQueue
       ),
-    [appointments, user?.id]
+    [enrichedAppointments]
   );
 
-  const scopedRecords = waitingTab === 'general' ? appointments : doctorSpecificRecords;
+  const scopedRecords = waitingTab === 'general' ? generalQueueRecords : doctorSpecificRecords;
 
   const pendingRecords = useMemo(
     () => scopedRecords.filter((appointment) => appointment.status === 'PENDING'),
     [scopedRecords]
   );
+
+  useEffect(() => {
+    const actionablePending = enrichedAppointments
+      .filter((appointment) => canDoctorRespondToRequest(appointment, user?.id))
+      .filter((appointment) => appointment.status === 'PENDING');
+    const nextIds = new Set(actionablePending.map((appointment) => appointment.id));
+
+    if (seenPendingIdsRef.current.size === 0) {
+      seenPendingIdsRef.current = nextIds;
+      return;
+    }
+
+    const newlyArrived = actionablePending.filter(
+      (appointment) => !seenPendingIdsRef.current.has(appointment.id)
+    );
+    if (newlyArrived.length > 0) {
+      const firstName =
+        newlyArrived[0]?.familyMember?.name ||
+        newlyArrived[0]?.patient?.name ||
+        'Patient';
+      messageApi.info(
+        newlyArrived.length === 1
+          ? `New appointment request from ${firstName}.`
+          : `${newlyArrived.length} new appointment requests received.`
+      );
+    }
+
+    seenPendingIdsRef.current = nextIds;
+  }, [enrichedAppointments, messageApi, user?.id]);
 
   const completedToday = useMemo(
     () =>
@@ -259,8 +356,104 @@ export default function DoctorWaitingRoom() {
     serviceName:
       getPractitionerTypeLabel(appointment.doctor, '-'),
     consultationMode: appointment.consultationMode || '-',
+    queueType: getQueueTag(appointment, user?.id),
     appointment,
   }));
+
+  const openDetailModal = (appointment) => {
+    setSelectedAppointment(appointment);
+    setDetailModalOpen(true);
+  };
+
+  const openDeclineModal = (appointment) => {
+    setSelectedAppointment(appointment);
+    setDeclineReason('');
+    setDeclineModalOpen(true);
+  };
+
+  const closeDetailModal = () => {
+    if (submittingAction) return;
+    setDetailModalOpen(false);
+  };
+
+  const closeDeclineModal = () => {
+    if (submittingAction) return;
+    setDeclineModalOpen(false);
+  };
+
+  const handleAcceptRequest = async () => {
+    if (!selectedAppointment?.id) return;
+    setSubmittingAction(true);
+    try {
+      await axios.put(
+        `${API_URL}/api/appointments/${selectedAppointment.id}/status`,
+        { status: 'ACCEPTED' },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+      messageApi.success('Request accepted successfully.');
+      setDetailModalOpen(false);
+      setDeclineModalOpen(false);
+      await fetchAppointments({ keepLoading: true });
+      navigate(getSessionRoute(selectedAppointment));
+    } catch (error) {
+      messageApi.error(error?.response?.data?.error || 'Failed to accept request.');
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const handleDeclineRequest = async () => {
+    if (!selectedAppointment?.id) return;
+    const normalizedReason = String(declineReason || '').trim();
+    const needsReason = !isGeneralQueueRecord(selectedAppointment, user?.id) || selectedAppointment?.doctorId === user?.id;
+
+    if (needsReason && normalizedReason.length < 5) {
+      messageApi.error('Please provide a decline reason with at least 5 characters.');
+      return;
+    }
+
+    setSubmittingAction(true);
+    try {
+      const payload = { status: 'REJECTED' };
+      if (normalizedReason) payload.declineReason = normalizedReason;
+
+      await axios.put(
+        `${API_URL}/api/appointments/${selectedAppointment.id}/status`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+      messageApi.success('Request declined.');
+      setDeclineModalOpen(false);
+      setDetailModalOpen(false);
+      setDeclineReason('');
+      await fetchAppointments({ keepLoading: true });
+    } catch (error) {
+      messageApi.error(error?.response?.data?.error || 'Failed to decline request.');
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const selectedSummary = parseAppointmentAiSummary(selectedAppointment);
+  const selectedConditions = Array.isArray(selectedSummary?.medicalConditions)
+    ? selectedSummary.medicalConditions
+    : [];
+  const selectedUploadedFiles = Array.isArray(selectedSummary?.attachedFileNames)
+    ? selectedSummary.attachedFileNames
+    : [];
+  const selectedPatientName =
+    selectedAppointment?.familyMember?.name || selectedAppointment?.patient?.name || '-';
+  const selectedProfile = selectedAppointment?.patient?.patientProfile || {};
+  const selectedCanRespond = canDoctorRespondToRequest(selectedAppointment, user?.id);
+  const hasGpMedicationHistory = String(selectedSummary?.gpMedicationHistory || '').trim().toUpperCase() === 'YES';
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80, render: (id) => <Text strong>#{id}</Text> },
@@ -285,6 +478,7 @@ export default function DoctorWaitingRoom() {
     { title: 'Service Type', dataIndex: 'serviceType', key: 'serviceType', width: 140 },
     { title: 'Consultation For', dataIndex: 'consultationFor', key: 'consultationFor', width: 170 },
     { title: 'Service Name', dataIndex: 'serviceName', key: 'serviceName', width: 180 },
+    { title: 'Queue', dataIndex: 'queueType', key: 'queueType', width: 140 },
     {
       title: 'Consultation Mode',
       dataIndex: 'consultationMode',
@@ -295,17 +489,27 @@ export default function DoctorWaitingRoom() {
     {
       title: 'Action',
       key: 'action',
-      width: 130,
-      render: (_, row) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<ChevronRight size={14} />}
-          onClick={() => navigate(getSessionRoute(row.appointment))}
-        >
-          Open
-        </Button>
-      ),
+      width: 170,
+      render: (_, row) => {
+        const canRespond = canDoctorRespondToRequest(row.appointment, user?.id);
+        if (!canRespond) {
+          return (
+            <Button size="small" onClick={() => openDetailModal(row.appointment)}>
+              View
+            </Button>
+          );
+        }
+        return (
+          <div className="flex items-center gap-2">
+            <Button type="primary" size="small" onClick={() => openDetailModal(row.appointment)}>
+              Accept
+            </Button>
+            <Button size="small" danger onClick={() => openDeclineModal(row.appointment)}>
+              Decline
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -355,6 +559,7 @@ export default function DoctorWaitingRoom() {
       }}
     >
       <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
+        {messageContextHolder}
         <SharedNavbar
           user={user}
           brandLabel="CareBridge"
@@ -364,7 +569,7 @@ export default function DoctorWaitingRoom() {
           onTabClick={handleDoctorNavClick}
           isOnline={isOnline}
           onToggleOnline={handleToggleOnline}
-          pendingCount={appointments.filter((appointment) => appointment.status === 'PENDING').length}
+          pendingCount={enrichedAppointments.filter((appointment) => appointment.status === 'PENDING').length}
           doctorName={doctorDisplayName}
           onLogout={logout}
           showMobileTabs
@@ -441,7 +646,7 @@ export default function DoctorWaitingRoom() {
               <Segmented
                 block={false}
                 value={waitingTab}
-                onChange={setWaitingTab}
+                onChange={(value) => setWaitingTab(String(value))}
                 options={[
                   { label: 'General Waiting Room', value: 'general' },
                   { label: 'Doctor Specific Requests', value: 'doctor' },
@@ -463,6 +668,227 @@ export default function DoctorWaitingRoom() {
             />
           </Card>
         </main>
+
+        <Modal
+          title={`Incoming Request - ${selectedPatientName}`}
+          open={detailModalOpen}
+          onCancel={closeDetailModal}
+          width={840}
+          footer={selectedCanRespond
+            ? [
+                <Button
+                  key="open-decline"
+                  danger
+                  onClick={() => {
+                    setDetailModalOpen(false);
+                    openDeclineModal(selectedAppointment);
+                  }}
+                  disabled={submittingAction}
+                >
+                  Decline
+                </Button>,
+                <Button
+                  key="accept"
+                  type="primary"
+                  loading={submittingAction}
+                  onClick={handleAcceptRequest}
+                >
+                  Accept Request
+                </Button>,
+              ]
+            : [
+                <Button key="close" onClick={closeDetailModal}>
+                  Close
+                </Button>,
+              ]}
+        >
+          {!selectedAppointment ? null : (
+            <Tabs
+              defaultActiveKey="health"
+              items={[
+                {
+                  key: 'health',
+                  label: 'Health Concerns',
+                  children: (
+                    <div className="space-y-3">
+                      <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Primary concern</p>
+                        <p className="mt-1 text-[15px] font-semibold leading-6 text-slate-900">
+                          {String(selectedSummary?.patientReason || '').trim() || 'Not provided'}
+                        </p>
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Clinical context</p>
+                        <div className="mt-2.5 space-y-2.5 text-sm">
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Allergies</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.allergies || '').trim() || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Medical conditions</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">
+                              {selectedSummary?.noMedicalCondition
+                                ? 'No medical condition selected'
+                                : selectedConditions.length > 0
+                                  ? selectedConditions.join(', ')
+                                  : 'Not provided'}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Supporting files</p>
+                        {selectedUploadedFiles.length > 0 ? (
+                          <ul className="mt-2 ml-4 list-disc space-y-1 text-[14px] font-medium text-slate-900">
+                            {selectedUploadedFiles.map((fileName) => (
+                              <li key={fileName}>{fileName}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-[14px] font-medium text-slate-600">No files uploaded</p>
+                        )}
+                      </section>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'qa',
+                  label: 'Questions & Answers',
+                  children: (
+                    <div className="space-y-3">
+                      <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Consultation history</p>
+                        <div className="mt-2.5 space-y-2.5 text-sm">
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Seen any doctor/clinic in last 12 months?</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.recentConsultationResponse || '').trim() || 'Not answered'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Currently seeing GP or on medication?</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.gpMedicationHistory || '').trim() || 'Not answered'}</p>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">GP / medication details</p>
+                        {hasGpMedicationHistory ? (
+                          <div className="mt-2.5 border-l-2 border-slate-300 pl-3 space-y-2.5 text-sm">
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Current GP Name</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.currentGpName || '').trim() || 'Not provided'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Current GP Email</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.currentGpEmail || '').trim() || 'Not provided'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Medicine Name</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.medicineName || '').trim() || 'Not provided'}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-[14px] font-medium text-slate-600">No GP/medication sub-details provided.</p>
+                        )}
+                      </section>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'details',
+                  label: 'More Details',
+                  children: (
+                    <div className="space-y-3">
+                      <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Patient identity</p>
+                        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 text-sm">
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Patient Name</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{selectedPatientName}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Patient Email</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{selectedAppointment?.patient?.email || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">User Type</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{selectedAppointment?.familyMember ? 'Family Member' : 'Self'}</p>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Appointment details</p>
+                        <div className="mt-2.5 border-l-2 border-slate-300 pl-3 space-y-2.5 text-sm">
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Service Name</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.serviceName || '').trim() || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Service Type</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedSummary?.serviceType || selectedAppointment?.type || '').trim() || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Consultation Mode</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{selectedAppointment?.consultationMode || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Queue Type</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{isGeneralQueueRecord(selectedAppointment, user?.id) ? 'General Queue' : 'Doctor Specific'}</p>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Health identifiers</p>
+                        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 text-sm">
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Medicare Card Number</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedProfile?.medicareCardNumber || '').trim() || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-semibold text-slate-500">Medicare IRN</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedProfile?.medicareIrn || '').trim() || 'Not provided'}</p>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <p className="text-[12px] font-semibold text-slate-500">Health Identifier Type</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedProfile?.healthIdentifierType || '').trim() || 'Not provided'}</p>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          title="Decline Request"
+          open={declineModalOpen}
+          onCancel={closeDeclineModal}
+          footer={[
+            <Button key="cancel" onClick={closeDeclineModal} disabled={submittingAction}>
+              Cancel
+            </Button>,
+            <Button key="decline" danger type="primary" loading={submittingAction} onClick={handleDeclineRequest}>
+              Decline Request
+            </Button>,
+          ]}
+        >
+          <Text className="!mb-2 !block !text-sm !text-slate-600">
+            Add a brief reason for declining this request.
+          </Text>
+          <TextArea
+            rows={4}
+            value={declineReason}
+            onChange={(event) => setDeclineReason(event.target.value)}
+            placeholder="Example: I am unavailable right now."
+          />
+        </Modal>
       </div>
     </ConfigProvider>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CalendarCheck2,
   CalendarClock,
@@ -14,6 +14,7 @@ import {
   Receipt,
   Save,
   ShieldCheck,
+  Stethoscope,
   UserCircle2,
   UserPlus2,
   Users,
@@ -23,11 +24,13 @@ import LandingNavbar from '../components/LandingNavbar';
 import { useAuth } from '../context/AuthContext';
 import PatientMedicalHistoryTab from '../components/account/PatientMedicalHistoryTab';
 import PatientMedicalDocumentsTab from '../components/account/PatientMedicalDocumentsTab';
+import PatientPastDoctorsTab from '../components/account/PatientPastDoctorsTab';
 import './patient-account.css';
 
 const accountTabs = [
   { key: 'profile', label: 'My Profile', icon: UserCircle2 },
   { key: 'medical-history', label: 'My Appointments', icon: CalendarClock },
+  { key: 'past-doctors', label: 'Past Doctors', icon: Stethoscope },
   { key: 'medical-documents', label: 'Medical Documents', icon: FileText },
   { key: 'family', label: 'My Family', icon: Users },
   { key: 'wallet', label: 'My Wallet', icon: Wallet },
@@ -110,6 +113,7 @@ function mapProfileFromApi(data, fallbackEmail) {
 export default function PatientAccount() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [familyMembers, setFamilyMembers] = useState([]);
   const [isFamilyLoading, setIsFamilyLoading] = useState(false);
@@ -117,6 +121,12 @@ export default function PatientAccount() {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState('');
+  const [autoReviewAppointmentId, setAutoReviewAppointmentId] = useState(() => {
+    const value = typeof location.state?.promptReviewAppointmentId === 'string'
+      ? location.state.promptReviewAppointmentId.trim()
+      : '';
+    return value || null;
+  });
   const fileInputRef = useRef(null);
 
   const activeTab = useMemo(() => resolveActiveTab(searchParams), [searchParams]);
@@ -126,6 +136,18 @@ export default function PatientAccount() {
   const apiBase = useMemo(() => import.meta.env.VITE_API_URL || 'http://localhost:5000', []);
   const familyApiUrl = useMemo(() => `${apiBase}/api/family-members`, [apiBase]);
   const profileApiUrl = useMemo(() => `${apiBase}/api/patient-profile/me`, [apiBase]);
+
+  useEffect(() => {
+    const nextAutoReviewAppointmentId = typeof location.state?.promptReviewAppointmentId === 'string'
+      ? location.state.promptReviewAppointmentId.trim()
+      : '';
+    if (!nextAutoReviewAppointmentId) return;
+    setAutoReviewAppointmentId(nextAutoReviewAppointmentId);
+    if (activeTab !== 'medical-history') {
+      setSearchParams({ tab: 'medical-history' }, { replace: true });
+    }
+    navigate('/patient/account?tab=medical-history', { replace: true, state: null });
+  }, [activeTab, location.state, navigate, setSearchParams]);
 
   useEffect(() => {
     if (activeTab !== 'family') return;
@@ -610,7 +632,11 @@ export default function PatientAccount() {
                 <h2>My Appointments</h2>
                 <p>Track current, upcoming, and past consultations in one place.</p>
               </header>
-              <PatientMedicalHistoryTab userFirstName={userFirstName} />
+              <PatientMedicalHistoryTab
+                userFirstName={userFirstName}
+                autoReviewAppointmentId={autoReviewAppointmentId}
+                onAutoReviewHandled={() => setAutoReviewAppointmentId(null)}
+              />
             </>
           ) : null}
 
@@ -621,6 +647,16 @@ export default function PatientAccount() {
                 <p>Access prescriptions, certificates, referrals, and diagnostic letters.</p>
               </header>
               <PatientMedicalDocumentsTab />
+            </>
+          ) : null}
+
+          {activeTab === 'past-doctors' ? (
+            <>
+              <header className="patient-account-main__header">
+                <h2>Past Doctors</h2>
+                <p>Review doctors you have already consulted and quickly book again.</p>
+              </header>
+              <PatientPastDoctorsTab />
             </>
           ) : null}
 
@@ -818,7 +854,7 @@ export default function PatientAccount() {
                   <button
                     type="button"
                     className="patient-account-healthcare-option"
-                    onClick={() => navigate('/doctors')}
+                    onClick={() => navigate('/patient/account?tab=past-doctors')}
                   >
                     <span>
                       <Users size={16} /> Past Doctors

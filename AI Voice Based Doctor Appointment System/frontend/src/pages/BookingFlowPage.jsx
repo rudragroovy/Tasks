@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Clock3, HeartPulse, ShieldAlert, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Camera, Clock3, HeartPulse, Mic, Search, ShieldAlert, Upload, X } from 'lucide-react';
 import LandingNavbar from '../components/LandingNavbar';
 import AppIcon from '../components/branding/AppIcon';
 import { getServiceRate } from '../data/practitionerServiceCatalog';
@@ -26,6 +26,49 @@ const MEDICAL_CONDITION_OPTIONS = [
   'Liver Disease',
   'Other',
 ];
+
+const CONDITION_LIBRARY = [
+  ...MEDICAL_CONDITION_OPTIONS,
+  'Arthritis',
+  'Anxiety',
+  'Depression',
+  'Migraine',
+  'Back Pain',
+  'Joint Pain',
+  'Neck Pain',
+  'COPD',
+  'Sleep Apnea',
+  'Obesity',
+  'PCOS',
+  'Osteoporosis',
+  'Gastritis',
+  'GERD',
+  'Epilepsy',
+  'Stroke',
+  'Cancer',
+  'Allergy',
+  'Eczema',
+  'Psoriasis',
+  'Anemia',
+  'Abdominal Pain',
+  'Chest Pain',
+  'Shortness of Breath',
+  'Nasal Congestion',
+  'Runny Nose',
+  'Chills',
+  'Muscle Aches',
+  'Diarrhea',
+  'Vomiting',
+  'Nausea',
+  'Fatigue',
+  'Sore Throat',
+  'Cough',
+  'Cold',
+  'Headache',
+  'Jaundice',
+];
+
+const CONDITION_FILTER_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 const MODE_OPTIONS = [
   { value: 'VIDEO', label: 'Televideo' },
@@ -156,6 +199,11 @@ export default function BookingFlowPage() {
   const [currentGpEmail, setCurrentGpEmail] = useState(String(aiSummary?.currentGpEmail || '').trim());
   const [medicineName, setMedicineName] = useState(String(aiSummary?.medicineName || '').trim());
   const [showConditionPicker, setShowConditionPicker] = useState(false);
+  const [draftMedicalConditions, setDraftMedicalConditions] = useState([]);
+  const [conditionSearchTerm, setConditionSearchTerm] = useState('');
+  const [conditionLetterFilter, setConditionLetterFilter] = useState('ALL');
+  const [showCustomConditionInput, setShowCustomConditionInput] = useState(false);
+  const [customConditionInput, setCustomConditionInput] = useState('');
 
   const [slots, setSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -164,6 +212,12 @@ export default function BookingFlowPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [deviceCheckStatus, setDeviceCheckStatus] = useState('idle');
+  const [deviceCheck, setDeviceCheck] = useState({
+    camera: 'pending',
+    microphone: 'pending',
+    message: '',
+  });
 
   useEffect(() => {
     if (!doctorId) return;
@@ -317,6 +371,30 @@ export default function BookingFlowPage() {
     ? 'Myself'
     : familyMembers.find((member) => String(member.id) === selectedPatientId)?.name || 'Family';
 
+  const availableConditionOptions = useMemo(() => {
+    const merged = [...CONDITION_LIBRARY, ...selectedMedicalConditions, ...draftMedicalConditions];
+    return Array.from(
+      new Set(
+        merged
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [draftMedicalConditions, selectedMedicalConditions]);
+
+  const filteredConditionOptions = useMemo(() => {
+    return availableConditionOptions.filter((condition) => {
+      if (conditionLetterFilter !== 'ALL') {
+        const firstLetter = String(condition).trim().charAt(0).toUpperCase();
+        if (firstLetter !== conditionLetterFilter) return false;
+      }
+      if (conditionSearchTerm.trim()) {
+        return condition.toLowerCase().includes(conditionSearchTerm.trim().toLowerCase());
+      }
+      return true;
+    });
+  }, [availableConditionOptions, conditionLetterFilter, conditionSearchTerm]);
+
   const handleEmergencyYes = () => {
     window.location.href = 'tel:000';
   };
@@ -334,13 +412,139 @@ export default function BookingFlowPage() {
     });
   };
 
-  const toggleMedicalCondition = (condition) => {
-    setNoMedicalCondition(false);
-    setSelectedMedicalConditions((current) => {
-      const exists = current.includes(condition);
-      if (exists) return current.filter((item) => item !== condition);
+  const openConditionPicker = () => {
+    setDraftMedicalConditions([...selectedMedicalConditions]);
+    setConditionSearchTerm('');
+    setConditionLetterFilter('ALL');
+    setShowCustomConditionInput(false);
+    setCustomConditionInput('');
+    setShowConditionPicker(true);
+  };
+
+  const closeConditionPicker = () => {
+    setShowConditionPicker(false);
+    setShowCustomConditionInput(false);
+    setCustomConditionInput('');
+  };
+
+  const toggleDraftMedicalCondition = (condition) => {
+    setDraftMedicalConditions((current) => {
+      const exists = current.some(
+        (item) => item.trim().toLowerCase() === String(condition).trim().toLowerCase()
+      );
+      if (exists) {
+        return current.filter(
+          (item) => item.trim().toLowerCase() !== String(condition).trim().toLowerCase()
+        );
+      }
       return [...current, condition];
     });
+  };
+
+  const addCustomConditionToDraft = () => {
+    const normalized = String(customConditionInput || '').trim();
+    if (!normalized) return;
+    const exists = draftMedicalConditions.some(
+      (item) => item.trim().toLowerCase() === normalized.toLowerCase()
+    );
+    if (!exists) {
+      setDraftMedicalConditions((current) => [...current, normalized]);
+    }
+    setCustomConditionInput('');
+    setShowCustomConditionInput(false);
+    setConditionSearchTerm('');
+    setConditionLetterFilter('ALL');
+  };
+
+  const confirmConditionPicker = () => {
+    setNoMedicalCondition(false);
+    setSelectedMedicalConditions([...draftMedicalConditions]);
+    closeConditionPicker();
+  };
+
+  const runDeviceCheck = async () => {
+    clearValidationError('deviceCheck');
+
+    const isVideoConsultation = consultationMode === 'VIDEO';
+    const isAudioConsultation = consultationMode === 'AUDIO';
+
+    if (!isVideoConsultation && !isAudioConsultation) {
+      setDeviceCheckStatus('ready');
+      setDeviceCheck({
+        camera: 'not_required',
+        microphone: 'not_required',
+        message: 'No camera or microphone check is required for in-person appointments.',
+      });
+      return;
+    }
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setDeviceCheckStatus('failed');
+      setDeviceCheck({
+        camera: isVideoConsultation ? 'failed' : 'not_required',
+        microphone: 'failed',
+        message: isVideoConsultation
+          ? 'This browser cannot access camera and microphone.'
+          : 'This browser cannot access microphone.',
+      });
+      return;
+    }
+
+    setDeviceCheckStatus('checking');
+    setDeviceCheck({
+      camera: isVideoConsultation ? 'checking' : 'not_required',
+      microphone: 'checking',
+      message: '',
+    });
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: isVideoConsultation,
+      });
+      const hasCamera = isVideoConsultation ? stream.getVideoTracks().length > 0 : true;
+      const hasMic = stream.getAudioTracks().length > 0;
+      stream.getTracks().forEach((track) => track.stop());
+
+      const nextStatus = hasCamera && hasMic ? 'ready' : 'failed';
+      setDeviceCheckStatus(nextStatus);
+      setDeviceCheck({
+        camera: isVideoConsultation ? (hasCamera ? 'ready' : 'failed') : 'not_required',
+        microphone: hasMic ? 'ready' : 'failed',
+        message: hasCamera && hasMic
+          ? isVideoConsultation
+            ? 'Camera and microphone are ready.'
+            : 'Microphone is ready for audio consultation.'
+          : isVideoConsultation
+            ? 'Could not detect both camera and microphone.'
+            : 'Could not detect a working microphone.',
+      });
+    } catch (error) {
+      const errorName = String(error?.name || '');
+      let message = isVideoConsultation
+        ? 'Unable to access camera and microphone. Please check browser permissions.'
+        : 'Unable to access microphone. Please check browser permissions.';
+      if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+        message = isVideoConsultation
+          ? 'Camera and microphone permission was denied. Please allow access and try again.'
+          : 'Microphone permission was denied. Please allow access and try again.';
+      } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+        message = isVideoConsultation
+          ? 'Camera or microphone device was not found on this system.'
+          : 'Microphone device was not found on this system.';
+      } else if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
+        message = isVideoConsultation
+          ? 'Camera or microphone is currently busy in another app.'
+          : 'Microphone is currently busy in another app.';
+      }
+
+      setDeviceCheckStatus('failed');
+      setDeviceCheck({
+        camera: isVideoConsultation ? 'failed' : 'not_required',
+        microphone: 'failed',
+        message,
+      });
+    }
   };
 
   const goNextStep = () => {
@@ -381,6 +585,21 @@ export default function BookingFlowPage() {
   };
 
   const handlePayNow = async () => {
+    if (consultationMode === 'VIDEO' && deviceCheckStatus !== 'ready') {
+      setValidationErrors((current) => ({
+        ...current,
+        deviceCheck: 'Please run and pass the camera and microphone check before payment.',
+      }));
+      return;
+    }
+    if (consultationMode === 'AUDIO' && deviceCheckStatus !== 'ready') {
+      setValidationErrors((current) => ({
+        ...current,
+        deviceCheck: 'Please run and pass the microphone check before payment.',
+      }));
+      return;
+    }
+
     if (bookingType === 'SCHEDULED' && !selectedSlotStart) {
       setValidationErrors((current) => ({
         ...current,
@@ -468,7 +687,7 @@ export default function BookingFlowPage() {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_12%_-10%,rgba(20,184,166,0.08),transparent_42%),radial-gradient(circle_at_88%_6%,rgba(14,116,144,0.07),transparent_34%),#f8fbff] font-sans text-slate-900">
         <LandingNavbar activeKey="patient" />
-        <section className="mx-auto w-[min(1080px,calc(100%-48px))] pb-16 pt-[86px] max-md:w-[calc(100%-24px)] max-md:pb-14 max-md:pt-[76px]">
+        <section className="mx-auto w-[min(1080px,calc(100%-48px))] pb-16 pt-[112px] max-md:w-[calc(100%-24px)] max-md:pb-14 max-md:pt-[96px]">
           <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center text-[15px] font-bold text-slate-600">
             <p>Loading booking details...</p>
           </div>
@@ -481,7 +700,7 @@ export default function BookingFlowPage() {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_12%_-10%,rgba(20,184,166,0.08),transparent_42%),radial-gradient(circle_at_88%_6%,rgba(14,116,144,0.07),transparent_34%),#f8fbff] font-sans text-slate-900">
         <LandingNavbar activeKey="patient" />
-        <section className="mx-auto w-[min(1080px,calc(100%-48px))] pb-16 pt-[86px] max-md:w-[calc(100%-24px)] max-md:pb-14 max-md:pt-[76px]">
+        <section className="mx-auto w-[min(1080px,calc(100%-48px))] pb-16 pt-[112px] max-md:w-[calc(100%-24px)] max-md:pb-14 max-md:pt-[96px]">
           <div className="rounded-2xl border border-red-200 bg-white px-6 py-16 text-center text-[15px] font-bold text-red-700">
             <p>{doctorError}</p>
           </div>
@@ -495,7 +714,7 @@ export default function BookingFlowPage() {
       <LandingNavbar activeKey="patient" />
 
       {showSafetyGate ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 pb-4 pt-7" role="dialog" aria-modal="true" aria-label="Safety Check">
+        <div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-4 pb-6 pt-24" role="dialog" aria-modal="true" aria-label="Safety Check">
           <article className="w-[min(640px,calc(100%-20px))] overflow-hidden rounded-2xl border border-rose-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.34)]">
             <header className="bg-gradient-to-br from-red-500 to-rose-500 px-4 py-5 text-center text-white">
               <ShieldAlert size={30} className="mx-auto" />
@@ -550,7 +769,139 @@ export default function BookingFlowPage() {
         </div>
       ) : null}
 
-      <section className="mx-auto w-[min(1080px,calc(100%-48px))] pb-16 pt-[86px] max-md:w-[calc(100%-24px)] max-md:pb-14 max-md:pt-[76px]">
+      {showConditionPicker && !noMedicalCondition ? (
+        <div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-4 pb-6 pt-24" role="dialog" aria-modal="true" aria-label="Select Medical Conditions">
+          <article className="w-[min(920px,calc(100%-24px))] rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.34)]">
+            <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <h3 className="text-xl font-black text-slate-900">Please select your medical conditions</h3>
+              <button
+                type="button"
+                aria-label="Close medical condition picker"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100"
+                onClick={closeConditionPicker}
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="space-y-3 px-5 py-4">
+              <div className="relative">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  className="w-full rounded-[10px] border border-slate-200 py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-800 outline-none ring-cyan-700/10 focus:border-sky-300 focus:ring-4"
+                  placeholder="Search condition..."
+                  value={conditionSearchTerm}
+                  onChange={(event) => setConditionSearchTerm(event.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  className={`h-8 rounded-md border px-2 text-xs font-extrabold ${
+                    conditionLetterFilter === 'ALL'
+                      ? 'border-transparent bg-gradient-to-r from-cyan-800 to-cyan-700 text-white'
+                      : 'border-slate-200 bg-white text-slate-700'
+                  }`}
+                  onClick={() => setConditionLetterFilter('ALL')}
+                >
+                  ALL
+                </button>
+                {CONDITION_FILTER_LETTERS.map((letter) => (
+                  <button
+                    key={letter}
+                    type="button"
+                    className={`h-8 min-w-8 rounded-md border px-2 text-xs font-extrabold ${
+                      conditionLetterFilter === letter
+                        ? 'border-transparent bg-gradient-to-r from-cyan-800 to-cyan-700 text-white'
+                        : 'border-slate-200 bg-white text-slate-700'
+                    }`}
+                    onClick={() => setConditionLetterFilter(letter)}
+                  >
+                    {letter}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="ml-auto h-8 rounded-md border border-cyan-700 px-3 text-xs font-extrabold text-cyan-800"
+                  onClick={() => setShowCustomConditionInput((current) => !current)}
+                >
+                  Add other
+                </button>
+              </div>
+
+              {showCustomConditionInput ? (
+                <div className="flex flex-col gap-2 rounded-[10px] border border-sky-200 bg-sky-50/50 p-3 md:flex-row">
+                  <input
+                    type="text"
+                    className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none ring-cyan-700/10 focus:border-sky-300 focus:ring-4"
+                    placeholder="Enter custom condition"
+                    value={customConditionInput}
+                    onChange={(event) => setCustomConditionInput(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="h-10 min-w-[92px] rounded-[10px] bg-gradient-to-r from-cyan-800 to-cyan-700 px-3 text-sm font-extrabold text-white"
+                    onClick={addCustomConditionToDraft}
+                  >
+                    Add
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="max-h-[360px] overflow-y-auto pr-1">
+                {filteredConditionOptions.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredConditionOptions.map((condition) => {
+                      const isSelected = draftMedicalConditions.some(
+                        (item) => item.trim().toLowerCase() === condition.trim().toLowerCase()
+                      );
+                      return (
+                        <button
+                          key={condition}
+                          type="button"
+                          className={`min-h-[44px] rounded-xl border px-4 text-center text-[15px] font-extrabold ${
+                            isSelected
+                              ? 'border-transparent bg-gradient-to-r from-cyan-800 to-cyan-700 text-white'
+                              : 'border-slate-200 bg-slate-50 text-slate-800'
+                          }`}
+                          onClick={() => toggleDraftMedicalCondition(condition)}
+                        >
+                          {condition}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="rounded-[10px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                    No conditions found. Try another search or add a custom condition.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <footer className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <button
+                type="button"
+                className="h-10 rounded-[10px] border border-slate-300 px-4 text-sm font-extrabold text-slate-700"
+                onClick={closeConditionPicker}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="h-10 rounded-[10px] bg-gradient-to-r from-cyan-800 to-cyan-700 px-5 text-sm font-extrabold text-white"
+                onClick={confirmConditionPicker}
+              >
+                Confirm
+              </button>
+            </footer>
+          </article>
+        </div>
+      ) : null}
+
+      <section className="mx-auto w-[min(1080px,calc(100%-48px))] pb-16 pt-[112px] max-md:w-[calc(100%-24px)] max-md:pb-14 max-md:pt-[96px]">
         <div className="mb-[18px] flex items-center gap-2 text-[13px] font-bold text-slate-500">
           <span>Home</span>
           <span>/</span>
@@ -775,30 +1126,11 @@ export default function BookingFlowPage() {
                   <button
                     type="button"
                     className="min-h-10 w-full rounded-[10px] border border-sky-200 bg-white px-3 text-[14px] font-extrabold text-cyan-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    onClick={() => setShowConditionPicker((current) => !current)}
+                    onClick={openConditionPicker}
                     disabled={noMedicalCondition}
                   >
-                    {showConditionPicker ? 'Hide Medical Conditions' : 'Select Medical Conditions'}
+                    Select Medical Conditions
                   </button>
-                  {showConditionPicker && !noMedicalCondition ? (
-                    <div className="mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2">
-                      {MEDICAL_CONDITION_OPTIONS.map((condition) => (
-                        <button
-                          type="button"
-                          key={condition}
-                          className={`min-h-[38px] rounded-[10px] border text-[13px] font-extrabold ${
-                            selectedMedicalConditions.includes(condition)
-                              ? 'border-transparent bg-gradient-to-r from-cyan-800 to-cyan-700 text-white'
-                              : 'border-slate-200 bg-white text-slate-700'
-                          }`}
-                          aria-pressed={selectedMedicalConditions.includes(condition)}
-                          onClick={() => toggleMedicalCondition(condition)}
-                        >
-                          {condition}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                   {!noMedicalCondition && selectedMedicalConditions.length > 0 ? (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
                       {selectedMedicalConditions.map((condition) => (
@@ -820,7 +1152,7 @@ export default function BookingFlowPage() {
                       setNoMedicalCondition(event.target.checked);
                       if (event.target.checked) {
                         setSelectedMedicalConditions([]);
-                        setShowConditionPicker(false);
+                        closeConditionPicker();
                       }
                     }}
                   />
@@ -919,7 +1251,103 @@ export default function BookingFlowPage() {
 
               <div className="mb-3 flex items-center gap-2 rounded-[10px] border border-sky-200 bg-sky-50 px-3 py-2.5 text-[14px] font-bold text-cyan-800">
                 <AlertTriangle size={16} />
-                <p>Camera and microphone access may be required during telehealth consultations.</p>
+                <p>
+                  {consultationMode === 'VIDEO'
+                    ? 'Camera and microphone access is required for televideo consultations.'
+                    : consultationMode === 'AUDIO'
+                      ? 'Microphone access is required for audio consultations.'
+                      : 'No camera or microphone access is required for in-person consultations.'}
+                </p>
+              </div>
+
+              <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <h3 className="font-heading text-[17px] font-black text-slate-900">
+                    {consultationMode === 'VIDEO'
+                      ? 'Mic & Camera Check'
+                      : consultationMode === 'AUDIO'
+                        ? 'Microphone Check'
+                        : 'Device Check'}
+                  </h3>
+                  <button
+                    type="button"
+                    className="h-9 rounded-[10px] border border-cyan-700 px-3 text-[13px] font-extrabold text-cyan-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={runDeviceCheck}
+                    disabled={consultationMode === 'IN_PERSON' || deviceCheckStatus === 'checking'}
+                  >
+                    {consultationMode === 'IN_PERSON'
+                      ? 'Not required'
+                      : deviceCheckStatus === 'checking'
+                        ? 'Checking...'
+                        : 'Run check'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <div className="flex items-center justify-between rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2">
+                    <span className="inline-flex items-center gap-2 text-[14px] font-bold text-slate-700">
+                      <Camera size={15} />
+                      Camera
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[12px] font-extrabold ${
+                      deviceCheck.camera === 'ready'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : deviceCheck.camera === 'not_required'
+                          ? 'bg-slate-200 text-slate-600'
+                        : deviceCheck.camera === 'failed'
+                          ? 'bg-red-100 text-red-700'
+                          : deviceCheck.camera === 'checking'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {deviceCheck.camera === 'ready'
+                        ? 'Ready'
+                        : deviceCheck.camera === 'not_required'
+                          ? 'Not required'
+                        : deviceCheck.camera === 'failed'
+                          ? 'Not ready'
+                          : deviceCheck.camera === 'checking'
+                            ? 'Checking'
+                            : 'Not checked'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2">
+                    <span className="inline-flex items-center gap-2 text-[14px] font-bold text-slate-700">
+                      <Mic size={15} />
+                      Microphone
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[12px] font-extrabold ${
+                      deviceCheck.microphone === 'ready'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : deviceCheck.microphone === 'not_required'
+                          ? 'bg-slate-200 text-slate-600'
+                        : deviceCheck.microphone === 'failed'
+                          ? 'bg-red-100 text-red-700'
+                          : deviceCheck.microphone === 'checking'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {deviceCheck.microphone === 'ready'
+                        ? 'Ready'
+                        : deviceCheck.microphone === 'not_required'
+                          ? 'Not required'
+                        : deviceCheck.microphone === 'failed'
+                          ? 'Not ready'
+                          : deviceCheck.microphone === 'checking'
+                            ? 'Checking'
+                            : 'Not checked'}
+                    </span>
+                  </div>
+                </div>
+                {deviceCheck.message ? (
+                  <p className={`mt-2 text-[13px] font-bold ${
+                    deviceCheckStatus === 'ready' || consultationMode === 'IN_PERSON' ? 'text-emerald-700' : 'text-slate-600'
+                  }`}>
+                    {deviceCheck.message}
+                  </p>
+                ) : null}
+                {validationErrors.deviceCheck ? (
+                  <p className="mt-2 text-[13px] font-bold text-red-700">{validationErrors.deviceCheck}</p>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">

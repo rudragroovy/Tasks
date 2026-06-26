@@ -12,6 +12,37 @@ import {
   ShieldCheck, Wifi, CheckCircle2, Loader2, CalendarClock, MessageSquare
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const GENERAL_QUEUE_WAIT_MINUTES = 30;
+
+function parseAppointmentAiSummary(appointment) {
+  const raw = appointment?.aiSummary;
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getQueueType(appointment) {
+  const summary = parseAppointmentAiSummary(appointment);
+  return String(summary?.queueType || '').trim().toUpperCase() || 'DOCTOR_SPECIFIC';
+}
+
+function isAutoGeneralEligible(appointment) {
+  if (!appointment) return false;
+  if (appointment.type !== 'ON_DEMAND') return false;
+  if (appointment.status !== 'PENDING') return false;
+  if (appointment.paymentStatus !== 'PAID') return false;
+  const createdAt = new Date(appointment.createdAt || 0);
+  if (Number.isNaN(createdAt.getTime())) return false;
+  const threshold = Date.now() - GENERAL_QUEUE_WAIT_MINUTES * 60 * 1000;
+  return createdAt.getTime() <= threshold;
+}
+
 /* ── Animated pulsing ring ── */
 function PulseRing({ color = 'border-health-400' }) {
   return <div className={`absolute inset-0 rounded-full border-2 opacity-40 ${color}`} />;
@@ -55,6 +86,7 @@ export default function PatientWaitingRoom() {
   const [timeLeft, setTimeLeft] = useState(120);
   const [step, setStep] = useState(0); // 0=payment done, 1=assigned, 2=call ready
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isMovingToGeneral, setIsMovingToGeneral] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelErrorMessage, setCancelErrorMessage] = useState('');
   const consultationMode = appointment?.consultationMode || 'VIDEO';
@@ -69,6 +101,8 @@ export default function PatientWaitingRoom() {
     : consultationMode === 'IN_PERSON'
       ? MessageSquare
       : Video;
+  const queueType = getQueueType(appointment);
+  const isGeneralQueue = queueType === 'GENERAL' || isAutoGeneralEligible(appointment);
   const isAppointmentReadyByRule = useCallback((appt) =>
     appt?.status === 'ACCEPTED' ||
     (appt?.type === 'SCHEDULED' && appt?.consultationMode === 'IN_PERSON' && appt?.paymentStatus === 'PAID'), []);
@@ -82,7 +116,7 @@ export default function PatientWaitingRoom() {
     if (!appointmentId) return;
     const fetchAppointment = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/appointments`, {
+        const res = await axios.get(`${API_URL}/api/appointments`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const appt = res.data.find(a => a.id === appointmentId);
@@ -158,7 +192,7 @@ export default function PatientWaitingRoom() {
     setIsCancelling(true);
     try {
       const { data } = await axios.put(
-        `http://localhost:5000/api/appointments/${appointmentId}/status`,
+        `${API_URL}/api/appointments/${appointmentId}/status`,
         { status: 'CANCELLED' },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
@@ -173,23 +207,49 @@ export default function PatientWaitingRoom() {
     }
   };
 
+  const handleMoveToGeneralQueue = async ({ silent = false } = {}) => {
+    if (!appointmentId || isMovingToGeneral) return;
+    setIsMovingToGeneral(true);
+    try {
+      const { data } = await axios.post(
+        `${API_URL}/api/appointments/${appointmentId}/move-to-general`,
+        {},
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setAppointment(data);
+    } catch (err) {
+      if (!silent) {
+        setCancelErrorMessage(err?.response?.data?.error || 'Failed to move request to general waiting room.');
+      }
+    } finally {
+      setIsMovingToGeneral(false);
+    }
+  };
+
   const doctorName = formatDoctorName(appointment?.doctor?.name, 'Your Doctor');
 
-  const canCancelScheduledCall =
-    appointment?.type === 'SCHEDULED' &&
+  const canCancelRequest =
     appointment?.status !== 'CANCELLED' &&
     appointment?.status !== 'COMPLETED' &&
     appointment?.status !== 'REJECTED';
 
+  const canMoveToGeneralQueue =
+    appointment?.type === 'ON_DEMAND' &&
+    appointment?.status === 'PENDING' &&
+    appointment?.paymentStatus === 'PAID' &&
+    !isGeneralQueue;
+
+  useEffect(() => {
+    if (!appointment) return;
+    if (getQueueType(appointment) === 'GENERAL') return;
+    if (!isAutoGeneralEligible(appointment)) return;
+    handleMoveToGeneralQueue({ silent: true });
+  }, [appointment?.id, appointment?.status, appointment?.paymentStatus, appointment?.createdAt]);
+
   const timerPct = (timeLeft / 120) * 100;
 
   return (
-    <div className="bg-slate-50 font-sans flex flex-col relative overflow-hidden" style={{ height: '100dvh' }}>
-      {/* Ambient gradient orbs */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-primary-300 blur-[120px] opacity-20" />
-        <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] rounded-full bg-health-300 blur-[120px] opacity-20" />
-      </div>
+    <div className="bg-white font-sans flex flex-col relative overflow-hidden" style={{ height: '100dvh' }}>
 
       {/* Header */}
       <div className="relative z-40">
@@ -197,245 +257,147 @@ export default function PatientWaitingRoom() {
       </div>
 
       {/* Main — fills remaining dvh height, card scrollable on mobile */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-3 py-3 sm:px-4 sm:py-4 lg:px-8 xl:px-16 overflow-hidden">
+      <main className="relative z-10 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-          className="w-full max-w-md lg:max-w-5xl xl:max-w-6xl flex flex-col min-h-0 flex-1"
-          style={{ maxHeight: 'calc(100dvh - 80px)' }}
+          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+          className="mx-auto w-full max-w-6xl"
         >
-          {/* ── Outer card shell — vertical on mobile, horizontal on lg+ ── */}
-          <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden flex flex-col lg:flex-row flex-1 min-h-0">
-
-            {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                LEFT PANEL  dark / decorative
-                mobile: compact top banner strip
-                desktop: full left column ~45%
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-            <div className="relative bg-primary-900 overflow-hidden px-5 sm:px-8 py-4 sm:py-5 lg:w-[45%] lg:shrink-0 lg:flex lg:flex-col lg:p-8 lg:overflow-hidden">
-              {/* Glow orbs */}
-              <div className="absolute -top-12 -right-12 w-56 h-56 bg-health-500 rounded-full blur-[80px] opacity-20 pointer-events-none" />
-              <div className="absolute -bottom-14 -left-8 w-48 h-48 bg-primary-500 rounded-full blur-[70px] opacity-25 pointer-events-none" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary-700 rounded-full blur-[100px] opacity-30 pointer-events-none" />
-
-              {/* Top: eyebrow + title + doctor info */}
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-primary-300 text-xs font-black uppercase tracking-widest">{isScheduledAppointment ? 'Scheduled Appointment' : 'Virtual Waiting Room'}</p>
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white/10 border border-white/15 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                    <CalendarClock className="w-4 h-4 sm:w-5 sm:h-5 text-health-400" />
-                  </div>
-                </div>
-
-                {/* Doctor name as primary heading — always visible */}
-                <div className="flex items-center gap-3 mt-3">
-                  <img
-                    src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${appointment?.doctor?.name || 'Doctor'}&backgroundColor=164E63`}
-                    alt="Doctor"
-                    className="w-10 h-10 rounded-full border-2 border-white/20 object-cover shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-white font-heading font-black text-base sm:text-lg lg:text-xl truncate leading-tight">{doctorName}</p>
-                    <p className="text-primary-300 text-xs font-medium truncate">{getPractitionerTypeLabel(appointment?.doctor, 'Specialist')}</p>
-                  </div>
-                  <span className={`shrink-0 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${step >= 2
-                      ? 'bg-health-500/20 text-health-300 border border-health-500/30'
-                      : 'bg-primary-500/20 text-primary-200 border border-primary-400/20'
-                    }`}>
-                    {step >= 2 ? (isScheduledAppointment ? 'Scheduled' : 'Ready') : 'Pending'}
-                  </span>
-                </div>
-
-                <div className="mt-4 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-                {/* Status line — mobile only */}
-                <p className="mt-3 text-primary-200 text-xs sm:text-sm font-medium lg:hidden">
-                  {step >= 2
-                    ? (isScheduledAppointment
-                      ? 'Appointment confirmed and added to doctor schedule.'
-                      : 'Doctor accepted, you can join the call.')
-                    : 'Reviewing your triage notes...'}
-                </p>
-              </div>
-
-              {/* Large animated avatar — desktop only */}
-              <div className="hidden lg:flex flex-col items-center justify-center flex-1 py-4 relative z-10">
-                <div className="relative w-36 h-36">
-                  <PulseRing color="border-primary-400" delay={0} />
-                  <PulseRing color="border-primary-300" delay={0.7} />
-                  <PulseRing color="border-primary-200" delay={1.4} />
-                  <div className="absolute inset-5 rounded-full bg-white border-4 border-white/30 shadow-2xl overflow-hidden z-10">
-                    <img
-                      src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${appointment?.doctor?.name || 'Doctor'}&backgroundColor=164E63`}
-                      alt="Doctor"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div
-                    className={`absolute bottom-1 right-1 w-10 h-10 rounded-full border-4 border-primary-900 flex items-center justify-center z-20 shadow-lg ${step >= 2 ? 'bg-health-500' : 'bg-primary-600'
-                      }`}
-                  >
-                    <Video className="w-4 h-4 text-white" />
-                  </div>
-                </div>
-
-                <p className="mt-4 text-white font-heading font-black text-xl text-center">
-                  {doctorName}
-                </p>
-                <p className="mt-1 text-primary-300 text-xs font-medium text-center max-w-[240px] leading-relaxed">
-                  {step >= 2
-                    ? (isScheduledAppointment ? 'Confirmed and scheduled' : 'Accepted and ready to join')
-                    : 'Reviewing your triage notes...'}
-                </p>
-              </div>
-
-              {/* Desktop bottom trust note */}
-              <div className="hidden lg:flex relative z-10 items-center gap-2 text-primary-400 text-xs font-medium">
-                <Wifi className="w-3.5 h-3.5" />
-                End-to-end encrypted telemedicine session
-              </div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-5 shadow-sm sm:px-8 sm:py-8">
+            <div className="mx-auto mb-8 flex w-fit max-w-full items-center gap-2 rounded-lg bg-primary-900 px-3 py-2 text-xs font-semibold text-white">
+              <CalendarClock className="h-3.5 w-3.5 text-cyan-300" />
+              <span>
+                {isGeneralQueue
+                  ? "You're in general queue and will be seen shortly. You'll be notified when any doctor is ready."
+                  : "You're in queue and will be seen shortly. You'll be notified when doctor is ready."}
+              </span>
             </div>
 
-            {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                RIGHT PANEL  white / actions
-                mobile: body below banner
-                desktop: right column (flex-1)
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-            <div className="flex-1 flex flex-col px-5 sm:px-8 py-4 sm:py-5 lg:p-8 space-y-3 sm:space-y-4 lg:overflow-y-auto min-h-0">
-
-              {/* Mobile avatar — hidden on xs phones, show from sm upward */}
-              <div className="hidden sm:flex justify-center lg:hidden">
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24">
-                  <PulseRing color="border-primary-200" delay={0} />
-                  <PulseRing color="border-primary-300" delay={0.7} />
-                  <PulseRing color="border-primary-400" delay={1.4} />
-                  <div className="absolute inset-4 rounded-full bg-white border-4 border-white shadow-lg overflow-hidden z-10">
-                    <img
-                      src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${appointment?.doctor?.name || 'Doctor'}&backgroundColor=f8fafc`}
-                      alt="Doctor"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div
-                    className={`absolute bottom-1 right-1 w-9 h-9 rounded-full border-4 border-white flex items-center justify-center z-20 shadow-md ${step >= 2 ? 'bg-health-500' : 'bg-primary-600'
-                      }`}
-                  >
-                    <Video className="w-4 h-4 text-white" />
-                  </div>
+            <div className="mx-auto flex max-w-md flex-col items-center text-center">
+              <div className="relative h-28 w-28">
+                <PulseRing color="border-primary-300" />
+                <div className="absolute inset-[10px] overflow-hidden rounded-full border-[3px] border-primary-200 bg-white shadow-md">
+                  <img
+                    src={`https://api.dicebear.com/7.x/initials/svg?seed=Dr${appointment?.doctor?.name || 'Doctor'}&backgroundColor=eff6ff`}
+                    alt="Doctor"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               </div>
 
-              {/* Desktop section label */}
-              <div className="hidden lg:block">
-                <p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Session Progress</p>
-                <h2 className="font-heading font-black text-2xl text-slate-900">Consultation Steps</h2>
-              </div>
+              <h2 className="mt-4 text-3xl font-black leading-tight text-slate-900">
+                {step >= 2 ? 'Session Ready' : 'Waiting For Doctor...'}
+              </h2>
+              <p className="mt-1 text-base font-bold text-primary-700">
+                {doctorName} {step >= 2 ? 'is ready to consult now' : 'is currently online'}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {consultationLabel} consultation {isScheduledAppointment ? '(Scheduled)' : '(On demand)'}
+              </p>
+            </div>
 
-              {/* Progress steps */}
-              <div className="space-y-2.5 lg:flex-1">
-                <StepRow
-                  icon={ShieldCheck}
-                  label="Payment Confirmed"
-                  sub="Your appointment is booked"
-                  active={false}
-                  done={true}
-                />
-                <StepRow
-                  icon={Stethoscope}
-                  label={isScheduledAppointment ? 'Appointment Confirmed' : 'Doctor Reviewing Triage'}
-                  sub={isScheduledAppointment ? 'Added directly to doctor schedule' : 'Matching with your specialist'}
-                  active={!isScheduledAppointment && step < 2}
-                  done={step >= 2}
-                />
-                <StepRow
-                  icon={consultationMode === 'AUDIO' ? Phone : (consultationMode === 'IN_PERSON' ? Stethoscope : Video)}
-                  label={`${consultationLabel} Session Ready`}
-                  sub={isScheduledAppointment ? 'Join at your scheduled time' : 'Join when the doctor accepts'}
-                  active={step >= 2}
-                  done={false}
-                />
-              </div>
-
-              {/* CTAs */}
-              <div className="space-y-2 sm:space-y-3 lg:mt-auto">
-                <AnimatePresence>
-                  {step >= 2 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                    >
-                      <button type="button"
-                        onClick={() => navigate(readySessionRoute)}
-                        className="w-full py-3 sm:py-4 rounded-2xl font-heading font-black text-white text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all shadow-lg shadow-health-500/25 hover:shadow-health-500/40 hover:scale-[1.01] active:scale-[0.98]"
-                        style={{ background: 'linear-gradient(135deg, #059669 0%, #06B6D4 100%)' }}
-                      >
-                        {consultationMode === 'AUDIO'
-                          ? <Phone className="w-4 h-4" />
-                          : (consultationMode === 'IN_PERSON'
-                            ? <MessageSquare className="w-4 h-4" />
-                            : <Video className="w-4 h-4" />)}
-                        {consultationMode === 'IN_PERSON'
-                          ? 'Open In-Person Chat'
-                          : `${isScheduledAppointment ? 'Open' : 'Join'} ${consultationLabel} Session`}
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <button type="button"
-                  onClick={() => navigate('/dashboard')}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl border-2 border-slate-100 text-slate-500 font-bold text-sm hover:bg-slate-50 hover:text-slate-700 hover:border-slate-200 transition-all cursor-pointer"
+            <div className="mx-auto mt-6 flex max-w-2xl flex-wrap items-center justify-center gap-3">
+              {canCancelRequest && (
+                <button
+                  type="button"
+                  onClick={() => setShowCancelConfirm(true)}
+                  disabled={isCancelling}
+                  className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to Dashboard
+                  {isCancelling ? 'Cancelling...' : 'Cancel Request'}
                 </button>
+              )}
 
-                {canCancelScheduledCall && (
-                  <button type="button"
-                    onClick={() => setShowCancelConfirm(true)}
-                    disabled={isCancelling}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl border-2 border-red-100 bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 hover:border-red-200 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isCancelling ? 'Cancelling...' : 'Cancel Scheduled Call'}
-                  </button>
-                )}
-              </div>
+              {canMoveToGeneralQueue && (
+                <button
+                  type="button"
+                  onClick={() => handleMoveToGeneralQueue()}
+                  disabled={isMovingToGeneral}
+                  className="rounded-xl bg-primary-800 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-primary-900 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isMovingToGeneral ? 'Moving...' : 'Move to General Waiting Room'}
+                </button>
+              )}
 
-              {/* Mobile security note — hidden on very small screens */}
-              <div className="hidden sm:flex items-center justify-center gap-2 text-xs font-medium text-slate-400 lg:hidden pb-1">
-                <Wifi className="w-3.5 h-3.5" />
-                End-to-end encrypted
-              </div>
+              {step >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => navigate(readySessionRoute)}
+                  className="rounded-xl bg-gradient-to-r from-health-600 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-cyan-500/20 transition hover:brightness-105"
+                >
+                  {consultationMode === 'IN_PERSON'
+                    ? 'Open In-Person Chat'
+                    : `${isScheduledAppointment ? 'Open' : 'Join'} ${consultationLabel} Session`}
+                </button>
+              )}
+            </div>
+
+            <div className="mx-auto mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to Dashboard
+              </button>
+            </div>
+
+            <div className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {[
+                {
+                  icon: CheckCircle2,
+                  iconClass: 'text-amber-500',
+                  title: 'Request Acceptance',
+                  description: `${doctorName} will join you shortly.`,
+                },
+                {
+                  icon: Stethoscope,
+                  iconClass: 'text-cyan-600',
+                  title: 'Consultation',
+                  description: 'Your doctor will conduct your consultation session.',
+                },
+                {
+                  icon: Video,
+                  iconClass: 'text-blue-600',
+                  title: 'Telehealth Session',
+                  description: 'Connect with your doctor online to discuss your concerns.',
+                },
+                {
+                  icon: CalendarClock,
+                  iconClass: 'text-primary-700',
+                  title: 'Reassign to Available Doctor',
+                  description: "If there's no response in 30 minutes, we move your request to available doctors.",
+                },
+                {
+                  icon: ShieldCheck,
+                  iconClass: 'text-emerald-600',
+                  title: 'Cancellation & Refund',
+                  description: 'If no doctor is available, your request can be cancelled with refund support.',
+                },
+              ].map((item) => (
+                <div key={item.title} className="rounded-xl border border-slate-200 bg-white p-3.5">
+                  <p className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900">
+                    <item.icon className={`h-3.5 w-3.5 ${item.iconClass}`} />
+                    {item.title}
+                  </p>
+                  <p className="mt-2 text-sm font-medium leading-5 text-slate-600">
+                    {item.description}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
-
-          {/* Trust badges — mobile only, desktop has them inside left panel */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="mt-3 flex lg:hidden items-center justify-center gap-4"
-          >
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-health-500" />
-              HIPAA Compliant
-            </div>
-            <div className="w-px h-3 bg-slate-200" />
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-              <Video className="w-3.5 h-3.5 text-primary-500" />
-              HD Video Ready
-            </div>
-          </motion.div>
         </motion.div>
       </main>
 
       <ConfirmDialog
         open={showCancelConfirm}
-        title="Cancel Scheduled Call?"
-        message="This will cancel your scheduled appointment and release the reserved slot."
+        title="Cancel Request?"
+        message={isScheduledAppointment
+          ? 'This will cancel your scheduled appointment and release the reserved slot.'
+          : 'This will cancel your consultation request.'}
         confirmText="Yes, Cancel"
         cancelText="Keep Appointment"
         confirmVariant="danger"

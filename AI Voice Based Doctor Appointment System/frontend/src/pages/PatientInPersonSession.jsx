@@ -9,6 +9,7 @@ import { useSocket } from '../context/SocketContext';
 import { formatDoctorName } from '../utils/doctorName';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
 
 export default function PatientInPersonSession() {
   const { appointmentId } = useParams();
@@ -129,9 +130,9 @@ export default function PatientInPersonSession() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(PATIENT_APPOINTMENTS_ROUTE)}
               className="w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer"
-              aria-label="Back to dashboard"
+              aria-label="Back to appointments"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
