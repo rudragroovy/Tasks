@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, FileBadge2, FileText, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, FileBadge2, FileText, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getPractitionerTypeLabel } from '../../utils/doctorConsultation';
 
@@ -123,7 +123,10 @@ export default function PatientMedicalDocumentsTab() {
       })
       .map((appointment) => {
         const consultation = appointment?.consultation || {};
-        const rawDocumentUrl = consultation?.[activeTypeConfig.consultationField];
+        const summary = parseSummary(appointment?.aiSummary);
+        const rawDocumentUrl =
+          consultation?.[activeTypeConfig.consultationField] ||
+          summary?.[activeTypeConfig.consultationField];
         const documentUrl = resolveDocumentUrl(rawDocumentUrl);
         if (!documentUrl) return null;
 
@@ -234,14 +237,25 @@ export default function PatientMedicalDocumentsTab() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="patient-account-doc-card__action"
-                  onClick={() => window.open(document.documentUrl, '_blank', 'noopener,noreferrer')}
-                >
-                  <FileText size={14} />
-                  {activeTypeConfig.actionLabel}
-                </button>
+                <div className="patient-account-doc-card__actions">
+                  <button
+                    type="button"
+                    className="patient-account-doc-card__action"
+                    onClick={() => window.open(document.documentUrl, '_blank', 'noopener,noreferrer')}
+                  >
+                    <FileText size={14} />
+                    {activeTypeConfig.actionLabel}
+                  </button>
+                  <a
+                    href={document.documentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="patient-account-doc-card__action patient-account-doc-card__action--download"
+                  >
+                    <Download size={14} />
+                    Download
+                  </a>
+                </div>
               </article>
             ))}
           </div>

@@ -143,6 +143,25 @@ module.exports = function(io) {
       }
     });
 
+    socket.on('prescription:sync', (data) => {
+      const { appointmentId, prescription } = data || {};
+      if (!appointmentId) return;
+      // ponytail: live in-room sync only; persisted on consultation completion path.
+      socket.to(`appt:${appointmentId}`).emit('prescription:sync', {
+        appointmentId,
+        prescription: Array.isArray(prescription) ? prescription : [],
+      });
+    });
+
+    socket.on('call-notes:sync', (data) => {
+      const { appointmentId, notes } = data || {};
+      if (!appointmentId) return;
+      socket.to(`appt:${appointmentId}`).emit('call-notes:sync', {
+        appointmentId,
+        notes: String(notes || ''),
+      });
+    });
+
     socket.on('disconnect', async () => {
       console.log('User disconnected:', socket.id);
       const disconnectedUser = socketUsers.get(socket.id);

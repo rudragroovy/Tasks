@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Avatar, Button, Card, ConfigProvider, Empty, Input, Pagination, Typography } from 'antd';
-import { FileBadge2, FileText, Search } from 'lucide-react';
+import { Download, FileBadge2, FileText, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
 import { formatDoctorName } from '../utils/doctorName';
@@ -90,6 +90,19 @@ function getPatientEmail(appointment) {
 
 function getConsultationLabel(appointment) {
   return getPractitionerTypeLabel(appointment?.doctor, 'Standard Consultation');
+}
+
+function parseSummary(summary) {
+  if (!summary) return {};
+  if (typeof summary === 'object') return summary;
+  if (typeof summary === 'string') {
+    try {
+      return JSON.parse(summary);
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
 function resolveDocumentUrl(rawUrl) {
@@ -186,7 +199,10 @@ export default function DoctorMedicalDocuments() {
       })
       .map((appointment) => {
         const consultation = appointment?.consultation || {};
-        const rawDocumentUrl = consultation?.[activeTypeConfig.consultationField];
+        const summary = parseSummary(appointment?.aiSummary);
+        const rawDocumentUrl =
+          consultation?.[activeTypeConfig.consultationField] ||
+          summary?.[activeTypeConfig.consultationField];
         const documentUrl = resolveDocumentUrl(rawDocumentUrl);
         if (!documentUrl) return null;
 
@@ -362,15 +378,26 @@ export default function DoctorMedicalDocuments() {
                           </div>
                         </div>
 
-                        <Button
-                          block
-                          type="default"
-                          icon={<FileText size={14} />}
-                          className="!h-10 !rounded-lg !border-primary-700 !bg-white !text-sm !font-black !text-primary-700 transition-all duration-200 hover:!border-primary-800 hover:!bg-primary-50 hover:!text-primary-800"
-                          onClick={() => window.open(document.documentUrl, '_blank', 'noopener,noreferrer')}
-                        >
-                          {activeTypeConfig.actionLabel}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            type="default"
+                            icon={<FileText size={14} />}
+                            className="!h-10 !flex-1 !rounded-lg !border-primary-700 !bg-white !text-sm !font-black !text-primary-700 transition-all duration-200 hover:!border-primary-800 hover:!bg-primary-50 hover:!text-primary-800"
+                            onClick={() => window.open(document.documentUrl, '_blank', 'noopener,noreferrer')}
+                          >
+                            {activeTypeConfig.actionLabel}
+                          </Button>
+                          <Button
+                            type="default"
+                            icon={<Download size={14} />}
+                            href={document.documentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="!h-10 !flex-1 !rounded-lg !border-slate-300 !bg-white !text-sm !font-black !text-slate-700 transition-all duration-200 hover:!border-slate-400 hover:!bg-slate-50 hover:!text-slate-900"
+                          >
+                            Download
+                          </Button>
+                        </div>
                       </Card>
                     );
                   })}

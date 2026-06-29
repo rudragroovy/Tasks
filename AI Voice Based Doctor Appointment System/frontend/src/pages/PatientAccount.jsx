@@ -13,6 +13,7 @@ import {
   Phone,
   Receipt,
   Save,
+  CheckCircle2,
   ShieldCheck,
   Stethoscope,
   Trash2,
@@ -28,6 +29,7 @@ import PatientMedicalHistoryTab from '../components/account/PatientMedicalHistor
 import PatientMedicalDocumentsTab from '../components/account/PatientMedicalDocumentsTab';
 import PatientPastDoctorsTab from '../components/account/PatientPastDoctorsTab';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { isImageFile, uploadFileToS3 } from '../utils/fileUpload';
 import './patient-account.css';
 
 const accountTabs = [
@@ -141,6 +143,8 @@ export default function PatientAccount() {
   const [profileForm, setProfileForm] = useState(emptyProfileForm);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [isProfilePhotoUploading, setIsProfilePhotoUploading] = useState(false);
+  const [isFamilyPhotoUploading, setIsFamilyPhotoUploading] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState('');
   const [autoReviewAppointmentId, setAutoReviewAppointmentId] = useState(() => {
     const value = typeof location.state?.promptReviewAppointmentId === 'string'
@@ -148,6 +152,8 @@ export default function PatientAccount() {
       : '';
     return value || null;
   });
+  const [paymentSuccessRedirectTarget, setPaymentSuccessRedirectTarget] = useState('');
+  const [paymentSuccessCountdown, setPaymentSuccessCountdown] = useState(3);
   const fileInputRef = useRef(null);
 
   const activeTab = useMemo(() => resolveActiveTab(searchParams), [searchParams]);
@@ -169,6 +175,46 @@ export default function PatientAccount() {
     }
     navigate('/patient/account?tab=medical-history', { replace: true, state: null });
   }, [activeTab, location.state, navigate, setSearchParams]);
+
+  useEffect(() => {
+    const paymentSuccessAppointmentId = typeof location.state?.paymentSuccessAppointmentId === 'string'
+      ? location.state.paymentSuccessAppointmentId.trim()
+      : '';
+    if (!paymentSuccessAppointmentId) return;
+
+    const redirectTo = typeof location.state?.paymentSuccessRedirect === 'string'
+      ? location.state.paymentSuccessRedirect
+      : `/waiting-room?id=${paymentSuccessAppointmentId}`;
+
+    setPaymentSuccessRedirectTarget(redirectTo);
+    setPaymentSuccessCountdown(3);
+    navigate('/patient/account?tab=medical-history', { replace: true, state: null });
+  }, [location.state, navigate]);
+
+  useEffect(() => {
+    if (!paymentSuccessRedirectTarget) return undefined;
+
+    const countdownInterval = window.setInterval(() => {
+      setPaymentSuccessCountdown((current) => {
+        if (current <= 1) {
+          window.clearInterval(countdownInterval);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
+    const redirectTimeout = window.setTimeout(() => {
+      const target = paymentSuccessRedirectTarget;
+      setPaymentSuccessRedirectTarget('');
+      navigate(target);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(countdownInterval);
+      window.clearTimeout(redirectTimeout);
+    };
+  }, [paymentSuccessRedirectTarget, navigate]);
 
   useEffect(() => {
     if (activeTab !== 'family') return;
@@ -224,16 +270,28 @@ export default function PatientAccount() {
     setFamilyForm((previous) => ({ ...previous, [field]: Boolean(checked) }));
   };
 
-  const handleFamilyPhotoSelect = (event) => {
+  const handleFamilyPhotoSelect = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        updateFamilyField('profilePictureUrl', reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+
+    if (!isImageFile(file)) {
+      setFamilySaveMessage('Please upload a valid image file.');
+      event.target.value = '';
+      return;
+    }
+
+    setIsFamilyPhotoUploading(true);
+    setFamilySaveMessage('');
+    try {
+      const uploaded = await uploadFileToS3(file, 'family-profile-photo');
+      updateFamilyField('profilePictureUrl', uploaded.url);
+    } catch (error) {
+      console.error('Failed to upload family profile image', error);
+      setFamilySaveMessage(error?.response?.data?.error || 'Could not upload family profile image.');
+    } finally {
+      setIsFamilyPhotoUploading(false);
+      event.target.value = '';
+    }
   };
 
   const refreshFamilyMembers = async () => {
@@ -293,16 +351,28 @@ export default function PatientAccount() {
     }
   };
 
-  const handlePhotoSelect = (event) => {
+  const handlePhotoSelect = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        updateField('profilePictureUrl', reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+
+    if (!isImageFile(file)) {
+      setProfileSaveMessage('Please upload a valid image file.');
+      event.target.value = '';
+      return;
+    }
+
+    setIsProfilePhotoUploading(true);
+    setProfileSaveMessage('');
+    try {
+      const uploaded = await uploadFileToS3(file, 'patient-profile-photo');
+      updateField('profilePictureUrl', uploaded.url);
+    } catch (error) {
+      console.error('Failed to upload profile image', error);
+      setProfileSaveMessage(error?.response?.data?.error || 'Could not upload profile image.');
+    } finally {
+      setIsProfilePhotoUploading(false);
+      event.target.value = '';
+    }
   };
 
   const handleProfileSave = async (event) => {
@@ -331,6 +401,31 @@ export default function PatientAccount() {
   return (
     <main className="patient-account-page">
       <LandingNavbar />
+
+      {paymentSuccessRedirectTarget ? (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-slate-950/45 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+              <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-heading font-black text-slate-900">Payment Successful</h2>
+            <p className="mt-2 text-sm font-semibold text-slate-600">
+              Redirecting you to waiting room in {paymentSuccessCountdown}s...
+            </p>
+            <button
+              type="button"
+              className="mt-4 rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700"
+              onClick={() => {
+                const target = paymentSuccessRedirectTarget;
+                setPaymentSuccessRedirectTarget('');
+                navigate(target);
+              }}
+            >
+              Go Now
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <section className="patient-account-shell">
         <aside className="patient-account-sidebar">
@@ -693,12 +788,13 @@ export default function PatientAccount() {
                 </article>
 
                 <div className="patient-account-actions">
-                  <button type="submit" className="patient-account-primary-btn" disabled={isProfileSaving}>
+                  <button type="submit" className="patient-account-primary-btn" disabled={isProfileSaving || isProfilePhotoUploading}>
                     <Save size={15} /> {isProfileSaving ? 'Saving...' : 'Submit Form'}
                   </button>
                 </div>
 
                 {isProfileLoading ? <p className="patient-account-muted">Loading profile...</p> : null}
+                {isProfilePhotoUploading ? <p className="patient-account-muted">Uploading profile photo...</p> : null}
                 {profileSaveMessage ? (
                   <p className="patient-account-save-message">{profileSaveMessage}</p>
                 ) : null}
@@ -1152,10 +1248,11 @@ export default function PatientAccount() {
                     </label>
 
                     <div className="patient-account-actions">
-                      <button type="submit" className="patient-account-primary-btn" disabled={isFamilySaving}>
+                      <button type="submit" className="patient-account-primary-btn" disabled={isFamilySaving || isFamilyPhotoUploading}>
                         {isFamilySaving ? 'Saving...' : 'Submit Form'}
                       </button>
                     </div>
+                    {isFamilyPhotoUploading ? <p className="patient-account-muted">Uploading family profile photo...</p> : null}
                   </form>
                 ) : null}
 
@@ -1257,7 +1354,7 @@ export default function PatientAccount() {
                   <button
                     type="button"
                     className="patient-account-healthcare-option"
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/patient/account?tab=medical-history')}
                   >
                     <span>
                       <Receipt size={16} /> Invoices

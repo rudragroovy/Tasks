@@ -1336,10 +1336,29 @@
   transition: background-color .16s ease, border-color .16s ease, color .16s ease;
 }
 
+.patient-account-doc-card__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .patient-account-doc-card__action:hover {
   border-color: #0c4a6e;
   background: #dff6ff;
   color: #0c4a6e;
+}
+
+.patient-account-doc-card__action--download {
+  text-decoration: none;
+  border-color: #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.patient-account-doc-card__action--download:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 .patient-account-documents-pagination {

@@ -12,6 +12,7 @@ const agoraRoutes = require('./routes/agora');
 const aiRoutes = require('./routes/ai');
 const adminRoutes = require('./routes/admin');
 const reviewRoutes = require('./routes/reviews');
+const uploadRoutes = require('./routes/uploads');
 const { ensureDefaultAdmin } = require('./utils/ensureDefaultAdmin');
 
 const path = require('path');
@@ -39,6 +40,7 @@ app.use('/api/agora', agoraRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Socket.io
 require('./socket')(io);

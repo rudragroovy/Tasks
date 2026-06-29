@@ -1,12 +1,14 @@
-import { useState, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LayoutDashboard, User, Mic, Bell, LogOut, Activity, X, Menu, History, Users, ChevronRight, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppIcon from '../branding/AppIcon';
+import { formatNotificationTime, useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
 
 const AIVoiceAssistant = lazy(() => import('../AIVoiceAssistant'));
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
 
 export function TopHeader({ activeAppointmentsCount = 0 }) {
   const navigate = useNavigate();
@@ -14,6 +16,10 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
   const { user, logout } = useAuth();
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const headerRef = useRef(null);
+  const { notifications, unreadCount, markAllRead, clearAll, markRead } = useRealtimeNotifications();
+  const notificationBadgeCount = unreadCount > 0 ? unreadCount : activeAppointmentsCount;
   const isMedicalHistoryTabActive =
     (location.pathname === '/patient/account' || location.pathname === '/account') &&
     new URLSearchParams(location.search).get('tab') === 'medical-history';
@@ -51,8 +57,29 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
     navigate(`/booking?practitionerType=${encodeURIComponent(practitionerType)}`, { state: { aiSummary: aiSummaryWithPatient } });
   };
 
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      if (!headerRef.current?.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
+    };
+    const onEscape = (event) => {
+      if (event.key === 'Escape') setIsNotificationsOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsNotificationsOpen(false);
+  }, [location.pathname, location.search]);
+
   return (
-    <header className="bg-white/85 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-40">
+    <header ref={headerRef} className="bg-white/85 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-40">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button type="button"
@@ -65,8 +92,8 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
           <button
             type="button"
             className="flex min-h-11 items-center gap-2 cursor-pointer"
-            onClick={() => navigate('/dashboard')}
-            aria-label="Go to dashboard"
+            onClick={() => navigate(PATIENT_APPOINTMENTS_ROUTE)}
+            aria-label="Go to my appointments"
           >
             <AppIcon size={32} />
             <span className="font-heading font-black text-slate-900 text-lg tracking-tight hidden sm:block">CareBridge</span>
@@ -75,10 +102,10 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
 
         <div className="hidden md:flex flex-1 items-center justify-center gap-5 lg:gap-8">
           <button type="button"
-            onClick={() => navigate('/dashboard')}
-            className={`font-bold text-sm flex items-center gap-1.5 transition-colors cursor-pointer ${location.pathname === '/dashboard' ? 'text-primary-700' : 'text-slate-500 hover:text-primary-600'}`}
+            onClick={() => navigate(PATIENT_APPOINTMENTS_ROUTE)}
+            className={`font-bold text-sm flex items-center gap-1.5 transition-colors cursor-pointer ${isMedicalHistoryTabActive ? 'text-primary-700' : 'text-slate-500 hover:text-primary-600'}`}
           >
-            <LayoutDashboard className="w-4 h-4" /> Dashboard
+            <LayoutDashboard className="w-4 h-4" /> My Appointments
           </button>
           <button type="button"
             onClick={() => navigate('/doctors')}
@@ -104,12 +131,70 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
         </div>
 
         <div className="flex items-center gap-4">
-          <button type="button" className="text-slate-400 hover:text-slate-600 relative cursor-pointer min-h-11 min-w-11" aria-label="Notifications">
-            <Bell className="w-5 h-5" />
-            {activeAppointmentsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-health-500 rounded-full border-2 border-white"></span>
+          <div className="relative">
+            <button
+              type="button"
+              className="text-slate-400 hover:text-slate-600 relative cursor-pointer min-h-11 min-w-11"
+              aria-label="Notifications"
+              onClick={() => setIsNotificationsOpen((prev) => !prev)}
+            >
+              <Bell className="w-5 h-5" />
+              {notificationBadgeCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-health-500 text-white text-[10px] font-black border-2 border-white flex items-center justify-center">
+                  {notificationBadgeCount > 99 ? '99+' : notificationBadgeCount}
+                </span>
+              )}
+            </button>
+
+            {isNotificationsOpen && (
+              <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[340px] max-w-[88vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(2,6,23,0.12)]">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <p className="text-base font-black text-slate-900">Notifications</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-primary-700 hover:text-primary-800"
+                      onClick={markAllRead}
+                    >
+                      Mark all read
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-slate-500 hover:text-slate-700"
+                      onClick={clearAll}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-[320px] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm font-semibold text-slate-500">No updates yet</div>
+                  ) : (
+                    notifications.slice(0, 12).map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          markRead(item.id);
+                          setIsNotificationsOpen(false);
+                          if (item.route) navigate(item.route);
+                        }}
+                        className={`w-full border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${
+                          item.read ? 'bg-white' : 'bg-cyan-50/40'
+                        }`}
+                      >
+                        <p className="text-sm font-black text-slate-900">{item.title}</p>
+                        <p className="mt-0.5 text-xs font-semibold text-slate-600">{item.description}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">{formatNotificationTime(item.createdAt)}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
             )}
-          </button>
+          </div>
           <div className="w-px h-6 bg-slate-200 hidden sm:block"></div>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-sm border border-primary-200">
@@ -283,10 +368,10 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
 
               <div className="p-4 flex flex-col gap-2 flex-1">
                 <button type="button"
-                  onClick={() => { setIsSidebarOpen(false); navigate('/dashboard'); }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${location.pathname === '/dashboard' ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                  onClick={() => { setIsSidebarOpen(false); navigate(PATIENT_APPOINTMENTS_ROUTE); }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${isMedicalHistoryTabActive ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
                 >
-                  <LayoutDashboard className="w-5 h-5" /> Dashboard
+                  <LayoutDashboard className="w-5 h-5" /> My Appointments
                 </button>
                 <button type="button"
                   onClick={() => { setIsSidebarOpen(false); navigate('/doctors'); }}

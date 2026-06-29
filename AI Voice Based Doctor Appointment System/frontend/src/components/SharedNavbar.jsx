@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlarmClock,
   Bell,
@@ -13,9 +13,11 @@ import {
   Star,
   User,
   Video,
+  X,
   Wallet,
 } from 'lucide-react';
 import AppIcon from './branding/AppIcon';
+import { formatNotificationTime, useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 export default function SharedNavbar({
   user,
@@ -36,11 +38,22 @@ export default function SharedNavbar({
 }) {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const navbarRef = useRef(null);
   const displayDoctorName = doctorName || user?.name || '';
   const avatarLetter = displayDoctorName.replace('Dr. ', '').charAt(0) || (isDoctor ? 'D' : 'U');
   const roleText = isDoctor ? 'Doctor' : 'Patient';
   const hasMoreOption = useMemo(() => navItems.some((item) => item.key === 'more'), [navItems]);
+  const {
+    notifications,
+    unreadCount,
+    markAllRead,
+    clearAll,
+    markRead,
+    toast,
+    dismissToast,
+  } = useRealtimeNotifications();
+  const notificationBadgeCount = unreadCount > 0 ? unreadCount : pendingCount;
 
   const moreMenuColumns = useMemo(
     () => [
@@ -105,12 +118,13 @@ export default function SharedNavbar({
   );
 
   useEffect(() => {
-    if (!isMoreMenuOpen && !isProfileMenuOpen) return undefined;
+    if (!isMoreMenuOpen && !isProfileMenuOpen && !isNotificationsOpen) return undefined;
 
     const onPointerDown = (event) => {
       if (!navbarRef.current?.contains(event.target)) {
         setIsMoreMenuOpen(false);
         setIsProfileMenuOpen(false);
+        setIsNotificationsOpen(false);
       }
     };
 
@@ -118,6 +132,7 @@ export default function SharedNavbar({
       if (event.key === 'Escape') {
         setIsMoreMenuOpen(false);
         setIsProfileMenuOpen(false);
+        setIsNotificationsOpen(false);
       }
     };
 
@@ -127,11 +142,12 @@ export default function SharedNavbar({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onEscape);
     };
-  }, [isMoreMenuOpen, isProfileMenuOpen]);
+  }, [isMoreMenuOpen, isProfileMenuOpen, isNotificationsOpen]);
 
   useEffect(() => {
     setIsMoreMenuOpen(false);
     setIsProfileMenuOpen(false);
+    setIsNotificationsOpen(false);
   }, [activeTab]);
   // Handle status styling
   const statusConfig = statusOverride || {
@@ -147,22 +163,26 @@ export default function SharedNavbar({
     if (itemKey === 'more' && hasMoreOption) {
       setIsMoreMenuOpen((prev) => !prev);
       setIsProfileMenuOpen(false);
+      setIsNotificationsOpen(false);
       return;
     }
     setIsMoreMenuOpen(false);
     setIsProfileMenuOpen(false);
+    setIsNotificationsOpen(false);
     if (onTabClick) onTabClick(itemKey);
   };
 
   const handleMoreMenuItemClick = (itemKey) => {
     setIsMoreMenuOpen(false);
     setIsProfileMenuOpen(false);
+    setIsNotificationsOpen(false);
     if (onTabClick) onTabClick(itemKey);
   };
 
   const handleProfileMenuToggle = () => {
     setIsProfileMenuOpen((prev) => !prev);
     setIsMoreMenuOpen(false);
+    setIsNotificationsOpen(false);
   };
 
   const handleProfileMenuAction = (actionKey) => {
@@ -245,16 +265,76 @@ export default function SharedNavbar({
           </motion.button>
 
           {/* Bell */}
-          <button
-            type="button"
-            className="text-slate-400 hover:text-slate-600 relative cursor-pointer min-h-11 min-w-11"
-            aria-label="Notifications"
-          >
-            <Bell className="w-5 h-5" />
-            {pendingCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-health-500 rounded-full border-2 border-white" />
+          <div className="relative inline-flex items-center shrink-0">
+            <button
+              type="button"
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
+              aria-label="Notifications"
+              onClick={() => {
+                setIsNotificationsOpen((prev) => !prev);
+                setIsMoreMenuOpen(false);
+                setIsProfileMenuOpen(false);
+              }}
+            >
+              <Bell className="w-5 h-5" />
+              {notificationBadgeCount > 0 && (
+                <span className="absolute -top-[3px] -right-[3px] min-w-[18px] h-[18px] px-1 rounded-full bg-health-500 text-white text-[10px] font-black border-2 border-white flex items-center justify-center leading-none">
+                  {notificationBadgeCount > 99 ? '99+' : notificationBadgeCount}
+                </span>
+              )}
+            </button>
+
+            {isNotificationsOpen && (
+              <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[340px] max-w-[88vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(2,6,23,0.12)]">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <p className="text-base font-black text-slate-900">Notifications</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-primary-700 hover:text-primary-800"
+                      onClick={markAllRead}
+                    >
+                      Mark all read
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-slate-500 hover:text-slate-700"
+                      onClick={clearAll}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-[320px] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm font-semibold text-slate-500">No updates yet</div>
+                  ) : (
+                    notifications.slice(0, 12).map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          markRead(item.id);
+                          setIsNotificationsOpen(false);
+                          if (item.route) {
+                            window.location.href = item.route;
+                          }
+                        }}
+                        className={`w-full border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${
+                          item.read ? 'bg-white' : 'bg-cyan-50/40'
+                        }`}
+                      >
+                        <p className="text-sm font-black text-slate-900">{item.title}</p>
+                        <p className="mt-0.5 text-xs font-semibold text-slate-600">{item.description}</p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">{formatNotificationTime(item.createdAt)}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
             )}
-          </button>
+          </div>
 
           <div className="w-px h-6 bg-slate-200 hidden sm:block" />
 
@@ -391,6 +471,27 @@ export default function SharedNavbar({
           })}
         </div>
       )}
+
+      <AnimatePresence>
+        {toast ? (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="fixed right-4 top-20 z-[1200] w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-sky-100 bg-white px-4 py-3 shadow-lg"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900">{toast.title}</p>
+                <p className="mt-0.5 text-xs font-semibold text-slate-600">{toast.description}</p>
+              </div>
+              <button type="button" onClick={dismissToast} className="text-slate-500 hover:text-slate-700">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </header>
   );
 }

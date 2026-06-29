@@ -37,6 +37,16 @@ const { TextArea } = Input;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const GENERAL_QUEUE_WAIT_MINUTES = 30;
 
+function resolveAttachmentUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  if (value.startsWith('//')) return `https:${value}`;
+  if (value.startsWith('/')) return `${API_URL}${value}`;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}\/.+/i.test(value)) return `https://${value}`;
+  return `${API_URL}/${value}`;
+}
+
 function normalizeExperienceLabel(value) {
   const raw = String(value || '').trim();
   if (!raw) return '0-1 Experience';
@@ -194,6 +204,13 @@ function getQueueTag(appointment, viewerDoctorId) {
   return isGeneralQueueRecord(appointment, viewerDoctorId)
     ? <Tag color="cyan">GENERAL</Tag>
     : <Tag color="geekblue">DOCTOR SPECIFIC</Tag>;
+}
+
+function formatYesNoLabel(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'YES') return 'Yes';
+  if (normalized === 'NO') return 'No';
+  return 'Not answered';
 }
 
 function canDoctorRespondToRequest(appointment, doctorId) {
@@ -449,6 +466,32 @@ export default function DoctorWaitingRoom() {
   const selectedUploadedFiles = Array.isArray(selectedSummary?.attachedFileNames)
     ? selectedSummary.attachedFileNames
     : [];
+  const selectedAttachedFiles = Array.isArray(selectedSummary?.attachedFiles)
+    ? selectedSummary.attachedFiles
+    : [];
+  const selectedQuestionnaire =
+    selectedSummary?.prescriptionQuestionnaire &&
+    typeof selectedSummary.prescriptionQuestionnaire === 'object'
+      ? selectedSummary.prescriptionQuestionnaire
+      : null;
+  const selectedPathologyTests = (
+    Array.isArray(selectedSummary?.selectedBloodTests)
+      ? selectedSummary.selectedBloodTests
+      : Array.isArray(selectedSummary?.pathologyTests)
+        ? selectedSummary.pathologyTests
+        : []
+  )
+    .map((testName) => String(testName || '').trim())
+    .filter(Boolean);
+  const selectedRadiologyTests = (
+    Array.isArray(selectedSummary?.selectedRadiologyTests)
+      ? selectedSummary.selectedRadiologyTests
+      : Array.isArray(selectedSummary?.radiologyTests)
+        ? selectedSummary.radiologyTests
+        : []
+  )
+    .map((testName) => String(testName || '').trim())
+    .filter(Boolean);
   const selectedPatientName =
     selectedAppointment?.familyMember?.name || selectedAppointment?.patient?.name || '-';
   const selectedProfile = selectedAppointment?.patient?.patientProfile || {};
@@ -740,7 +783,45 @@ export default function DoctorWaitingRoom() {
 
                       <section className="rounded-xl border border-slate-200 bg-white p-3.5">
                         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Supporting files</p>
-                        {selectedUploadedFiles.length > 0 ? (
+                        {selectedAttachedFiles.length > 0 ? (
+                          <div className="mt-2 space-y-2">
+                            {selectedAttachedFiles.map((file, index) => {
+                              const fileName = String(file?.name || `File ${index + 1}`).trim();
+                              const fileUrl = resolveAttachmentUrl(file?.url);
+                              return (
+                                <div
+                                  key={`${file?.key || fileName}-${index}`}
+                                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                                >
+                                  <p className="truncate text-[14px] font-medium text-slate-900" title={fileName}>
+                                    {fileName}
+                                  </p>
+                                  {fileUrl ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <Button
+                                        size="small"
+                                        type="primary"
+                                        onClick={() => window.open(fileUrl, '_blank', 'noopener,noreferrer')}
+                                      >
+                                        Open
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        href={fileUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        Download
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Text className="!text-xs !font-semibold !text-slate-500">No link</Text>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : selectedUploadedFiles.length > 0 ? (
                           <ul className="mt-2 ml-4 list-disc space-y-1 text-[14px] font-medium text-slate-900">
                             {selectedUploadedFiles.map((fileName) => (
                               <li key={fileName}>{fileName}</li>
@@ -791,6 +872,78 @@ export default function DoctorWaitingRoom() {
                           </div>
                         ) : (
                           <p className="mt-1 text-[14px] font-medium text-slate-600">No GP/medication sub-details provided.</p>
+                        )}
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Prescription questionnaire</p>
+                        {selectedQuestionnaire ? (
+                          <div className="mt-2.5 space-y-2.5 text-sm">
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Consulted within last 12 months</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{formatYesNoLabel(selectedQuestionnaire?.consultedWithinLast12Months)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Chronic conditions</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{formatYesNoLabel(selectedQuestionnaire?.chronicConditions)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Taking medications</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{formatYesNoLabel(selectedQuestionnaire?.takingMedications)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Recent surgeries or hospitalizations</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{formatYesNoLabel(selectedQuestionnaire?.recentSurgeriesOrHospitalizations)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Needs language or mobility assistance</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{formatYesNoLabel(selectedQuestionnaire?.needsLanguageOrMobilityAssistance)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Seen doctor for this issue before</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{formatYesNoLabel(selectedQuestionnaire?.seenDoctorForIssueBefore)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Symptom duration</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedQuestionnaire?.symptomDuration || '').trim() || 'Not provided'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Symptom severity</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedQuestionnaire?.symptomSeverity || '').trim() || 'Not provided'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold text-slate-500">Additional information</p>
+                              <p className="text-[14px] font-medium leading-5 text-slate-900">{String(selectedQuestionnaire?.additionalInformation || '').trim() || 'Not provided'}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-[14px] font-medium text-slate-600">No questionnaire responses provided.</p>
+                        )}
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Requested pathology tests</p>
+                        {selectedPathologyTests.length > 0 ? (
+                          <ul className="mt-2 ml-4 list-disc space-y-1 text-[14px] font-medium text-slate-900">
+                            {selectedPathologyTests.map((testName, index) => (
+                              <li key={`${testName}-${index}`}>{testName}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-[14px] font-medium text-slate-600">No pathology tests selected.</p>
+                        )}
+                      </section>
+
+                      <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Requested radiology tests</p>
+                        {selectedRadiologyTests.length > 0 ? (
+                          <ul className="mt-2 ml-4 list-disc space-y-1 text-[14px] font-medium text-slate-900">
+                            {selectedRadiologyTests.map((testName, index) => (
+                              <li key={`${testName}-${index}`}>{testName}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-[14px] font-medium text-slate-600">No radiology tests selected.</p>
                         )}
                       </section>
                     </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { TopHeader } from '../components/ui/top-header';
+import LandingNavbar from '../components/LandingNavbar';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDoctorName } from '../utils/doctorName';
@@ -14,6 +14,7 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const GENERAL_QUEUE_WAIT_MINUTES = 30;
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
 
 function parseAppointmentAiSummary(appointment) {
   const raw = appointment?.aiSummary;
@@ -109,7 +110,7 @@ export default function PatientWaitingRoom() {
 
   const handleDecline = useCallback(() => {
     socket.emit('call:response', { appointmentId, doctorId: appointment?.doctorId, accepted: false });
-    navigate('/dashboard');
+    navigate(PATIENT_APPOINTMENTS_ROUTE);
   }, [socket, appointmentId, appointment?.doctorId, navigate]);
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export default function PatientWaitingRoom() {
         setAppointment(updatedAppt);
         setStep(isAppointmentReadyByRule(updatedAppt) ? 2 : 1);
         if (updatedAppt.status === 'REJECTED' || updatedAppt.status === 'CANCELLED') {
-          navigate('/dashboard');
+          navigate(PATIENT_APPOINTMENTS_ROUTE);
         }
       }
     };
@@ -198,7 +199,7 @@ export default function PatientWaitingRoom() {
       );
       setAppointment(data);
       setShowCancelConfirm(false);
-      navigate('/dashboard');
+      navigate(PATIENT_APPOINTMENTS_ROUTE);
     } catch (err) {
       setShowCancelConfirm(false);
       setCancelErrorMessage(err?.response?.data?.error || 'Failed to cancel scheduled call.');
@@ -253,11 +254,11 @@ export default function PatientWaitingRoom() {
 
       {/* Header */}
       <div className="relative z-40">
-        <TopHeader />
+        <LandingNavbar />
       </div>
 
       {/* Main — fills remaining dvh height, card scrollable on mobile */}
-      <main className="relative z-10 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+      <main className="relative z-10 flex-1 overflow-y-auto px-4 pb-6 pt-24 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -336,11 +337,11 @@ export default function PatientWaitingRoom() {
             <div className="mx-auto mt-3 flex justify-center">
               <button
                 type="button"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate(PATIENT_APPOINTMENTS_ROUTE)}
                 className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back to Dashboard
+                Back to My Appointments
               </button>
             </div>
 

@@ -1,54 +1,60 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import dayjs from 'dayjs';
-import {
-  Button,
-  Card,
-  ConfigProvider,
-  DatePicker,
-  Empty,
-  Input,
-  Pagination,
-  Segmented,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd';
-import { CalendarDays, Search } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SharedNavbar from '../components/SharedNavbar';
+import { HistoryModal } from '../components/ui/history-modal';
 import { formatDoctorName } from '../utils/doctorName';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import './patient-account.css';
 
-const { RangePicker } = DatePicker;
-const { Title } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const EMPTY_STATE_IMAGE = 'https://cdn-icons-png.flaticon.com/512/4076/4076432.png';
+
+function safeDate(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function getAppointmentDate(appointment) {
   const rawDate =
     appointment?.scheduledAt ||
+    appointment?.scheduledFor ||
     appointment?.startTime ||
     appointment?.appointmentTime ||
     appointment?.createdAt ||
     appointment?.updatedAt;
-  if (!rawDate) return null;
-  const parsed = new Date(rawDate);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return safeDate(rawDate);
 }
 
-function getSessionRoute(appointment) {
-  if (appointment?.consultationMode === 'IN_PERSON') return `/doctor/in-person/${appointment.id}`;
-  return `/room/${appointment.id}`;
+function parseSummary(summary) {
+  if (!summary) return {};
+  if (typeof summary === 'object') return summary;
+  if (typeof summary === 'string') {
+    try {
+      return JSON.parse(summary);
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
-function getStatusTag(status) {
-  if (status === 'ACCEPTED') return <Tag color="cyan">IN PROGRESS</Tag>;
-  if (status === 'PENDING') return <Tag color="gold">PENDING</Tag>;
-  if (status === 'COMPLETED') return <Tag color="green">COMPLETED</Tag>;
-  if (status === 'REJECTED' || status === 'CANCELLED') return <Tag color="red">CANCELLED</Tag>;
-  return <Tag color="default">{status || 'UNKNOWN'}</Tag>;
+function formatStatusLabel(status) {
+  return String(status || 'UNKNOWN')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getModeLabel(mode) {
+  const normalized = String(mode || '').toUpperCase();
+  if (normalized === 'IN_PERSON') return 'In Person';
+  if (normalized === 'AUDIO') return 'Telephone';
+  if (normalized === 'VIDEO') return 'Televideo';
+  return 'Televideo';
 }
 
 export default function DoctorAppointments() {
@@ -66,10 +72,12 @@ export default function DoctorAppointments() {
     initialTab === 'past' || initialTab === 'upcoming' || initialTab === 'current' ? initialTab : 'current'
   );
   const [search, setSearch] = useState(initialSearch);
-  const [dateRange, setDateRange] = useState(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
+  const [selectedHistoryApt, setSelectedHistoryApt] = useState(null);
   const [isOnline, setIsOnline] = useState(Boolean(user?.doctorProfile?.isOnline));
-  const pageSize = 8;
+  const pageSize = 9;
 
   useEffect(() => {
     setIsOnline(Boolean(user?.doctorProfile?.isOnline));
@@ -150,216 +158,254 @@ export default function DoctorAppointments() {
   }, [appointments, activeTab]);
 
   const filteredAppointments = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const start = startDate ? safeDate(`${startDate}T00:00:00`) : null;
+    const end = endDate ? safeDate(`${endDate}T23:59:59`) : null;
+
     return tabbedAppointments.filter((appointment) => {
       const patientName = (appointment.familyMember?.name || appointment.patient?.name || '').toLowerCase();
-      const nameMatch = !search.trim() || patientName.includes(search.trim().toLowerCase());
+      const nameMatch = !query || patientName.includes(query);
       const patientMatch =
         !selectedPatientId || (appointment?.patient?.id || appointment?.patientId) === selectedPatientId;
 
       if (!nameMatch || !patientMatch) return false;
-      if (!dateRange || !dateRange[0] || !dateRange[1]) return true;
+      if (!start && !end) return true;
 
       const appointmentDate = getAppointmentDate(appointment);
       if (!appointmentDate) return false;
 
-      const value = dayjs(appointmentDate);
-      const start = dateRange[0].startOf('day');
-      const end = dateRange[1].endOf('day');
-
-      return (value.isAfter(start) || value.isSame(start)) && (value.isBefore(end) || value.isSame(end));
+      if (start && appointmentDate < start) return false;
+      if (end && appointmentDate > end) return false;
+      return true;
     });
-  }, [tabbedAppointments, search, dateRange, selectedPatientId]);
+  }, [tabbedAppointments, search, startDate, endDate, selectedPatientId]);
 
-  const maxPage = Math.max(1, Math.ceil(filteredAppointments.length / pageSize));
+  const sortedAppointments = useMemo(() => {
+    return [...filteredAppointments].sort((left, right) => {
+      const leftTime = getAppointmentDate(left)?.getTime() || 0;
+      const rightTime = getAppointmentDate(right)?.getTime() || 0;
+      return rightTime - leftTime;
+    });
+  }, [filteredAppointments]);
+
+  const maxPage = Math.max(1, Math.ceil(sortedAppointments.length / pageSize));
   const currentPage = Math.min(page, maxPage);
-  const paginatedAppointments = filteredAppointments.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const columns = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 90,
-      render: (id) => <span className="font-semibold">#{id}</span>,
-    },
-    {
-      title: 'Patient Name',
-      dataIndex: 'patientName',
-      key: 'patientName',
-      width: 220,
-    },
-    {
-      title: 'Date & Time',
-      dataIndex: 'date',
-      key: 'date',
-      width: 200,
-    },
-    {
-      title: 'Consultation Mode',
-      dataIndex: 'mode',
-      key: 'mode',
-      width: 180,
-      render: (mode) => <Tag color="blue">{mode}</Tag>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 160,
-      render: (status) => getStatusTag(status),
-    },
-    {
-      title: 'Action',
-      dataIndex: 'action',
-      key: 'action',
-      width: 160,
-    },
-  ];
-
-  const tableData = paginatedAppointments.map((appointment) => {
-    const date = getAppointmentDate(appointment);
-    const canOpen = appointment.status === 'ACCEPTED' || appointment.consultationMode === 'IN_PERSON';
-
-    return {
-      key: appointment.id,
-      id: appointment.id,
-      patientName: appointment.familyMember?.name || appointment.patient?.name || 'Unknown Patient',
-      date: date
-        ? date.toLocaleString([], {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : 'Not scheduled',
-      mode: appointment.consultationMode || 'VIDEO',
-      status: appointment.status,
-      action: canOpen ? (
-        <Button type="primary" size="small" onClick={() => navigate(getSessionRoute(appointment))}>
-          Open Session
-        </Button>
-      ) : (
-        <span className="text-xs text-slate-400">-</span>
-      ),
-    };
-  });
+  const paginatedAppointments = sortedAppointments.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageStart = sortedAppointments.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const pageEnd = Math.min(currentPage * pageSize, sortedAppointments.length);
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#0e7490',
-          colorSuccess: '#059669',
-          borderRadius: 12,
-          fontFamily: '"Outfit", sans-serif',
-        },
-        components: {
-          Segmented: {
-            trackBg: '#e6f7fb',
-            itemColor: '#155e75',
-            itemHoverColor: '#0e7490',
-            itemSelectedBg: '#0e7490',
-            itemSelectedColor: '#ffffff',
-          },
-        },
-      }}
-    >
-      <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
-        <SharedNavbar
-          user={user}
-          brandLabel="CareBridge"
-          onLogoClick={() => navigate('/dashboard')}
-          navItems={doctorNavItems}
-          activeTab="appointments"
-          onTabClick={handleDoctorNavClick}
-          isOnline={isOnline}
-          onToggleOnline={handleToggleOnline}
-          pendingCount={appointments.filter((appointment) => appointment.status === 'PENDING').length}
-          doctorName={doctorName}
-          onLogout={logout}
-          showMobileTabs
-        />
+    <div className="min-h-screen bg-[#f5f8ff] text-slate-900">
+      <SharedNavbar
+        user={user}
+        brandLabel="CareBridge"
+        onLogoClick={() => navigate('/dashboard')}
+        navItems={doctorNavItems}
+        activeTab="appointments"
+        onTabClick={handleDoctorNavClick}
+        isOnline={isOnline}
+        onToggleOnline={handleToggleOnline}
+        pendingCount={appointments.filter((appointment) => appointment.status === 'PENDING').length}
+        doctorName={doctorName}
+        onLogout={logout}
+        showMobileTabs
+      />
 
-        <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-          <Card bordered={false} className="shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <Title level={3} style={{ margin: 0 }}>
-                My Appointment
-              </Title>
-              <Segmented
-                value={activeTab}
-                onChange={(value) => {
-                  setActiveTab(value);
+      <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
+        <article className="patient-account-card">
+          <header className="patient-account-history-header">
+            <h3>My Appointment</h3>
+            <div className="patient-account-history-tabs" role="tablist" aria-label="Doctor appointment tabs">
+              <button
+                type="button"
+                className={activeTab === 'current' ? 'is-active' : ''}
+                onClick={() => {
+                  setActiveTab('current');
                   setPage(1);
                 }}
-                options={[
-                  { value: 'current', label: 'Current Appointments' },
-                  { value: 'upcoming', label: 'Upcoming Appointments' },
-                  { value: 'past', label: 'Past Appointments' },
-                ]}
-                style={{ padding: 4, borderRadius: 12 }}
-              />
+              >
+                Current
+              </button>
+              <button
+                type="button"
+                className={activeTab === 'upcoming' ? 'is-active' : ''}
+                onClick={() => {
+                  setActiveTab('upcoming');
+                  setPage(1);
+                }}
+              >
+                Upcoming
+              </button>
+              <button
+                type="button"
+                className={activeTab === 'past' ? 'is-active' : ''}
+                onClick={() => {
+                  setActiveTab('past');
+                  setPage(1);
+                }}
+              >
+                Past
+              </button>
             </div>
+          </header>
 
-            <Space wrap size={12} className="mb-5">
-              <Input
-                allowClear
-                prefix={<Search size={14} />}
-                placeholder="Search By Name"
+          <div className="patient-account-history-filters">
+            <label className="patient-account-history-filter patient-account-history-filter--search">
+              <Search size={14} />
+              <input
+                type="text"
+                placeholder="Search by patient name"
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
                   setPage(1);
                 }}
-                style={{ width: 270 }}
               />
-              <RangePicker
-                value={dateRange}
-                onChange={(value) => {
-                  setDateRange(value);
+            </label>
+
+            <label className="patient-account-history-filter patient-account-history-filter--date">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => {
+                  setStartDate(event.target.value);
                   setPage(1);
                 }}
-                placeholder={['Start Date', 'End Date']}
-                suffixIcon={<CalendarDays size={14} />}
               />
-            </Space>
+              <Calendar size={14} />
+            </label>
 
-            {tableData.length === 0 && !loading ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-16">
-                <Empty
-                  description={<span className="text-base font-semibold text-slate-500">No appointment Found</span>}
-                />
-              </div>
-            ) : (
-              <Table
-                columns={columns}
-                dataSource={tableData}
-                loading={loading}
-                pagination={false}
-                scroll={{ x: 980 }}
-                size="middle"
+            <label className="patient-account-history-filter patient-account-history-filter--date">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => {
+                  setEndDate(event.target.value);
+                  setPage(1);
+                }}
               />
-            )}
+              <Calendar size={14} />
+            </label>
+          </div>
 
-            <div className="mt-5 flex items-center justify-end gap-3 text-sm text-slate-500">
-              <span>
-                {filteredAppointments.length === 0 ? '0' : (currentPage - 1) * pageSize + 1} to{' '}
-                {Math.min(filteredAppointments.length, currentPage * pageSize)} of {filteredAppointments.length}
-              </span>
-              <Pagination
-                simple
-                current={currentPage}
-                pageSize={pageSize}
-                total={filteredAppointments.length}
-                onChange={setPage}
-                showSizeChanger={false}
-              />
+          {loading ? (
+            <div className="patient-account-history-empty">
+              <div className="patient-account-history-spinner" />
+              <p>Loading appointments...</p>
             </div>
-          </Card>
-        </main>
-      </div>
-    </ConfigProvider>
+          ) : paginatedAppointments.length === 0 ? (
+            <div className="patient-account-history-empty">
+              <img src={EMPTY_STATE_IMAGE} alt="No appointments found" />
+              <p>No appointments found</p>
+            </div>
+          ) : (
+            <>
+              <div className="patient-account-history-grid">
+                {paginatedAppointments.map((appointment) => {
+                  const patientName = appointment.familyMember?.name || appointment.patient?.name || 'Unknown Patient';
+                  const relationLabel = appointment.familyMember?.relation || 'Self';
+                  const appointmentDate = getAppointmentDate(appointment);
+                  const status = String(appointment?.status || 'UNKNOWN').toLowerCase();
+                  const statusLabel = formatStatusLabel(appointment?.status);
+                  const modeLabel = getModeLabel(appointment?.consultationMode);
+                  const summary = parseSummary(appointment?.aiSummary);
+                  const serviceLabel =
+                    summary?.service ||
+                    summary?.service_name ||
+                    summary?.consultation_type ||
+                    summary?.primary_symptom ||
+                    'Consultation';
+                  const appointmentType = appointment?.type === 'SCHEDULED' ? 'Scheduled' : 'On-demand';
+                  return (
+                    <article key={appointment.id} className="patient-account-history-card">
+                      <div className="patient-account-history-card__head">
+                        <img
+                          src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                            patientName
+                          )}&backgroundColor=f1f5f9`}
+                          alt={patientName}
+                        />
+                        <div className="patient-account-history-card__head-meta">
+                          <h4>{patientName.toUpperCase()}</h4>
+                          <span>{`${relationLabel} | ${modeLabel}`}</span>
+                        </div>
+                        <strong className={`patient-account-history-card__status status-${status}`}>
+                          {statusLabel}
+                        </strong>
+                      </div>
+
+                      <div className="patient-account-history-card__body">
+                        <h5>{serviceLabel}</h5>
+                        <ul className="patient-account-history-card__facts">
+                          <li>
+                            <span>Appointment</span>
+                            <strong>{`#${appointment.id}`}</strong>
+                          </li>
+                          <li>
+                            <span>Type</span>
+                            <strong>{appointmentType}</strong>
+                          </li>
+                          <li>
+                            <span>Date &amp; Time</span>
+                            <strong>
+                              {appointmentDate
+                                ? `${appointmentDate.toLocaleDateString()} ${appointmentDate.toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}`
+                                : '-'}
+                            </strong>
+                          </li>
+                          <li>
+                            <span>Payment</span>
+                            <strong>{formatStatusLabel(appointment?.paymentStatus || 'pending')}</strong>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div className="patient-account-history-card__actions">
+                        <button type="button" onClick={() => setSelectedHistoryApt(appointment)}>
+                          View More
+                        </button>
+                        <button type="button" onClick={() => navigate('/doctor/chat')}>
+                          Open Chat
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="patient-account-history-pagination">
+                <span>{`${pageStart}-${pageEnd} of ${sortedAppointments.length}`}</span>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setPage((previous) => Math.max(1, previous - 1))}
+                    disabled={currentPage === 1}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage((previous) => Math.min(maxPage, previous + 1))}
+                    disabled={currentPage === maxPage}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </article>
+      </main>
+
+      {selectedHistoryApt ? (
+        <HistoryModal apt={selectedHistoryApt} onClose={() => setSelectedHistoryApt(null)} />
+      ) : null}
+    </div>
   );
 }
 

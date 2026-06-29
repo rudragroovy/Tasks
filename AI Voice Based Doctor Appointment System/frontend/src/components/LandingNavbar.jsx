@@ -3,6 +3,7 @@ import { Button, Layout, Space } from 'antd';
 import {
   Activity,
   ArrowRight,
+  Bell,
   ChevronDown,
   Crown,
   FileText,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { formatNotificationTime, useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import useServiceNavigation from '../hooks/useServiceNavigation';
 import AppIcon from './branding/AppIcon';
 import '../pages/landing-page.css';
@@ -263,10 +265,13 @@ export default function LandingNavbar({ activeKey = null }) {
   const [isPatientMenuOpen, setIsPatientMenuOpen] = useState(false);
   const [isDoctorMenuOpen, setIsDoctorMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isAIVoiceAssistantOpen, setIsAIVoiceAssistantOpen] = useState(false);
   const [activeDoctorMenuItem, setActiveDoctorMenuItem] = useState(doctorsMenuItems[0].key);
   const [activePatientServiceType, setActivePatientServiceType] = useState(patientMenuServiceTypes[0].key);
   const [activePatientCategory, setActivePatientCategory] = useState(patientMenuServiceTypes[0].categories[0].key);
+  const { notifications, unreadCount, markAllRead, clearAll, markRead } = useRealtimeNotifications();
+  const notificationBadgeCount = unreadCount;
 
   const selectedKey = useMemo(() => activeKey, [activeKey]);
   const primaryNavItems = useMemo(() => {
@@ -291,13 +296,14 @@ export default function LandingNavbar({ activeKey = null }) {
   );
 
   useEffect(() => {
-    if (!isPatientMenuOpen && !isDoctorMenuOpen && !isProfileMenuOpen) return undefined;
+    if (!isPatientMenuOpen && !isDoctorMenuOpen && !isProfileMenuOpen && !isNotificationsOpen) return undefined;
 
     const onPointerDown = (event) => {
       if (!navbarPanelRef.current?.contains(event.target)) {
         setIsPatientMenuOpen(false);
         setIsDoctorMenuOpen(false);
         setIsProfileMenuOpen(false);
+        setIsNotificationsOpen(false);
       }
     };
 
@@ -306,6 +312,7 @@ export default function LandingNavbar({ activeKey = null }) {
         setIsPatientMenuOpen(false);
         setIsDoctorMenuOpen(false);
         setIsProfileMenuOpen(false);
+        setIsNotificationsOpen(false);
       }
     };
 
@@ -315,7 +322,7 @@ export default function LandingNavbar({ activeKey = null }) {
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onEscape);
     };
-  }, [isDoctorMenuOpen, isPatientMenuOpen, isProfileMenuOpen]);
+  }, [isDoctorMenuOpen, isPatientMenuOpen, isProfileMenuOpen, isNotificationsOpen]);
 
   useEffect(() => {
     if (!location.hash || (location.pathname !== '/' && location.pathname !== '/home')) {
@@ -345,6 +352,7 @@ export default function LandingNavbar({ activeKey = null }) {
     setIsPatientMenuOpen(false);
     setIsDoctorMenuOpen(false);
     setIsProfileMenuOpen(false);
+    setIsNotificationsOpen(false);
     setIsAIVoiceAssistantOpen(true);
   };
 
@@ -358,6 +366,7 @@ export default function LandingNavbar({ activeKey = null }) {
     setIsPatientMenuOpen(false);
     setIsDoctorMenuOpen(false);
     setIsProfileMenuOpen(false);
+    setIsNotificationsOpen(false);
     if (user) {
       navigate('/');
       return;
@@ -413,6 +422,7 @@ export default function LandingNavbar({ activeKey = null }) {
       setIsPatientMenuOpen(false);
       setIsDoctorMenuOpen(false);
       setIsProfileMenuOpen(false);
+      setIsNotificationsOpen(false);
       navigate('/patient/chat');
       return;
     }
@@ -421,6 +431,7 @@ export default function LandingNavbar({ activeKey = null }) {
       setIsPatientMenuOpen((previous) => !previous);
       setIsDoctorMenuOpen(false);
       setIsProfileMenuOpen(false);
+      setIsNotificationsOpen(false);
       return;
     }
 
@@ -428,6 +439,7 @@ export default function LandingNavbar({ activeKey = null }) {
       setIsDoctorMenuOpen((previous) => !previous);
       setIsPatientMenuOpen(false);
       setIsProfileMenuOpen(false);
+      setIsNotificationsOpen(false);
       return;
     }
 
@@ -435,6 +447,7 @@ export default function LandingNavbar({ activeKey = null }) {
       setIsPatientMenuOpen(false);
       setIsDoctorMenuOpen(false);
       setIsProfileMenuOpen(false);
+      setIsNotificationsOpen(false);
       navigateToSection('steps');
       return;
     }
@@ -443,6 +456,7 @@ export default function LandingNavbar({ activeKey = null }) {
       setIsPatientMenuOpen(false);
       setIsDoctorMenuOpen(false);
       setIsProfileMenuOpen(false);
+      setIsNotificationsOpen(false);
       navigateToSection('pricing');
       return;
     }
@@ -450,6 +464,7 @@ export default function LandingNavbar({ activeKey = null }) {
     setIsPatientMenuOpen(false);
     setIsDoctorMenuOpen(false);
     setIsProfileMenuOpen(false);
+    setIsNotificationsOpen(false);
   };
 
   return (
@@ -527,74 +542,145 @@ export default function LandingNavbar({ activeKey = null }) {
                 </button>
               </>
             ) : isPatientUser ? (
-              <div className="landing-nav-v2__profile">
-                <button
-                  type="button"
-                  className={`landing-nav-v2__profile-trigger${isProfileMenuOpen ? ' is-open' : ''}`}
-                  onClick={() => {
-                    setIsProfileMenuOpen((previous) => !previous);
-                    setIsPatientMenuOpen(false);
-                    setIsDoctorMenuOpen(false);
-                  }}
-                >
-                  <span className="landing-nav-v2__profile-avatar">{displayName.charAt(0).toUpperCase()}</span>
-                  <span className="landing-nav-v2__profile-name">{displayName}</span>
-                  <ChevronDown size={14} />
-                </button>
-                {isProfileMenuOpen ? (
-                  <div className="landing-nav-v2__profile-menu" role="menu" aria-label="Account menu">
-                    <button
-                      type="button"
-                      className="landing-nav-v2__profile-item"
-                      role="menuitem"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        navigate('/patient/account');
-                      }}
-                    >
-                      <UserCircle2 size={15} />
-                      My Profile
-                    </button>
-                    <button
-                      type="button"
-                      className="landing-nav-v2__profile-item"
-                      role="menuitem"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        navigate('/patient/account?tab=wallet');
-                      }}
-                    >
-                      <Wallet size={15} />
-                      My Wallet
-                    </button>
-                    <button
-                      type="button"
-                      className="landing-nav-v2__profile-item"
-                      role="menuitem"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        navigate('/patient/account?tab=security');
-                      }}
-                    >
-                      <KeyRound size={15} />
-                      Change password
-                    </button>
-                    <button
-                      type="button"
-                      className="landing-nav-v2__profile-item landing-nav-v2__profile-item--logout"
-                      role="menuitem"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        logout();
-                        navigate('/');
-                      }}
-                    >
-                      <LogOut size={15} />
-                      Logout
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <>
+                <div className="landing-nav-v2__notif">
+                  <button
+                    type="button"
+                    className="landing-nav-v2__notif-btn"
+                    aria-label="Notifications"
+                    onClick={() => {
+                      setIsNotificationsOpen((previous) => !previous);
+                      setIsPatientMenuOpen(false);
+                      setIsDoctorMenuOpen(false);
+                      setIsProfileMenuOpen(false);
+                    }}
+                  >
+                    <Bell size={18} />
+                    {notificationBadgeCount > 0 ? (
+                      <span className="landing-nav-v2__notif-badge">
+                        {notificationBadgeCount > 99 ? '99+' : notificationBadgeCount}
+                      </span>
+                    ) : null}
+                  </button>
+                  {isNotificationsOpen ? (
+                    <div className="landing-nav-v2__notif-panel">
+                      <div className="landing-nav-v2__notif-header">
+                        <p className="landing-nav-v2__notif-title">Notifications</p>
+                        <div className="landing-nav-v2__notif-actions">
+                          <button
+                            type="button"
+                            className="landing-nav-v2__notif-action landing-nav-v2__notif-action--primary"
+                            onClick={markAllRead}
+                          >
+                            Mark all read
+                          </button>
+                          <button
+                            type="button"
+                            className="landing-nav-v2__notif-action"
+                            onClick={clearAll}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="landing-nav-v2__notif-list">
+                        {notifications.length === 0 ? (
+                          <div className="landing-nav-v2__notif-empty">No updates yet</div>
+                        ) : (
+                          notifications.slice(0, 12).map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                markRead(item.id);
+                                setIsNotificationsOpen(false);
+                                if (item.route) navigate(item.route);
+                              }}
+                              className={`landing-nav-v2__notif-item ${
+                                item.read ? '' : 'is-unread'
+                              }`}
+                            >
+                              <p className="landing-nav-v2__notif-item-title">{item.title}</p>
+                              <p className="landing-nav-v2__notif-item-desc">{item.description}</p>
+                              <p className="landing-nav-v2__notif-item-time">{formatNotificationTime(item.createdAt)}</p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="landing-nav-v2__profile">
+                  <button
+                    type="button"
+                    className={`landing-nav-v2__profile-trigger${isProfileMenuOpen ? ' is-open' : ''}`}
+                    onClick={() => {
+                      setIsProfileMenuOpen((previous) => !previous);
+                      setIsPatientMenuOpen(false);
+                      setIsDoctorMenuOpen(false);
+                      setIsNotificationsOpen(false);
+                    }}
+                  >
+                    <span className="landing-nav-v2__profile-avatar">{displayName.charAt(0).toUpperCase()}</span>
+                    <span className="landing-nav-v2__profile-name">{displayName}</span>
+                    <ChevronDown size={14} />
+                  </button>
+                  {isProfileMenuOpen ? (
+                    <div className="landing-nav-v2__profile-menu" role="menu" aria-label="Account menu">
+                      <button
+                        type="button"
+                        className="landing-nav-v2__profile-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          navigate('/patient/account');
+                        }}
+                      >
+                        <UserCircle2 size={15} />
+                        My Profile
+                      </button>
+                      <button
+                        type="button"
+                        className="landing-nav-v2__profile-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          navigate('/patient/account?tab=wallet');
+                        }}
+                      >
+                        <Wallet size={15} />
+                        My Wallet
+                      </button>
+                      <button
+                        type="button"
+                        className="landing-nav-v2__profile-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          navigate('/patient/account?tab=security');
+                        }}
+                      >
+                        <KeyRound size={15} />
+                        Change password
+                      </button>
+                      <button
+                        type="button"
+                        className="landing-nav-v2__profile-item landing-nav-v2__profile-item--logout"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          logout();
+                          navigate('/');
+                        }}
+                      >
+                        <LogOut size={15} />
+                        Logout
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </>
             ) : (
               <button type="button" className="landing-nav-v2__solid" onClick={handlePrimaryAction}>
                 <span className="label-full">Home</span>

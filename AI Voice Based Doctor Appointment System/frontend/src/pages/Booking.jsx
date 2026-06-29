@@ -20,6 +20,7 @@ import {
   parseDoctorServiceSelections,
 } from '../utils/doctorServices';
 import { useSocket } from '../context/SocketContext';
+import useServiceNavigation from '../hooks/useServiceNavigation';
 import './booking-page.css';
 
 const MODE_OPTIONS = [
@@ -135,6 +136,7 @@ export default function Booking() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const socket = useSocket();
+  const navigateToService = useServiceNavigation();
 
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -465,6 +467,17 @@ export default function Booking() {
   };
 
   const { day: bookingDayLabel, date: bookingDateLabel } = formatDateBadges(bookingDate);
+  const canNavigateToSelectedService = Boolean(selectedServiceName || categoryQuery);
+
+  const handleSelectedServiceBreadcrumbClick = () => {
+    if (selectedServiceName) {
+      navigateToService(selectedServiceName);
+      return;
+    }
+    if (categoryQuery) {
+      navigate(`/category/${encodeURIComponent(categoryQuery)}`);
+    }
+  };
 
   return (
     <main className="booking-page">
@@ -472,9 +485,18 @@ export default function Booking() {
 
       <section className="booking-shell booking-shell--page">
         <div className="booking-breadcrumbs">
-          <span>Home</span>
+          <button type="button" className="booking-breadcrumb-link" onClick={() => navigate('/home')}>
+            Home
+          </button>
           <span>/</span>
-          <span>{selectedServiceName || categoryQuery || 'Booking'}</span>
+          <button
+            type="button"
+            className="booking-breadcrumb-link booking-breadcrumb-link--current"
+            onClick={handleSelectedServiceBreadcrumbClick}
+            disabled={!canNavigateToSelectedService}
+          >
+            {selectedServiceName || categoryQuery || 'Booking'}
+          </button>
         </div>
 
         <div className="booking-layout">

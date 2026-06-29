@@ -1,32 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { CheckCircle, LayoutDashboard, Clock } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { TopHeader } from '../components/ui/top-header';
+import LandingNavbar from '../components/LandingNavbar';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [verifying, setVerifying] = useState(true);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   const sessionId = searchParams.get('session_id');
   const appointmentId = searchParams.get('appointmentId');
-  const type = searchParams.get('type');
-  const isOnDemand = type === 'ON_DEMAND';
+  const type = searchParams.get('type') || '';
 
   useEffect(() => {
     if (!sessionId || !appointmentId) {
-      navigate('/dashboard');
+      navigate(PATIENT_APPOINTMENTS_ROUTE);
       return;
     }
 
-    let countdownInterval;
-    let redirectTimeout;
     let isActive = true;
 
     const confirmPayment = async () => {
@@ -40,26 +36,18 @@ export default function PaymentSuccess() {
 
         if (!isActive) return;
         setVerifying(false);
-        setShowSuccessPopup(true);
-        setRedirectCountdown(3);
-
-        countdownInterval = setInterval(() => {
-          setRedirectCountdown((current) => {
-            if (current <= 1) {
-              clearInterval(countdownInterval);
-              return 0;
-            }
-            return current - 1;
-          });
-        }, 1000);
-
-        redirectTimeout = setTimeout(() => {
-          navigate(`/waiting-room?id=${appointmentId}`);
-        }, 3000);
+        navigate('/patient/account?tab=medical-history', {
+          replace: true,
+          state: {
+            paymentSuccessAppointmentId: appointmentId,
+            paymentSuccessRedirect: `/waiting-room?id=${appointmentId}`,
+            paymentSuccessType: type,
+          },
+        });
       } catch (error) {
         console.error('Payment confirmation failed:', error);
         alert('Could not verify payment. Please contact support.');
-        navigate('/dashboard');
+        navigate(PATIENT_APPOINTMENTS_ROUTE);
       }
     };
 
@@ -67,33 +55,12 @@ export default function PaymentSuccess() {
 
     return () => {
       isActive = false;
-      if (countdownInterval) clearInterval(countdownInterval);
-      if (redirectTimeout) clearTimeout(redirectTimeout);
     };
-  }, [sessionId, appointmentId, isOnDemand, navigate]);
+  }, [sessionId, appointmentId, type, navigate]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col overflow-hidden">
-      <TopHeader />
-
-      {showSuccessPopup ? (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/45 px-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-6 text-center shadow-2xl"
-          >
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
-              <CheckCircle className="h-8 w-8 text-emerald-600" />
-            </div>
-            <h2 className="text-xl font-heading font-black text-slate-900">Payment Successful</h2>
-            <p className="mt-2 text-sm font-semibold text-slate-600">
-              Redirecting you to waiting room in {redirectCountdown}s...
-            </p>
-          </motion.div>
-        </div>
-      ) : null}
+      <LandingNavbar />
 
       {/* Background blobs */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-health-100 rounded-full blur-[120px] opacity-30 pointer-events-none" />
@@ -135,32 +102,26 @@ export default function PaymentSuccess() {
               ) : (
                 <div className="space-y-4">
                   <div className="bg-health-50 border border-health-100 rounded-2xl p-4 text-center">
-                    <p className="text-sm font-bold text-health-700">
-                      {isOnDemand
-                        ? 'Your consultation request is now in doctor queue.'
-                        : 'Your scheduled appointment is confirmed.'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-center gap-2 text-sm font-bold text-slate-400">
-                    <div className="w-4 h-4 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
-                    Redirecting you to waiting room...
+                    <p className="text-sm font-bold text-health-700">Payment verified. Redirecting to My Appointments...</p>
                   </div>
                 </div>
               )}
 
-              <div className="border-t border-slate-100 pt-6 flex gap-3">
+              <div className="border-t border-slate-100 pt-6">
                 <button
-                  onClick={() => navigate('/dashboard')}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors text-sm"
+                  onClick={() =>
+                    navigate('/patient/account?tab=medical-history', {
+                      replace: true,
+                      state: {
+                        paymentSuccessAppointmentId: appointmentId,
+                        paymentSuccessRedirect: `/waiting-room?id=${appointmentId}`,
+                        paymentSuccessType: type,
+                      },
+                    })
+                  }
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 text-white font-bold hover:bg-primary-700 transition-colors text-sm shadow-md shadow-primary-600/20"
                 >
-                  <LayoutDashboard className="w-4 h-4" /> Dashboard
-                </button>
-                <button
-                  onClick={() => navigate(`/waiting-room?id=${appointmentId}`)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 text-white font-bold hover:bg-primary-700 transition-colors text-sm shadow-md shadow-primary-600/20"
-                >
-                  <Clock className="w-4 h-4" /> Go to Waiting Room
+                  Go to My Appointments
                 </button>
               </div>
             </div>

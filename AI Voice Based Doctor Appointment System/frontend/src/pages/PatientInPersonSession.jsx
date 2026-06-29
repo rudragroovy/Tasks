@@ -11,6 +11,13 @@ import { formatDoctorName } from '../utils/doctorName';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
 
+function resolvePrescriptionUrl(rawUrl) {
+  if (!rawUrl) return '';
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
+  const normalizedPath = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`;
+  return `${API_URL}${normalizedPath}`;
+}
+
 export default function PatientInPersonSession() {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
@@ -248,14 +255,24 @@ export default function PatientInPersonSession() {
                   <p className="text-sm font-medium text-slate-600">
                     Your doctor has shared a prescription for this appointment.
                   </p>
-                  <a
-                    href={`${API_URL}${appointment.consultation.prescriptionUrl}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-                  >
-                    <FileText className="w-4 h-4" /> Open Prescription PDF
-                  </a>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={resolvePrescriptionUrl(appointment.consultation.prescriptionUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                    >
+                      <FileText className="w-4 h-4" /> Open Prescription PDF
+                    </a>
+                    <a
+                      href={resolvePrescriptionUrl(appointment.consultation.prescriptionUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Download
+                    </a>
+                  </div>
                 </div>
               ) : (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">

@@ -11,6 +11,13 @@ import { formatDoctorName } from '../utils/doctorName';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+function resolvePrescriptionUrl(rawUrl) {
+  if (!rawUrl) return '';
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
+  const normalizedPath = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`;
+  return `${API_URL}${normalizedPath}`;
+}
+
 const emptyMedicine = { name: '', dosage: '', frequency: '', duration: '' };
 
 export default function DoctorInPersonSession() {
@@ -309,14 +316,24 @@ export default function DoctorInPersonSession() {
                 {prescription.length > 0 && (
                   <div className="space-y-2 mb-3">
                     {prescription.map((med, idx) => (
-                      <div key={`${med.name}-${idx}`} className="rounded-xl border border-health-200 bg-health-50 px-3 py-2.5 flex items-start justify-between gap-3">
+                      <div key={`${med?.drugName || med?.name || 'medicine'}-${idx}`} className="rounded-xl border border-health-200 bg-health-50 px-3 py-2.5 flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-health-700">{med.name}</p>
+                          <p className="text-sm font-bold text-health-700">{med?.drugName || med?.name || 'Medicine'}</p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                            {med.dosage && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-health-200 text-health-700">{med.dosage}</span>}
-                            {med.frequency && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-health-200 text-health-700">{med.frequency}</span>}
-                            {med.duration && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-health-200 text-health-700">{med.duration}</span>}
+                            {(med?.dosage || med?.dose) && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-health-200 text-health-700">
+                                {med?.dosage || `${med?.dose || ''}${med?.doseUnit ? ` ${med.doseUnit}` : ''}`.trim()}
+                              </span>
+                            )}
+                            {med?.frequency && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-health-200 text-health-700">{med.frequency}</span>}
+                            {(med?.duration || med?.durationValue) && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-health-200 text-health-700">
+                                {med?.duration || `${med?.durationValue || ''}${med?.durationUnit ? ` ${med.durationUnit}` : ''}`.trim()}
+                              </span>
+                            )}
+                            {med?.route && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-health-200 text-health-700">{med.route}</span>}
                           </div>
+                          {med?.directions ? <p className="text-[11px] text-slate-600 mt-1">Directions: {med.directions}</p> : null}
                         </div>
                         {!isCompleted && (
                           <button
@@ -374,14 +391,24 @@ export default function DoctorInPersonSession() {
               </div>
 
               {appointment?.consultation?.prescriptionUrl && (
-                <a
-                  href={`${API_URL}${appointment.consultation.prescriptionUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-                >
-                  <FileText className="w-4 h-4" /> View Existing Prescription PDF
-                </a>
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={resolvePrescriptionUrl(appointment.consultation.prescriptionUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                  >
+                    <FileText className="w-4 h-4" /> View Existing Prescription PDF
+                  </a>
+                  <a
+                    href={resolvePrescriptionUrl(appointment.consultation.prescriptionUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    Download
+                  </a>
+                </div>
               )}
             </div>
 

@@ -5,6 +5,8 @@ import { DoctorCard } from '../components/ui/doctor-card';
 import { ArrowLeft, User, Search } from 'lucide-react';
 import { TopHeader } from '../components/ui/top-header';
 
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
+
 export default function DoctorsList() {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,10 +44,10 @@ export default function DoctorsList() {
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col overflow-hidden">
         <button 
-          onClick={() => navigate('/dashboard')} 
+          onClick={() => navigate(PATIENT_APPOINTMENTS_ROUTE)} 
           className="flex items-center gap-2 text-slate-500 hover:text-slate-900 font-bold mb-6 transition-colors shrink-0"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          <ArrowLeft className="w-4 h-4" /> Back to My Appointments
         </button>
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 shrink-0">

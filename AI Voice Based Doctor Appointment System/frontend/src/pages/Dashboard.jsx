@@ -13,6 +13,7 @@ import AppointmentReviewModal from '../components/reviews/AppointmentReviewModal
 
 const AIVoiceAssistant = lazy(() => import('../components/AIVoiceAssistant'));
 const DoctorDashboard = lazy(() => import('./DoctorDashboard'));
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -717,9 +718,9 @@ export default function Dashboard() {
 
       {/* Mobile Bottom Nav */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 flex justify-around items-end p-3 pb-5 z-40 shadow-lg">
-         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-primary-600 cursor-pointer">
+         <button onClick={() => navigate(PATIENT_APPOINTMENTS_ROUTE)} className="flex flex-col items-center gap-1 text-primary-600 cursor-pointer">
            <LayoutDashboard className="w-5 h-5" />
-           <span className="text-[10px] font-bold">Home</span>
+           <span className="text-[10px] font-bold">Appointments</span>
          </button>
          <button onClick={() => navigate('/patient/chat')} className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 cursor-pointer">
            <MessageSquare className="w-5 h-5" />

@@ -16,9 +16,185 @@ import LandingNavbar from '../components/LandingNavbar';
 import { formatDoctorName } from '../utils/doctorName';
 import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
 import { DOCTOR_NAV_ITEMS, handleDoctorNavClick as navigateDoctorNavClick } from '../utils/doctorNavigation';
+import { uploadFileToS3 } from '../utils/fileUpload';
 
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '1480fbbff91244f7a77f0a8ed1359c19';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
+const PATHOLOGY_TEST_OPTIONS = [
+  'Vitamin D',
+  'Full Blood Count (FBC)',
+  'Liver Function Tests (LFT)',
+  'TSH',
+  'High Density Lipoprotein (HDL)',
+  'Low Density Lipoprotein (LDL)',
+  'Fasting Glucose',
+  'Cholesterol',
+  'Triglycerides',
+  'Calcium, Magnesium, Phosphate',
+  'Blood Test',
+  'Electrolytes And Kidney Function',
+];
+const RADIOLOGY_TEST_OPTIONS = [
+  'Head',
+  'Jaw',
+  'Nose',
+  'Back',
+  'Fingers',
+  'Ankle',
+  'Knee',
+  'Head/Brain',
+];
+const PRESCRIBER_TYPE_OPTIONS = [
+  'Medical Practitioner',
+  'Nurse Practitioner',
+  'Dentist',
+  'Other',
+];
+const PRESCRIPTION_ROUTE_OPTIONS = ['Oral', 'Topical', 'Inhalation', 'Injection', 'Other'];
+const PRESCRIPTION_DURATION_UNITS = ['days', 'weeks', 'months'];
+const PRESCRIPTION_DOSE_UNITS = ['mg', 'mcg', 'g', 'ml', 'tablet', 'capsule', 'drop', 'puff', 'unit'];
+const CALL_NOTES_MANAGEMENT_OPTIONS = [
+  { key: 'medicationPrescribed', label: 'Medication Prescribed' },
+  { key: 'pathologyRequest', label: 'Pathology Request' },
+  { key: 'referralGiven', label: 'Referral Given' },
+  { key: 'medicalCertificateIssued', label: 'Medical Certificate Issued' },
+  { key: 'radiologyRequest', label: 'Radiology Request' },
+  { key: 'other', label: 'Other' },
+];
+const PRESCRIPTION_FORM_LABEL_CLASS = 'text-xs font-semibold text-slate-700';
+const PRESCRIPTION_FORM_CONTROL_CLASS = 'h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-primary-500 focus:ring-2 focus:ring-primary-100';
+const PRESCRIPTION_FORM_TEXTAREA_CLASS = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-colors focus:border-primary-500 focus:ring-2 focus:ring-primary-100';
+const PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS = 'flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 cursor-pointer hover:border-primary-200 hover:bg-primary-50/40 transition-colors';
+
+function createEmptyCallNotesForm() {
+  return {
+    temperature: '',
+    bloodPressure: '',
+    bloodGlucose: '',
+    heartRate: '',
+    respiratoryRate: '',
+    oxygenSaturation: '',
+    otherNotes: '',
+    clinicalAssessment: '',
+    followUpInstructions: '',
+    medicationPrescribed: false,
+    pathologyRequest: false,
+    referralGiven: false,
+    medicalCertificateIssued: false,
+    radiologyRequest: false,
+    other: false,
+  };
+}
+
+function formatCallNoteValue(value, fallback = 'Not provided') {
+  const text = String(value ?? '').trim();
+  return text || fallback;
+}
+
+function buildCallNotesPayload(form, context = {}) {
+  const selectedPlans = CALL_NOTES_MANAGEMENT_OPTIONS
+    .filter((item) => Boolean(form?.[item.key]))
+    .map((item) => item.label);
+
+  const lines = [
+    'Patient Info:',
+    `- Patient Name: ${formatCallNoteValue(context.patientName)}`,
+    `- DOB: ${formatCallNoteValue(context.patientDateOfBirth)}`,
+    `- Consultation Type: ${formatCallNoteValue(context.consultationType)}`,
+    `- Service Name: ${formatCallNoteValue(context.serviceName)}`,
+    '',
+    'Observations:',
+    `- Temperature (Ã‚Â°C): ${formatCallNoteValue(form?.temperature)}`,
+    `- Blood Pressure (mmHg): ${formatCallNoteValue(form?.bloodPressure)}`,
+    `- Blood Glucose / Diabetes Info: ${formatCallNoteValue(form?.bloodGlucose)}`,
+    `- Heart Rate (bpm): ${formatCallNoteValue(form?.heartRate)}`,
+    `- Respiratory Rate (breaths/min): ${formatCallNoteValue(form?.respiratoryRate)}`,
+    `- Oxygen Saturation (SpO2): ${formatCallNoteValue(form?.oxygenSaturation)}`,
+    `- Other Notes: ${formatCallNoteValue(form?.otherNotes)}`,
+    '',
+    'Clinical Assessment / Provisional Diagnosis:',
+    formatCallNoteValue(form?.clinicalAssessment),
+    '',
+    'Management Plan:',
+    selectedPlans.length > 0 ? `- ${selectedPlans.join(', ')}` : '- None selected',
+    '',
+    'Follow-up Instructions:',
+    formatCallNoteValue(form?.followUpInstructions),
+  ];
+
+  return lines.join('\n');
+}
+
+function createEmptyPrescriptionDraft() {
+  return {
+    issueType: 'EPRESCRIPTION',
+    medicareNumber: '',
+    medicareIrn: '',
+    prescriberHpioNumber: '',
+    prescriberHpiiNumber: '',
+    prescriberNumber: '',
+    ahpraNumber: '',
+    authorityNumber: '',
+    prescriptionEntityId: '',
+    prescriberType: 'Medical Practitioner',
+    diagnosis: '',
+    reasonForPrescription: '',
+    reasonForAuthority: '',
+    drugName: '',
+    packName: '',
+    prescribedQuantity: '',
+    packQuantity: '',
+    route: 'Oral',
+    repeats: '0',
+    minimumRepeatIntervalDays: '',
+    dose: '',
+    doseUnit: 'mg',
+    durationValue: '',
+    durationUnit: 'days',
+    frequency: '',
+    directions: '',
+    preferredPharmacy: '',
+    notes: '',
+    annotations: '',
+    noBrandSubstitution: false,
+    includeBrandName: false,
+    emergencySupply: false,
+    activeScript: false,
+    sendToEmail: true,
+    sendToSms: false,
+    printCopy: false,
+    expiryDate: '',
+    reminderEnabled: false,
+  };
+}
+
+function buildDosageLabel(draft) {
+  const dose = String(draft?.dose || '').trim();
+  const unit = String(draft?.doseUnit || '').trim();
+  if (!dose) return '';
+  return `${dose}${unit ? ` ${unit}` : ''}`.trim();
+}
+
+function buildDurationLabel(draft) {
+  const value = String(draft?.durationValue || '').trim();
+  const unit = String(draft?.durationUnit || '').trim();
+  if (!value) return '';
+  return `${value}${unit ? ` ${unit}` : ''}`.trim();
+}
+
+function toPrescriptionItem(draft) {
+  const drugName = String(draft?.drugName || '').trim();
+  const dosageLabel = buildDosageLabel(draft);
+  const durationLabel = buildDurationLabel(draft);
+  return {
+    ...draft,
+    name: drugName,
+    dosage: dosageLabel,
+    duration: durationLabel,
+    frequency: String(draft?.frequency || '').trim(),
+  };
+}
 
 function parseAiSummary(value) {
   if (!value) return {};
@@ -29,6 +205,14 @@ function parseAiSummary(value) {
   } catch {
     return {};
   }
+}
+
+function firstNonEmptyValue(...values) {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
 }
 
 export default function MeetingRoom() {
@@ -64,6 +248,27 @@ export default function MeetingRoom() {
     setTimeout(() => setToastMessage(null), 3500);
   };
   const showComingSoon = (feature) => showToast(`${feature} will be available here soon.`);
+  const handleSignatureSelect = async (targetKey, event) => {
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+
+    setUploadingSignatureFor(targetKey);
+    setSignatureUploadError('');
+    try {
+      const uploaded = await uploadFileToS3(selectedFile, `doctor-signature-${targetKey}`);
+      setSignatureUploads((current) => ({
+        ...current,
+        [targetKey]: uploaded,
+      }));
+      showToast('Signature uploaded successfully.');
+    } catch (error) {
+      console.error('Failed to upload signature', error);
+      setSignatureUploadError(error?.response?.data?.error || 'Could not upload signature.');
+    } finally {
+      setUploadingSignatureFor('');
+      event.target.value = '';
+    }
+  };
 
   useEffect(() => {
     setIsOnline(Boolean(user?.doctorProfile?.isOnline));
@@ -82,15 +287,32 @@ export default function MeetingRoom() {
   // Sidebar
   const [activeTab, setActiveTab] = useState(null); // null = closed
   const [notes, setNotes] = useState('');
+  const [callNotesForm, setCallNotesForm] = useState(createEmptyCallNotesForm);
+  const [savingCallNote, setSavingCallNote] = useState(false);
   const [prescription, setPrescription] = useState([]);
-  const [medInput, setMedInput] = useState({ name: '', dosage: '', frequency: '', duration: '' });
+  const [prescriptionDraft, setPrescriptionDraft] = useState(createEmptyPrescriptionDraft);
   const [medicalCertForm, setMedicalCertForm] = useState({ startDate: '', endDate: '', reason: '', advice: '' });
   const [referralForm, setReferralForm] = useState({ doctorName: '', doctorEmail: '', doctorAddress: '', phoneNo: '', condition: '' });
+  const [referralSpecialists, setReferralSpecialists] = useState([]);
+  const [loadingReferralSpecialists, setLoadingReferralSpecialists] = useState(false);
   const [pathologyTestInput, setPathologyTestInput] = useState('');
   const [pathologyTests, setPathologyTests] = useState([]);
   const [radiologyTestInput, setRadiologyTestInput] = useState('');
   const [radiologyTests, setRadiologyTests] = useState([]);
   const [patientRequestNote, setPatientRequestNote] = useState('');
+  const [signatureUploads, setSignatureUploads] = useState({
+    medicalCertificate: null,
+    specialistReferral: null,
+    pathologyRequest: null,
+    radiologyRequest: null,
+  });
+  const [uploadingSignatureFor, setUploadingSignatureFor] = useState('');
+  const [signatureUploadError, setSignatureUploadError] = useState('');
+  const medicalCertificateSignatureInputRef = useRef(null);
+  const specialistReferralSignatureInputRef = useRef(null);
+  const pathologySignatureInputRef = useRef(null);
+  const radiologySignatureInputRef = useRef(null);
+  const [savingGeneratedDocumentType, setSavingGeneratedDocumentType] = useState('');
 
   const [userNames, setUserNames] = useState({});
   const myUidRef = useRef(null);
@@ -142,7 +364,7 @@ export default function MeetingRoom() {
   const [doctorsList, setDoctorsList] = useState([]);
   const [invitingDoctorId, setInvitingDoctorId] = useState(null);
 
-  // â”€â”€ Fetch doctors for invite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Fetch doctors for invite ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   const fetchDoctorsForInvite = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/appointments/doctors`, {
@@ -180,9 +402,51 @@ export default function MeetingRoom() {
       setInvitingDoctorId(null);
     }
   };
+  const fetchReferralSpecialists = async () => {
+    try {
+      setLoadingReferralSpecialists(true);
+      const res = await axios.get(`${API_URL}/api/appointments/doctors`, {
+        params: { type: 'SCHEDULED' },
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setReferralSpecialists(rows.filter((item) => item?.userId && item.userId !== user?.id));
+    } catch (err) {
+      console.error('Failed to fetch specialists for referral', err);
+      setReferralSpecialists([]);
+    } finally {
+      setLoadingReferralSpecialists(false);
+    }
+  };
+
+  const handleReferralSpecialistChange = (value) => {
+    const typed = String(value || '').trim();
+    const normalized = typed.toLowerCase();
+    const matched = referralSpecialists.find(
+      (item) => String(item?.user?.name || '').trim().toLowerCase() === normalized
+    );
+    if (!matched) {
+      setReferralForm((current) => ({
+        ...current,
+        doctorName: typed,
+        doctorEmail: '',
+        doctorAddress: '',
+        phoneNo: '',
+      }));
+      return;
+    }
+
+    setReferralForm((current) => ({
+      ...current,
+      doctorName: String(matched?.user?.name || '').trim(),
+      doctorEmail: String(matched?.user?.email || '').trim(),
+      doctorAddress: String(matched?.address || '').trim(),
+      phoneNo: String([matched?.phoneCode, matched?.phone].filter(Boolean).join(' ')).trim(),
+    }));
+  };
 
 
-  // â”€â”€ Fetch appointment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Fetch appointment ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   useEffect(() => {
     const fetchAppt = async () => {
       try {
@@ -206,6 +470,9 @@ export default function MeetingRoom() {
         }
         if (Array.isArray(data?.consultation?.prescription)) {
           setPrescription(data.consultation.prescription);
+        }
+        if (typeof data?.consultation?.notes === 'string') {
+          setNotes(data.consultation.notes);
         }
       } catch (err) { console.error(err); }
     };
@@ -240,7 +507,7 @@ export default function MeetingRoom() {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [showInviteModal, showPatientEndConfirm, waitingForPatientConfirmation, showLeaveCallOptions, activeTab]);
 
-  // â”€â”€ Socket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Socket ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   useEffect(() => {
     if (!socket || !appointmentId) return;
     socket.emit('join_appointment', appointmentId);
@@ -261,7 +528,7 @@ export default function MeetingRoom() {
     }
     const handleAnswered = (data) => {
       if (data.appointmentId === appointmentId && !data.accepted) {
-        navigate('/dashboard');
+        navigate(user?.role === 'PATIENT' ? PATIENT_APPOINTMENTS_ROUTE : '/dashboard');
       }
     };
 
@@ -313,6 +580,15 @@ export default function MeetingRoom() {
       playSuccessSound();
     };
 
+    const handlePrescriptionSync = (data) => {
+      if (!data || String(data.appointmentId) !== String(appointmentId)) return;
+      setPrescription(Array.isArray(data.prescription) ? data.prescription : []);
+    };
+    const handleCallNotesSync = (data) => {
+      if (!data || String(data.appointmentId) !== String(appointmentId)) return;
+      setNotes(String(data.notes || ''));
+    };
+
     const handleAgoraUserJoined = (data) => {
       if (data.appointmentId === appointmentId) {
         setUserNames(prev => ({ ...prev, [data.uid]: data.name }));
@@ -328,6 +604,8 @@ export default function MeetingRoom() {
     socket.on('call:accept_complete', handleAcceptComplete);
     socket.on('call:decline_complete', handleDeclineComplete);
     socket.on('call:incoming', handleIncomingCall);
+    socket.on('prescription:sync', handlePrescriptionSync);
+    socket.on('call-notes:sync', handleCallNotesSync);
     socket.on('agora:user_joined', handleAgoraUserJoined);
     return () => {
       socket.off('call:answered', handleAnswered);
@@ -336,9 +614,17 @@ export default function MeetingRoom() {
       socket.off('call:accept_complete', handleAcceptComplete);
       socket.off('call:decline_complete', handleDeclineComplete);
       socket.off('call:incoming', handleIncomingCall);
+      socket.off('prescription:sync', handlePrescriptionSync);
+      socket.off('call-notes:sync', handleCallNotesSync);
       socket.off('agora:user_joined', handleAgoraUserJoined);
     };
   }, [socket, appointmentId, appointment, user, navigate, isRtcMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!socket || !appointmentId || user?.role !== 'DOCTOR') return;
+    // ponytail: push current draft list to room so patient sees add/remove instantly.
+    socket.emit('prescription:sync', { appointmentId, prescription });
+  }, [socket, appointmentId, user?.role, prescription]);
 
   // Guarantee that we broadcast our name to the room as soon as we are in the call 
   // and the socket is fully available. This covers the edge case where the socket 
@@ -349,7 +635,7 @@ export default function MeetingRoom() {
     }
   }, [inCall, socket, appointmentId, user?.name, isRtcMode]);
 
-  // â”€â”€ Agora setup + AUTO JOIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Agora setup + AUTO JOIN ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   useEffect(() => {
     if (!appointment) return;
     if (!isRtcMode) {
@@ -575,7 +861,7 @@ export default function MeetingRoom() {
     }
   }, [messages]);
 
-  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Helpers ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   async function leaveCall(skipNavigate = false, navigationState = null) {
@@ -588,15 +874,16 @@ export default function MeetingRoom() {
     }
     setInCall(false);
     if (skipNavigate !== true) {
+      const defaultRedirect = user?.role === 'PATIENT' ? PATIENT_APPOINTMENTS_ROUTE : '/dashboard';
       if (navigationState && typeof navigationState === 'object') {
         const redirectTo = typeof navigationState.redirectTo === 'string' && navigationState.redirectTo.trim()
           ? navigationState.redirectTo.trim()
-          : '/dashboard';
+          : defaultRedirect;
         const nextState = { ...navigationState };
         delete nextState.redirectTo;
         navigate(redirectTo, { state: Object.keys(nextState).length > 0 ? nextState : null });
       } else {
-        navigate('/dashboard');
+        navigate(defaultRedirect);
       }
     }
   }
@@ -616,25 +903,113 @@ export default function MeetingRoom() {
     setNewMessage('');
   };
 
+  const updateCallNotesField = (field, value) => {
+    setCallNotesForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const toggleCallNotesField = (field, checked) => {
+    setCallNotesForm((current) => ({ ...current, [field]: Boolean(checked) }));
+  };
+
+  const saveCallNote = async () => {
+    try {
+      setSavingCallNote(true);
+      const notesPayload = buildCallNotesPayload(callNotesForm, {
+        patientName,
+        patientDateOfBirth,
+        consultationType: callNotesConsultationType,
+        serviceName: callNotesServiceName,
+      });
+      setNotes(notesPayload);
+      await axios.post(`${API_URL}/api/appointments/${appointmentId}/notes`,
+        { notes: notesPayload, prescription: prescriptionRef.current || prescription },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      if (socket) {
+        socket.emit('call-notes:sync', { appointmentId, notes: notesPayload });
+      }
+      showToast('Call note saved.');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to save call note');
+    } finally {
+      setSavingCallNote(false);
+    }
+  };
+
   const addMedicine = () => {
-    const nextName = String(medInput.name || '').trim();
+    const nextName = String(prescriptionDraft.drugName || '').trim();
     if (!nextName) return;
-    setPrescription((current) => [...current, { ...medInput, name: nextName }]);
-    setMedInput({ name: '', dosage: '', frequency: '', duration: '' });
+    const nextItem = toPrescriptionItem({
+      ...prescriptionDraft,
+      drugName: nextName,
+    });
+    setPrescription((current) => [...current, nextItem]);
+    setPrescriptionDraft((current) => ({
+      ...current,
+      diagnosis: '',
+      reasonForPrescription: '',
+      reasonForAuthority: '',
+      drugName: '',
+      packName: '',
+      prescribedQuantity: '',
+      packQuantity: '',
+      route: 'Oral',
+      repeats: '0',
+      minimumRepeatIntervalDays: '',
+      dose: '',
+      doseUnit: current?.doseUnit || 'mg',
+      durationValue: '',
+      durationUnit: current?.durationUnit || 'days',
+      frequency: '',
+      directions: '',
+      preferredPharmacy: '',
+      notes: '',
+      annotations: '',
+      noBrandSubstitution: false,
+      includeBrandName: false,
+      emergencySupply: false,
+      activeScript: false,
+      expiryDate: '',
+      reminderEnabled: false,
+    }));
+  };
+  const updatePrescriptionDraftField = (field, value) => {
+    setPrescriptionDraft((current) => ({ ...current, [field]: value }));
+  };
+  const togglePrescriptionDraftCheckbox = (field, checked) => {
+    setPrescriptionDraft((current) => ({ ...current, [field]: Boolean(checked) }));
   };
 
   const addPathologyTest = () => {
     const next = pathologyTestInput.trim();
-    if (!next || pathologyTests.length >= 10) return;
-    setPathologyTests((current) => [...current, next]);
+    if (!next) return;
+    setPathologyTests((current) => (current.includes(next) ? current : [...current, next]));
     setPathologyTestInput('');
+  };
+
+  const togglePathologyTest = (testName, checked) => {
+    const normalized = String(testName || '').trim();
+    if (!normalized) return;
+    setPathologyTests((current) => {
+      if (checked) return current.includes(normalized) ? current : [...current, normalized];
+      return current.filter((item) => item !== normalized);
+    });
   };
 
   const addRadiologyTest = () => {
     const next = radiologyTestInput.trim();
-    if (!next || radiologyTests.length >= 10) return;
-    setRadiologyTests((current) => [...current, next]);
+    if (!next) return;
+    setRadiologyTests((current) => (current.includes(next) ? current : [...current, next]));
     setRadiologyTestInput('');
+  };
+
+  const toggleRadiologyTest = (testName, checked) => {
+    const normalized = String(testName || '').trim();
+    if (!normalized) return;
+    setRadiologyTests((current) => {
+      if (checked) return current.includes(normalized) ? current : [...current, normalized];
+      return current.filter((item) => item !== normalized);
+    });
   };
 
   const completeConsultation = async () => {
@@ -699,7 +1074,22 @@ export default function MeetingRoom() {
   const summary = parseAiSummary(appointment?.aiSummary);
   const medicalConditions = Array.isArray(summary?.medicalConditions) ? summary.medicalConditions : [];
   const attachedFileNames = Array.isArray(summary?.attachedFileNames) ? summary.attachedFileNames : [];
+  const bookingQuestionnaire = summary?.prescriptionQuestionnaire && typeof summary.prescriptionQuestionnaire === 'object'
+    ? summary.prescriptionQuestionnaire
+    : {};
+  const requestedPathologyTests = Array.isArray(summary?.selectedBloodTests)
+    ? summary.selectedBloodTests
+    : Array.isArray(summary?.pathologyTests)
+      ? summary.pathologyTests
+      : [];
+  const requestedRadiologyTests = Array.isArray(summary?.selectedRadiologyTests)
+    ? summary.selectedRadiologyTests
+    : Array.isArray(summary?.radiologyTests)
+      ? summary.radiologyTests
+      : [];
   const patientProfile = appointment?.patient?.patientProfile || null;
+  const familyLinkedProfile = appointment?.familyMember?.linkedUser?.patientProfile || null;
+  const resolvedPatientProfile = appointment?.familyMember ? (familyLinkedProfile || patientProfile) : patientProfile;
   const hasGpMedicationHistory = ['yes', 'y', 'true', '1'].includes(String(summary?.gpMedicationHistory || '').trim().toLowerCase());
 
   const otherName = isDoctor
@@ -715,15 +1105,365 @@ export default function MeetingRoom() {
   const doctorAddress = String(doctorProfile?.address || '').trim();
   const doctorContact = String([doctorProfile?.phoneCode, doctorProfile?.phone].filter(Boolean).join(' ')).trim();
   const doctorProviderNumber = String(doctorProfile?.providerNumber || '').trim();
-  const patientDateOfBirth = String(summary?.patientDateOfBirth || patientProfile?.dateOfBirth || '').trim();
-  const patientGender = String(appointment?.familyMember?.gender || patientProfile?.gender || '').trim();
-  const patientContact = String(summary?.patientPhone || [patientProfile?.phoneCode, patientProfile?.phone].filter(Boolean).join(' ') || patientEmail || '').trim();
-  const patientAddress = String(appointment?.familyMember?.address || patientProfile?.address || summary?.patient_address || summary?.address || '').trim();
+  const doctorPrescriberNumber = String(doctorProfile?.prescriberNumber || '').trim();
+  const doctorAhpraNumber = String(doctorProfile?.ahpraNumber || '').trim();
+  const doctorHpiiNumber = String(doctorProfile?.hpiIndividualNumber || '').trim();
+  const doctorHpioNumber = String(doctorProfile?.hpioNumber || '').trim();
+  const doctorPrescriptionEntityId = String(doctorProfile?.prescriptionEntityId || '').trim();
+  const patientMedicareCardNumber = firstNonEmptyValue(
+    resolvedPatientProfile?.medicareCardNumber,
+    summary?.medicareCardNumber,
+    summary?.medicareNumber
+  );
+  const patientMedicareIrn = firstNonEmptyValue(resolvedPatientProfile?.medicareIrn, summary?.medicareIrn);
+  const patientDateOfBirth = firstNonEmptyValue(resolvedPatientProfile?.dateOfBirth, summary?.patientDateOfBirth);
+  const patientGender = firstNonEmptyValue(appointment?.familyMember?.gender, resolvedPatientProfile?.gender);
+  const patientContact = firstNonEmptyValue(
+    [resolvedPatientProfile?.phoneCode, resolvedPatientProfile?.phone].filter(Boolean).join(' '),
+    summary?.patientPhone,
+    patientEmail
+  );
+  const patientAddress = firstNonEmptyValue(
+    appointment?.familyMember?.address,
+    resolvedPatientProfile?.address,
+    summary?.patient_address,
+    summary?.address
+  );
+  const knownPatientReason = firstNonEmptyValue(summary?.patientReason, summary?.reasonForRequest);
+  const knownDiagnosis = firstNonEmptyValue(
+    summary?.diagnosis,
+    knownPatientReason,
+    Array.isArray(summary?.symptoms) ? summary.symptoms.join(', ') : ''
+  );
+  const knownClinicalNotes = firstNonEmptyValue(summary?.medicalHistoryNotes);
+  const knownAllergies = firstNonEmptyValue(resolvedPatientProfile?.allergies, summary?.allergies);
+  const callNotesConsultationType = isInPersonMode ? 'In Person' : 'Telehealth';
+  const callNotesServiceName = firstNonEmptyValue(
+    summary?.serviceName,
+    summary?.service_name,
+    summary?.service,
+    'Standard Consultation'
+  );
+  const questionnaireRows = [
+    { label: 'Consulted within last 12 months', value: bookingQuestionnaire?.consultedWithinLast12Months || summary?.recentConsultationResponse },
+    { label: 'Any chronic conditions', value: bookingQuestionnaire?.chronicConditions },
+    { label: 'Currently taking medications', value: bookingQuestionnaire?.takingMedications },
+    { label: 'Recent surgeries or hospitalizations', value: bookingQuestionnaire?.recentSurgeriesOrHospitalizations },
+    { label: 'Needs language or mobility assistance', value: bookingQuestionnaire?.needsLanguageOrMobilityAssistance },
+    { label: 'Seen doctor for this issue before', value: bookingQuestionnaire?.seenDoctorForIssueBefore },
+    { label: 'Symptom duration', value: bookingQuestionnaire?.symptomDuration },
+    { label: 'Symptom severity (1-10)', value: bookingQuestionnaire?.symptomSeverity },
+    { label: 'Additional information', value: bookingQuestionnaire?.additionalInformation },
+  ];
+  const hasQuestionnaireResponses = questionnaireRows.some((row) => String(row.value || '').trim());
   const queueTypeLabel = String(summary?.queueType || '').trim().toUpperCase() === 'GENERAL' ? 'General Queue' : 'Doctor Specific';
+  const normalizedServiceLabel = String(
+    summary?.serviceName || summary?.service_name || summary?.service || ''
+  ).trim().toLowerCase();
+  const normalizedServiceType = String(
+    summary?.serviceType || summary?.service_type || ''
+  ).trim().toLowerCase();
+  const isPrescriptionOnlyMeeting = (
+    normalizedServiceLabel.includes('single prescription') ||
+    normalizedServiceLabel.includes('multiple prescription') ||
+    (normalizedServiceLabel === '' && normalizedServiceType.includes('prescription'))
+  );
+  const autoReferralCondition = summary?.noMedicalCondition
+    ? (knownDiagnosis || 'General medical review')
+    : (medicalConditions.length > 0 ? medicalConditions.join(', ') : (knownDiagnosis || 'General medical review'));
+
+  useEffect(() => {
+    if (!isDoctor || activeTab !== 'specialist-referral') return;
+    if (referralSpecialists.length > 0 || loadingReferralSpecialists) return;
+    fetchReferralSpecialists();
+  }, [isDoctor, activeTab, referralSpecialists.length, loadingReferralSpecialists]);
+
+  useEffect(() => {
+    if (!isDoctor) return;
+    setReferralForm((current) => ({
+      ...current,
+      condition: current.condition || autoReferralCondition,
+    }));
+  }, [isDoctor, autoReferralCondition]);
+
+  useEffect(() => {
+    if (!isDoctor) return;
+    setCallNotesForm((current) => ({
+      ...current,
+      clinicalAssessment: current.clinicalAssessment || knownDiagnosis,
+      otherNotes: current.otherNotes || knownClinicalNotes,
+    }));
+  }, [isDoctor, knownDiagnosis, knownClinicalNotes]);
+
+  useEffect(() => {
+    if (!isDoctor) return;
+    const payload = buildCallNotesPayload(callNotesForm, {
+      patientName,
+      patientDateOfBirth,
+      consultationType: callNotesConsultationType,
+      serviceName: callNotesServiceName,
+    });
+    setNotes(payload);
+  }, [
+    isDoctor,
+    callNotesForm,
+    patientName,
+    patientDateOfBirth,
+    callNotesConsultationType,
+    callNotesServiceName,
+  ]);
+
+  useEffect(() => {
+    if (!isDoctor) return;
+    setPrescriptionDraft((current) => ({
+      ...current,
+      medicareNumber: current.medicareNumber || patientMedicareCardNumber,
+      medicareIrn: current.medicareIrn || patientMedicareIrn,
+      diagnosis: current.diagnosis || knownDiagnosis,
+      reasonForPrescription: current.reasonForPrescription || knownPatientReason,
+      notes: current.notes || knownClinicalNotes,
+      annotations: current.annotations || (knownAllergies ? `Allergies: ${knownAllergies}` : ''),
+      prescriberHpioNumber: current.prescriberHpioNumber || doctorHpioNumber,
+      prescriberHpiiNumber: current.prescriberHpiiNumber || doctorHpiiNumber,
+      prescriberNumber: current.prescriberNumber || doctorPrescriberNumber || doctorProviderNumber,
+      ahpraNumber: current.ahpraNumber || doctorAhpraNumber,
+      prescriptionEntityId: current.prescriptionEntityId || doctorPrescriptionEntityId,
+    }));
+  }, [
+    isDoctor,
+    patientMedicareCardNumber,
+    patientMedicareIrn,
+    knownDiagnosis,
+    knownPatientReason,
+    knownClinicalNotes,
+    knownAllergies,
+    doctorHpioNumber,
+    doctorHpiiNumber,
+    doctorPrescriberNumber,
+    doctorProviderNumber,
+    doctorAhpraNumber,
+    doctorPrescriptionEntityId,
+  ]);
+  useEffect(() => {
+    if (!isDoctor) return;
+    if (pathologyTests.length > 0) return;
+    if (!Array.isArray(requestedPathologyTests) || requestedPathologyTests.length === 0) return;
+
+    const normalized = Array.from(
+      new Set(
+        requestedPathologyTests
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      )
+    ).slice(0, 10);
+
+    if (normalized.length > 0) {
+      setPathologyTests(normalized);
+    }
+  }, [isDoctor, pathologyTests.length, requestedPathologyTests]);
+  useEffect(() => {
+    if (!isDoctor) return;
+    if (radiologyTests.length > 0) return;
+    if (!Array.isArray(requestedRadiologyTests) || requestedRadiologyTests.length === 0) return;
+
+    const normalized = Array.from(
+      new Set(
+        requestedRadiologyTests
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (normalized.length > 0) {
+      setRadiologyTests(normalized);
+    }
+  }, [isDoctor, radiologyTests.length, requestedRadiologyTests]);
+  useEffect(() => {
+    if (!isPrescriptionOnlyMeeting) return;
+    if (![
+      'medical-certificate',
+      'specialist-referral',
+      'pathology-request',
+      'radiology-request',
+      'triage',
+      'request-medical-certificate',
+      'request-specialist-referral',
+      'request-pathology',
+      'request-radiology',
+    ].includes(activeTab)) return;
+    setActiveTab('booking');
+  }, [activeTab, isPrescriptionOnlyMeeting]);
   const currentDateLabel = new Date().toLocaleDateString('en-GB');
   const referralValidUntilDate = new Date();
   referralValidUntilDate.setFullYear(referralValidUntilDate.getFullYear() + 1);
   const referralValidUntilLabel = referralValidUntilDate.toLocaleDateString('en-GB');
+  const generatedDocumentFieldByType = {
+    MEDICAL_CERTIFICATE: 'medicalCertificateUrl',
+    SPECIALIST_REFERRAL: 'specialistReferralUrl',
+    PATHOLOGY_LETTER: 'pathologyLetterUrl',
+    RADIOLOGY_LETTER: 'radiologyLetterUrl',
+  };
+  const escapeHtml = (value) =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const buildDocumentHtml = ({ title, bodyHtml, signatureUrl }) => {
+    const signatureBlock = signatureUrl
+      ? `<div style="margin-top:20px;"><p style="margin:0 0 8px;font-weight:600;">Doctor Signature</p><img src="${escapeHtml(signatureUrl)}" alt="Doctor signature" style="max-width:220px;max-height:120px;object-fit:contain;border:1px solid #d1d5db;padding:6px;border-radius:8px;background:#fff;" /></div>`
+      : '';
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #0f172a; margin: 24px; line-height: 1.5; }
+    h1 { margin: 0 0 12px; font-size: 22px; }
+    .meta { color: #475569; font-size: 13px; margin-bottom: 16px; }
+    .card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; margin-top: 10px; background: #f8fafc; }
+    ul { margin: 8px 0 0 18px; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="meta">Generated at ${escapeHtml(new Date().toLocaleString())}</div>
+  ${bodyHtml}
+  ${signatureBlock}
+</body>
+</html>`;
+  };
+
+  const saveGeneratedDocument = async (documentType, htmlContent, signatureUpload) => {
+    if (!appointmentId) return;
+    if (!signatureUpload?.url) {
+      showToast('Please upload doctor signature before saving.');
+      return;
+    }
+    const lowerType = String(documentType || '').toLowerCase();
+    const fileName = `${lowerType}_${appointmentId}_${Date.now()}.html`;
+    const htmlFile = new File([htmlContent], fileName, { type: 'text/html' });
+
+    setSavingGeneratedDocumentType(documentType);
+    try {
+      const uploadedDocument = await uploadFileToS3(htmlFile, `generated-${lowerType}`);
+      await axios.post(
+        `${API_URL}/api/appointments/${appointmentId}/documents`,
+        {
+          documentType,
+          documentUrl: uploadedDocument.url,
+          signatureUrl: signatureUpload?.url || '',
+        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+
+      const targetField = generatedDocumentFieldByType[documentType];
+      setAppointment((current) => {
+        if (!current) return current;
+        const currentSummary = parseAiSummary(current.aiSummary);
+        return {
+          ...current,
+          aiSummary: {
+            ...currentSummary,
+            [targetField]: uploadedDocument.url,
+          },
+        };
+      });
+      showToast('Document saved successfully.');
+    } catch (error) {
+      console.error('Failed to save generated document', error);
+      showToast(error?.response?.data?.error || 'Failed to save document.');
+    } finally {
+      setSavingGeneratedDocumentType('');
+    }
+  };
+
+  const handleSaveMedicalCertificate = async () => {
+    const signatureUpload = signatureUploads.medicalCertificate;
+    const bodyHtml = `
+      <div class="card">
+        <p><strong>Doctor:</strong> ${escapeHtml(doctorDisplayName)}</p>
+        <p><strong>Patient:</strong> ${escapeHtml(patientName)}</p>
+        <p><strong>Date:</strong> ${escapeHtml(currentDateLabel)}</p>
+        <p><strong>Unfit From:</strong> ${escapeHtml(medicalCertForm.startDate || 'Not provided')}</p>
+        <p><strong>Unfit To:</strong> ${escapeHtml(medicalCertForm.endDate || 'Not provided')}</p>
+        <p><strong>Reason:</strong> ${escapeHtml(medicalCertForm.reason || 'Not provided')}</p>
+        <p><strong>Advice:</strong> ${escapeHtml(medicalCertForm.advice || 'Not provided')}</p>
+      </div>`;
+    const htmlContent = buildDocumentHtml({
+      title: 'Medical Certificate',
+      bodyHtml,
+      signatureUrl: signatureUpload?.url || '',
+    });
+    await saveGeneratedDocument('MEDICAL_CERTIFICATE', htmlContent, signatureUpload);
+  };
+
+  const handleSaveSpecialistReferral = async () => {
+    const signatureUpload = signatureUploads.specialistReferral;
+    const bodyHtml = `
+      <div class="card">
+        <p><strong>Doctor:</strong> ${escapeHtml(doctorDisplayName)}</p>
+        <p><strong>Patient:</strong> ${escapeHtml(patientName)}</p>
+        <p><strong>Date:</strong> ${escapeHtml(currentDateLabel)}</p>
+        <p><strong>Referred To:</strong> ${escapeHtml(referralForm.doctorName || 'Not provided')}</p>
+        <p><strong>Referred Email:</strong> ${escapeHtml(referralForm.doctorEmail || 'Not provided')}</p>
+        <p><strong>Referred Address:</strong> ${escapeHtml(referralForm.doctorAddress || 'Not provided')}</p>
+        <p><strong>Phone:</strong> ${escapeHtml(referralForm.phoneNo || 'Not provided')}</p>
+        <p><strong>Condition:</strong> ${escapeHtml(referralForm.condition || 'Not provided')}</p>
+        <p><strong>Valid Until:</strong> ${escapeHtml(referralValidUntilLabel)}</p>
+      </div>`;
+    const htmlContent = buildDocumentHtml({
+      title: 'Specialist Referral Letter',
+      bodyHtml,
+      signatureUrl: signatureUpload?.url || '',
+    });
+    await saveGeneratedDocument('SPECIALIST_REFERRAL', htmlContent, signatureUpload);
+  };
+
+  const handleSavePathologyLetter = async () => {
+    const signatureUpload = signatureUploads.pathologyRequest;
+    const testsList = pathologyTests.length > 0
+      ? pathologyTests.map((test) => `<li>${escapeHtml(test)}</li>`).join('')
+      : '<li>No tests added</li>';
+    const bodyHtml = `
+      <div class="card">
+        <p><strong>Doctor:</strong> ${escapeHtml(doctorDisplayName)}</p>
+        <p><strong>Patient:</strong> ${escapeHtml(patientName)}</p>
+        <p><strong>Date:</strong> ${escapeHtml(currentDateLabel)}</p>
+        <p><strong>Requested Pathology Tests:</strong></p>
+        <ul>${testsList}</ul>
+      </div>`;
+    const htmlContent = buildDocumentHtml({
+      title: 'Pathology Request Letter',
+      bodyHtml,
+      signatureUrl: signatureUpload?.url || '',
+    });
+    await saveGeneratedDocument('PATHOLOGY_LETTER', htmlContent, signatureUpload);
+  };
+
+  const handleSaveRadiologyLetter = async () => {
+    const signatureUpload = signatureUploads.radiologyRequest;
+    const testsList = radiologyTests.length > 0
+      ? radiologyTests.map((test) => `<li>${escapeHtml(test)}</li>`).join('')
+      : '<li>No tests added</li>';
+    const bodyHtml = `
+      <div class="card">
+        <p><strong>Doctor:</strong> ${escapeHtml(doctorDisplayName)}</p>
+        <p><strong>Patient:</strong> ${escapeHtml(patientName)}</p>
+        <p><strong>Date:</strong> ${escapeHtml(currentDateLabel)}</p>
+        <p><strong>Requested Radiology Tests:</strong></p>
+        <ul>${testsList}</ul>
+      </div>`;
+    const htmlContent = buildDocumentHtml({
+      title: 'Radiology Request Letter',
+      bodyHtml,
+      signatureUrl: signatureUpload?.url || '',
+    });
+    await saveGeneratedDocument('RADIOLOGY_LETTER', htmlContent, signatureUpload);
+  };
   const activeRemoteUser = remoteUsers.find((u) => u.uid === activeRemoteUid) || remoteUsers[0] || null;
   const stackedRemoteUsers = activeRemoteUser
     ? remoteUsers.filter((u) => u.uid !== activeRemoteUser.uid)
@@ -753,7 +1493,7 @@ export default function MeetingRoom() {
   const sidebarOpen = activeTab !== null;
   const consultationModeLabel = isInPersonMode ? 'In-Person' : (isAudioMode ? 'Audio' : 'Video');
   const roomTitle = isInPersonMode ? `${consultationModeLabel} Consultation Room` : `${consultationModeLabel} Consultation`;
-  const patientVisiblePrescription = Array.isArray(appointment?.consultation?.prescription) ? appointment.consultation.prescription : [];
+  const patientVisiblePrescription = Array.isArray(prescription) ? prescription : [];
   const patientRequestTabs = {
     'request-medical-certificate': {
       tabLabel: 'Medical Cert Request',
@@ -814,7 +1554,7 @@ export default function MeetingRoom() {
   };
 
   const resolveSessionRouteForAppointment = async (targetAppointmentId) => {
-    if (!targetAppointmentId) return '/dashboard';
+    if (!targetAppointmentId) return user?.role === 'PATIENT' ? PATIENT_APPOINTMENTS_ROUTE : '/dashboard';
 
     if (String(targetAppointmentId) === String(appointmentId) && appointment?.consultationMode) {
       return getSessionRouteByMode(targetAppointmentId, appointment.consultationMode);
@@ -895,7 +1635,7 @@ export default function MeetingRoom() {
       setIsOnline(!nextStatus);
     }
   };
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Render ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   return (
     <div className="h-[100dvh] bg-slate-50 flex flex-col font-sans select-none overflow-hidden">
 
@@ -925,7 +1665,7 @@ export default function MeetingRoom() {
         <LandingNavbar activeKey="patient" />
       )}
 
-      {/* â”€â”€ Joining overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Joining overlay ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {joining && (
           <motion.div
@@ -945,7 +1685,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Call Incoming Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Call Incoming Toast ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {incomingCall && (
           <motion.div
@@ -1069,7 +1809,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Patient End Confirmation Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Patient End Confirmation Overlay ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {showPatientEndConfirm && (
           <motion.div
@@ -1119,7 +1859,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Doctor Waiting Overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Doctor Waiting Overlay ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {showLeaveCallOptions && (
           <motion.div
@@ -1202,7 +1942,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Invite Doctor Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Invite Doctor Modal ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {showInviteModal && (
           <motion.div
@@ -1288,7 +2028,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Consultation Completed overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Consultation Completed overlay ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {showCompletedDialog && (
           <motion.div
@@ -1328,7 +2068,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Notes Success Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Notes Success Toast ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {showNotesSuccess && (
           <motion.div
@@ -1352,7 +2092,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Global Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Global Toast ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -1367,7 +2107,7 @@ export default function MeetingRoom() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Top bar ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
       <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 z-10" style={{ background: 'rgba(255,255,255,0.95)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
         {/* Left: logo + name */}
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -1378,7 +2118,7 @@ export default function MeetingRoom() {
             <p className="text-slate-900 font-heading font-black text-sm leading-tight truncate">
               {otherName || roomTitle}
             </p>
-            <p className="text-slate-500 text-[10px] font-medium">{consultationModeLabel} · {getPractitionerTypeLabel(appointment?.doctor, 'Consultation Session')}</p>
+            <p className="text-slate-500 text-[10px] font-medium">{consultationModeLabel} Ã‚Â· {getPractitionerTypeLabel(appointment?.doctor, 'Consultation Session')}</p>
           </div>
         </div>
 
@@ -1448,7 +2188,7 @@ export default function MeetingRoom() {
                         transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
                         className="w-4 h-4 rounded-full border-2 border-slate-400 border-t-transparent"
                       />
-                      Waiting for them to join…
+                      Waiting for them to joinÃ¢â‚¬Â¦
                     </div>
                   </div>
                 </div>
@@ -1623,7 +2363,7 @@ export default function MeetingRoom() {
             </div>
           </div>
 
-          {/* Tabs row — below video, horizontal scrollable */}
+          {/* Tabs row Ã¢â‚¬â€ below video, horizontal scrollable */}
           <div
             className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm flex items-stretch justify-start overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden px-2 sm:px-4"
             style={{ scrollbarWidth: 'none' }}
@@ -1639,27 +2379,37 @@ export default function MeetingRoom() {
             <TabBtn
               icon={<FileText className="w-5 h-5" />}
               label="Call Notes"
-              active={isDoctor && activeTab === 'notes'}
-              onClick={isDoctor ? () => toggleTab('notes') : () => showComingSoon('Call notes')}
+              active={activeTab === 'notes'}
+              onClick={() => toggleTab('notes')}
             />
             {isDoctor ? (
               <>
-                <TabBtn icon={<FileText className="w-5 h-5" />} label="Medical Certificate" active={activeTab === 'medical-certificate'} onClick={() => toggleTab('medical-certificate')} />
-                <TabBtn icon={<FileText className="w-5 h-5" />} label="Specialist Referral Letter" active={activeTab === 'specialist-referral'} onClick={() => toggleTab('specialist-referral')} />
                 <TabBtn icon={<Activity className="w-5 h-5" />} label="Medical History" active={activeTab === 'medical-history'} onClick={() => toggleTab('medical-history')} />
-                <TabBtn icon={<Search className="w-5 h-5" />} label="Pathology Request" active={activeTab === 'pathology-request'} onClick={() => toggleTab('pathology-request')} />
-                <TabBtn icon={<LayoutDashboard className="w-5 h-5" />} label="Radiology Request" active={activeTab === 'radiology-request'} onClick={() => toggleTab('radiology-request')} />
+                {!isPrescriptionOnlyMeeting && (
+                  <>
+                    <TabBtn icon={<FileText className="w-5 h-5" />} label="Medical Certificate" active={activeTab === 'medical-certificate'} onClick={() => toggleTab('medical-certificate')} />
+                    <TabBtn icon={<FileText className="w-5 h-5" />} label="Specialist Referral Letter" active={activeTab === 'specialist-referral'} onClick={() => toggleTab('specialist-referral')} />
+                    <TabBtn icon={<Search className="w-5 h-5" />} label="Pathology Request" active={activeTab === 'pathology-request'} onClick={() => toggleTab('pathology-request')} />
+                    <TabBtn icon={<LayoutDashboard className="w-5 h-5" />} label="Radiology Request" active={activeTab === 'radiology-request'} onClick={() => toggleTab('radiology-request')} />
+                  </>
+                )}
               </>
             ) : (
               <>
-                <TabBtn icon={<FileText className="w-5 h-5" />} label="Medical Cert Request" active={activeTab === 'request-medical-certificate'} onClick={() => toggleTab('request-medical-certificate')} />
-                <TabBtn icon={<FileText className="w-5 h-5" />} label="Referral Request" active={activeTab === 'request-specialist-referral'} onClick={() => toggleTab('request-specialist-referral')} />
-                <TabBtn icon={<Search className="w-5 h-5" />} label="Pathology Request" active={activeTab === 'request-pathology'} onClick={() => toggleTab('request-pathology')} />
-                <TabBtn icon={<LayoutDashboard className="w-5 h-5" />} label="Radiology Request" active={activeTab === 'request-radiology'} onClick={() => toggleTab('request-radiology')} />
+                {isPrescriptionOnlyMeeting ? (
+                  <TabBtn icon={<Activity className="w-5 h-5" />} label="Medical History" active={activeTab === 'medical-history'} onClick={() => toggleTab('medical-history')} />
+                ) : (
+                  <>
+                    <TabBtn icon={<FileText className="w-5 h-5" />} label="Medical Cert Request" active={activeTab === 'request-medical-certificate'} onClick={() => toggleTab('request-medical-certificate')} />
+                    <TabBtn icon={<FileText className="w-5 h-5" />} label="Referral Request" active={activeTab === 'request-specialist-referral'} onClick={() => toggleTab('request-specialist-referral')} />
+                    <TabBtn icon={<Search className="w-5 h-5" />} label="Pathology Request" active={activeTab === 'request-pathology'} onClick={() => toggleTab('request-pathology')} />
+                    <TabBtn icon={<LayoutDashboard className="w-5 h-5" />} label="Radiology Request" active={activeTab === 'request-radiology'} onClick={() => toggleTab('request-radiology')} />
+                  </>
+                )}
               </>
             )}
 
-            {isDoctor && (
+            {isDoctor && !isPrescriptionOnlyMeeting && (
               <>
                 <TabBtn icon={<Activity className="w-5 h-5" />} label="AI Triage" active={activeTab === 'triage'} onClick={() => toggleTab('triage')} />
                 {isPrimaryDoctor && (
@@ -1674,7 +2424,7 @@ export default function MeetingRoom() {
             )}
           </div>
         </div>
-        {/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Sidebar ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
         <AnimatePresence>
           {sidebarOpen && (
             <motion.div
@@ -1682,7 +2432,7 @@ export default function MeetingRoom() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 380, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute top-0 right-0 z-40 h-full w-[min(92vw,360px)] flex flex-col overflow-hidden min-h-0 lg:static lg:z-auto lg:self-stretch lg:h-full lg:min-h-0 lg:max-h-full lg:w-[360px] lg:shrink-0"
+              className="absolute top-0 right-0 z-40 h-full w-[min(96vw,440px)] flex flex-col overflow-hidden min-h-0 lg:static lg:z-auto lg:self-stretch lg:h-full lg:min-h-0 lg:max-h-full lg:w-[460px] lg:shrink-0"
               style={{ background: '#f8fafc', borderLeft: '1px solid rgba(0,0,0,0.05)' }} role="dialog" aria-label="Consultation sidebar"
             >
               {/* Sidebar header */}
@@ -1692,7 +2442,7 @@ export default function MeetingRoom() {
                   {activeTab === 'chat' && <><MessageSquare className="w-4 h-4 text-primary-600" /> Live Chat</>}
                   {activeTab === 'triage' && <><Activity className="w-4 h-4 text-health-600" /> AI Triage</>}
                   {activeTab === 'prescription' && <><Pill className="w-4 h-4 text-primary-600" /> Prescription</>}
-                  {activeTab === 'notes' && <><FileText className="w-4 h-4 text-health-600" /> Clinical Notes</>}
+                  {activeTab === 'notes' && <><FileText className="w-4 h-4 text-health-600" /> Call Notes</>}
                   {activePatientRequest && <><FileText className="w-4 h-4 text-primary-600" /> {activePatientRequest.title}</>}
                   {activeTab === 'medical-certificate' && <><FileText className="w-4 h-4 text-primary-600" /> Medical Certificate</>}
                   {activeTab === 'specialist-referral' && <><FileText className="w-4 h-4 text-primary-600" /> Specialist Referral Letter</>}
@@ -1745,6 +2495,18 @@ export default function MeetingRoom() {
                           {attachedFileNames.length > 0 ? attachedFileNames.join(', ') : 'No files uploaded'}
                         </p>
                       </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Requested pathology tests</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">
+                          {requestedPathologyTests.length > 0 ? requestedPathologyTests.join(', ') : 'Not provided'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Requested radiology tests</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">
+                          {requestedRadiologyTests.length > 0 ? requestedRadiologyTests.join(', ') : 'Not provided'}
+                        </p>
+                      </div>
                     </div>
                   </section>
 
@@ -1761,6 +2523,22 @@ export default function MeetingRoom() {
                       </div>
                     </div>
                   </section>
+
+                  {hasQuestionnaireResponses ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Questionnaire responses</p>
+                      <div className="mt-2.5 space-y-2.5 text-sm">
+                        {questionnaireRows.map((row) => (
+                          <div key={row.label}>
+                            <p className="text-[12px] font-semibold text-slate-500">{row.label}</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">
+                              {String(row.value || '').trim() || 'Not answered'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
 
                   <section className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">GP / medication details</p>
@@ -1852,7 +2630,7 @@ export default function MeetingRoom() {
                 </div>
               )}
 
-              {/* â”€â”€ CHAT TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ CHAT TAB ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
               {activeTab === 'chat' && (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* Encrypted badge */}
@@ -1949,7 +2727,7 @@ export default function MeetingRoom() {
                 </div>
               )}
 
-              {/* â”€â”€ AI TRIAGE TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ AI TRIAGE TAB ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
               {activeTab === 'triage' && isDoctor && (
                 <div
                   className="flex-1 overflow-y-auto p-5 space-y-4"
@@ -2022,7 +2800,7 @@ export default function MeetingRoom() {
                                   }}
                                 >
                                   <span className="text-[9px] font-black uppercase tracking-widest block mb-1.5 opacity-50">
-                                    {msg.role === 'user' ? 'ðŸ‘¤ Patient' : 'ðŸ¤– AI'}
+                                    {msg.role === 'user' ? 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¤ Patient' : 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬â€œ AI'}
                                   </span>
                                   {msg.text}
                                 </div>
@@ -2036,7 +2814,7 @@ export default function MeetingRoom() {
                 </div>
               )}
 
-              {/* â”€â”€ AI TRIAGE mic control bar â”€â”€ sticky bottom â”€â”€ */}
+              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ AI TRIAGE mic control bar ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ sticky bottom ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
               {activeTab === 'triage' && isDoctor && (
                 <div
                   className="shrink-0 flex items-center justify-between px-5 py-3 gap-3"
@@ -2070,90 +2848,491 @@ export default function MeetingRoom() {
                 </div>
               )}
 
-              {/* â”€â”€ PRESCRIPTION / NOTES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PRESCRIPTION / NOTES TAB ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
               {activeTab === 'prescription' && (
                 <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
                   {isDoctor ? (
-                    <div className="flex h-full flex-col gap-4">
-                      <section className="min-h-0 flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-center justify-between gap-3">
-                          <h4 className="text-sm font-black text-slate-900">Prescription</h4>
-                          <span className="rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-bold text-primary-700">
-                            {prescription.length} medicine{prescription.length === 1 ? '' : 's'}
-                          </span>
-                        </div>
-                        <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1 space-y-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
-                          {prescription.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">
-                              No medicine added yet.
-                            </div>
-                          ) : (
-                            prescription.map((med, i) => (
+                    <div className="flex h-full flex-col gap-5">
+                      {prescription.length > 0 ? (
+                        <section className="shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <h4 className="text-sm font-black text-slate-900">Added Medicines</h4>
+                            <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-primary-50 px-2 py-1 text-[11px] font-bold text-primary-700">
+                              {prescription.length}
+                            </span>
+                          </div>
+                          <div className="mt-3 max-h-[38vh] overflow-y-auto pr-1 space-y-2.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
+                            {prescription.map((med, i) => (
                               <motion.div
-                                key={`${med.name}-${i}`}
+                                key={`${med?.drugName || med?.name || 'medicine'}-${i}`}
                                 initial={{ opacity: 0, x: -8 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="flex items-start justify-between gap-3 rounded-xl border border-primary-100 bg-primary-50/60 p-3.5"
+                                className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
                               >
                                 <div className="min-w-0">
-                                  <p className="text-sm font-bold leading-tight text-slate-900">{med.name}</p>
-                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                    {med.dosage && <span className="rounded-full border border-primary-100 bg-white px-2 py-0.5 text-[10px] font-bold text-primary-700">{med.dosage}</span>}
-                                    {med.frequency && <span className="rounded-full border border-primary-100 bg-white px-2 py-0.5 text-[10px] font-bold text-primary-700">{med.frequency}</span>}
-                                    {med.duration && <span className="rounded-full border border-primary-100 bg-white px-2 py-0.5 text-[10px] font-bold text-primary-700">{med.duration}</span>}
+                                  <p className="text-sm font-bold leading-tight text-slate-900 truncate">
+                                    {med?.drugName || med?.name || 'Medicine'}
+                                  </p>
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                    {(med?.dosage || med?.dose) && (
+                                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                        {med?.dosage || `${med?.dose || ''}${med?.doseUnit ? ` ${med.doseUnit}` : ''}`.trim()}
+                                      </span>
+                                    )}
+                                    {med?.frequency && <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700">{med.frequency}</span>}
+                                    {(med?.duration || med?.durationValue) && (
+                                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                        {med?.duration || `${med?.durationValue || ''}${med?.durationUnit ? ` ${med.durationUnit}` : ''}`.trim()}
+                                      </span>
+                                    )}
+                                    {med?.route && <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700">{med.route}</span>}
+                                    {String(med?.repeats || '').trim() && (
+                                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                        Repeats: {med.repeats}
+                                      </span>
+                                    )}
                                   </div>
+                                  {String(med?.directions || '').trim() ? (
+                                    <p className="mt-2 text-[11px] font-medium text-slate-600 break-words">Directions: {med.directions}</p>
+                                  ) : null}
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => setPrescription((current) => current.filter((_, j) => j !== i))}
-                                  className="mt-0.5 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-100"
+                                  className="mt-0.5 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 transition-colors hover:bg-rose-50"
                                   aria-label="Remove medicine"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
                               </motion.div>
-                            ))
-                          )}
-                        </div>
-                      </section>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
 
-                      <section className="shrink-0 space-y-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Add Medicine</p>
-                        <input
-                          type="text"
-                          placeholder="Medicine name *"
-                          value={medInput.name}
-                          onChange={(e) => setMedInput({ ...medInput, name: e.target.value })}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            placeholder="Dosage (e.g. 500mg)"
-                            value={medInput.dosage}
-                            onChange={(e) => setMedInput({ ...medInput, dosage: e.target.value })}
-                            className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Frequency"
-                            value={medInput.frequency}
-                            onChange={(e) => setMedInput({ ...medInput, frequency: e.target.value })}
-                            className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                          />
+                      <section className="shrink-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">1. Prescription Setup</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <div className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Prescription Mode</span>
+                              <div className="grid grid-cols-1 gap-2">
+                                <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                                  <input
+                                    type="radio"
+                                    name="prescription-issue-type"
+                                    checked={prescriptionDraft.issueType === 'EPRESCRIPTION'}
+                                    onChange={() => updatePrescriptionDraftField('issueType', 'EPRESCRIPTION')}
+                                  />
+                                  ePrescription
+                                </label>
+                                <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                                  <input
+                                    type="radio"
+                                    name="prescription-issue-type"
+                                    checked={prescriptionDraft.issueType === 'PAPER'}
+                                    onChange={() => updatePrescriptionDraftField('issueType', 'PAPER')}
+                                  />
+                                  Paper Prescription
+                                </label>
+                              </div>
+                            </div>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Prescriber Type</span>
+                              <select
+                                value={prescriptionDraft.prescriberType}
+                                onChange={(e) => updatePrescriptionDraftField('prescriberType', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              >
+                                {PRESCRIBER_TYPE_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
                         </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">2. Patient & Authority</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Patient Medicare Number</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.medicareNumber}
+                                onChange={(e) => updatePrescriptionDraftField('medicareNumber', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Medicare IRN</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.medicareIrn}
+                                onChange={(e) => updatePrescriptionDraftField('medicareIrn', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Authority Number</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.authorityNumber}
+                                onChange={(e) => updatePrescriptionDraftField('authorityNumber', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">3. Prescriber Identifiers</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>HPI-O Number</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.prescriberHpioNumber}
+                                onChange={(e) => updatePrescriptionDraftField('prescriberHpioNumber', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>HPI-I Number</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.prescriberHpiiNumber}
+                                onChange={(e) => updatePrescriptionDraftField('prescriberHpiiNumber', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>AHPRA Number</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.ahpraNumber}
+                                onChange={(e) => updatePrescriptionDraftField('ahpraNumber', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Prescriber Number</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.prescriberNumber}
+                                onChange={(e) => updatePrescriptionDraftField('prescriberNumber', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Prescription Entity ID</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.prescriptionEntityId}
+                                onChange={(e) => updatePrescriptionDraftField('prescriptionEntityId', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">4. Medicine Details</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Diagnosis / Clinical indication</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.diagnosis}
+                                onChange={(e) => updatePrescriptionDraftField('diagnosis', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Drug Name *</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.drugName}
+                                onChange={(e) => updatePrescriptionDraftField('drugName', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Pack Name</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.packName}
+                                onChange={(e) => updatePrescriptionDraftField('packName', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Prescribed Qty</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.prescribedQuantity}
+                                onChange={(e) => updatePrescriptionDraftField('prescribedQuantity', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Pack Qty</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.packQuantity}
+                                onChange={(e) => updatePrescriptionDraftField('packQuantity', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">5. Dose & Schedule</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Dose</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.dose}
+                                onChange={(e) => updatePrescriptionDraftField('dose', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Dose Unit</span>
+                              <select
+                                value={prescriptionDraft.doseUnit}
+                                onChange={(e) => updatePrescriptionDraftField('doseUnit', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              >
+                                {PRESCRIPTION_DOSE_UNITS.map((unit) => (
+                                  <option key={unit} value={unit}>{unit}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Duration</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.durationValue}
+                                onChange={(e) => updatePrescriptionDraftField('durationValue', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Duration Unit</span>
+                              <select
+                                value={prescriptionDraft.durationUnit}
+                                onChange={(e) => updatePrescriptionDraftField('durationUnit', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              >
+                                {PRESCRIPTION_DURATION_UNITS.map((unit) => (
+                                  <option key={unit} value={unit}>{unit}</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Frequency</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.frequency}
+                                onChange={(e) => updatePrescriptionDraftField('frequency', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Route</span>
+                              <select
+                                value={prescriptionDraft.route}
+                                onChange={(e) => updatePrescriptionDraftField('route', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              >
+                                {PRESCRIPTION_ROUTE_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Preferred Pharmacy</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.preferredPharmacy}
+                                onChange={(e) => updatePrescriptionDraftField('preferredPharmacy', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Repeats</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={prescriptionDraft.repeats}
+                                onChange={(e) => updatePrescriptionDraftField('repeats', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Min Repeat Interval (days)</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={prescriptionDraft.minimumRepeatIntervalDays}
+                                onChange={(e) => updatePrescriptionDraftField('minimumRepeatIntervalDays', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Expiry Date</span>
+                              <input
+                                type="date"
+                                value={prescriptionDraft.expiryDate}
+                                onChange={(e) => updatePrescriptionDraftField('expiryDate', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+
+                          <label className="space-y-1 block">
+                            <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Directions</span>
+                            <textarea
+                              rows={2}
+                              value={prescriptionDraft.directions}
+                              onChange={(e) => updatePrescriptionDraftField('directions', e.target.value)}
+                              className={PRESCRIPTION_FORM_TEXTAREA_CLASS}
+                            />
+                          </label>
+
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Prescription Reason</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.reasonForPrescription}
+                                onChange={(e) => updatePrescriptionDraftField('reasonForPrescription', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Authority Reason</span>
+                              <input
+                                type="text"
+                                value={prescriptionDraft.reasonForAuthority}
+                                onChange={(e) => updatePrescriptionDraftField('reasonForAuthority', e.target.value)}
+                                className={PRESCRIPTION_FORM_CONTROL_CLASS}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">6. Notes & Delivery</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Clinical Notes</span>
+                              <textarea
+                                rows={2}
+                                value={prescriptionDraft.notes}
+                                onChange={(e) => updatePrescriptionDraftField('notes', e.target.value)}
+                                className={PRESCRIPTION_FORM_TEXTAREA_CLASS}
+                              />
+                            </label>
+                            <label className="space-y-1">
+                              <span className={PRESCRIPTION_FORM_LABEL_CLASS}>Annotations</span>
+                              <textarea
+                                rows={2}
+                                value={prescriptionDraft.annotations}
+                                onChange={(e) => updatePrescriptionDraftField('annotations', e.target.value)}
+                                className={PRESCRIPTION_FORM_TEXTAREA_CLASS}
+                              />
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3 text-xs font-semibold text-slate-700">
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.noBrandSubstitution}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('noBrandSubstitution', e.target.checked)}
+                              />
+                              No brand substitution
+                            </label>
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.includeBrandName}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('includeBrandName', e.target.checked)}
+                              />
+                              Include brand name
+                            </label>
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.emergencySupply}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('emergencySupply', e.target.checked)}
+                              />
+                              Emergency supply
+                            </label>
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.activeScript}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('activeScript', e.target.checked)}
+                              />
+                              Active script
+                            </label>
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.sendToEmail}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('sendToEmail', e.target.checked)}
+                              />
+                              Send by email
+                            </label>
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.sendToSms}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('sendToSms', e.target.checked)}
+                              />
+                              Send by mobile
+                            </label>
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.printCopy}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('printCopy', e.target.checked)}
+                              />
+                              Print copy
+                            </label>
+                            <label className={PRESCRIPTION_FORM_CHECKBOX_LABEL_CLASS}>
+                              <input
+                                type="checkbox"
+                                checked={prescriptionDraft.reminderEnabled}
+                                onChange={(e) => togglePrescriptionDraftCheckbox('reminderEnabled', e.target.checked)}
+                              />
+                              Enable reminder
+                            </label>
+                          </div>
+                        </div>
+
                         <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Duration (e.g. 7 days)"
-                            value={medInput.duration}
-                            onChange={(e) => setMedInput({ ...medInput, duration: e.target.value })}
-                            className="flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                          />
                           <button
                             type="button"
                             onClick={addMedicine}
-                            disabled={!String(medInput.name || '').trim()}
+                            disabled={!String(prescriptionDraft.drugName || '').trim()}
                             className="shrink-0 rounded-xl bg-primary-700 px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             Add
@@ -2172,9 +3351,22 @@ export default function MeetingRoom() {
                       ) : (
                         <div className="space-y-2">
                           {patientVisiblePrescription.map((med, idx) => (
-                            <div key={`${med?.name || 'med'}-${idx}`} className="rounded-xl border border-primary-100 bg-primary-50/60 p-3">
-                              <p className="text-sm font-bold text-slate-900">{med?.name || 'Medicine'}</p>
-                              <p className="text-xs text-slate-600 mt-1">{[med?.dosage, med?.frequency, med?.duration].filter(Boolean).join(' - ') || 'Details not provided'}</p>
+                            <div key={`${med?.drugName || med?.name || 'med'}-${idx}`} className="rounded-xl border border-primary-100 bg-primary-50/60 p-3">
+                              <p className="text-sm font-bold text-slate-900">{med?.drugName || med?.name || 'Medicine'}</p>
+                              <p className="text-xs text-slate-600 mt-1">
+                                {[
+                                  med?.dosage || `${med?.dose || ''}${med?.doseUnit ? ` ${med.doseUnit}` : ''}`.trim(),
+                                  med?.frequency,
+                                  med?.duration || `${med?.durationValue || ''}${med?.durationUnit ? ` ${med.durationUnit}` : ''}`.trim(),
+                                  med?.route,
+                                ].filter(Boolean).join(' - ') || 'Details not provided'}
+                              </p>
+                              {String(med?.directions || '').trim() ? (
+                                <p className="text-xs text-slate-700 mt-1">Directions: {med.directions}</p>
+                              ) : null}
+                              {String(med?.notes || '').trim() ? (
+                                <p className="text-xs text-slate-600 mt-1">Notes: {med.notes}</p>
+                              ) : null}
                             </div>
                           ))}
                         </div>
@@ -2189,45 +3381,168 @@ export default function MeetingRoom() {
                   className="flex-1 flex flex-col overflow-y-auto"
                   style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
                 >
-                  <div className="flex-1 p-5 space-y-5">
-                    {/* Observations */}
-                    <div>
-                      <label htmlFor="clinical-notes" className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
-                        <FileText className="w-3 h-3" /> Clinical Observations
+                  <div className="flex-1 p-5 space-y-4">
+                    <section className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Patient Info :</p>
+                      <div className="mt-2 grid gap-3 text-sm sm:grid-cols-2">
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-500">Patient Name</p>
+                          <p className="text-[14px] font-bold text-primary-700">{patientName}</p>
+                        </div>
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-500">DOB</p>
+                          <p className="text-[14px] font-bold text-primary-700">{patientDateOfBirth || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-500">Consultation Type</p>
+                          <p className="text-[14px] font-bold text-primary-700">{callNotesConsultationType}</p>
+                        </div>
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-500">Service Name</p>
+                          <p className="text-[14px] font-bold text-primary-700">{callNotesServiceName}</p>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Observations :</p>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <label className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-700">Temperature (Â°C)</span>
+                          <input
+                            type="text"
+                            value={callNotesForm.temperature}
+                            onChange={(e) => updateCallNotesField('temperature', e.target.value)}
+                            placeholder="Enter Temperature"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-700">Blood Pressure (mmHg)</span>
+                          <input
+                            type="text"
+                            value={callNotesForm.bloodPressure}
+                            onChange={(e) => updateCallNotesField('bloodPressure', e.target.value)}
+                            placeholder="Enter BP (e.g. 120/80)"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-700">Blood Glucose / Diabetes Info</span>
+                          <input
+                            type="text"
+                            value={callNotesForm.bloodGlucose}
+                            onChange={(e) => updateCallNotesField('bloodGlucose', e.target.value)}
+                            placeholder="Enter Blood Glucose"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-700">Heart Rate (bpm)</span>
+                          <input
+                            type="text"
+                            value={callNotesForm.heartRate}
+                            onChange={(e) => updateCallNotesField('heartRate', e.target.value)}
+                            placeholder="Enter Heart Rate"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-700">Respiratory Rate (breaths/min)</span>
+                          <input
+                            type="text"
+                            value={callNotesForm.respiratoryRate}
+                            onChange={(e) => updateCallNotesField('respiratoryRate', e.target.value)}
+                            placeholder="Enter Respiratory Rate"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-semibold text-slate-700">Oxygen Saturation (SpO2)</span>
+                          <input
+                            type="text"
+                            value={callNotesForm.oxygenSaturation}
+                            onChange={(e) => updateCallNotesField('oxygenSaturation', e.target.value)}
+                            placeholder="Enter SpO2 (%)"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                        <label className="space-y-1 md:col-span-2">
+                          <span className="text-xs font-semibold text-slate-700">Other Notes</span>
+                          <input
+                            type="text"
+                            value={callNotesForm.otherNotes}
+                            onChange={(e) => updateCallNotesField('otherNotes', e.target.value)}
+                            placeholder="Enter Other Notes"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                        <label className="space-y-1 md:col-span-2">
+                          <span className="text-xs font-semibold text-slate-700">Clinical Assessment / Provisional Diagnosis</span>
+                          <textarea
+                            rows={3}
+                            value={callNotesForm.clinicalAssessment}
+                            onChange={(e) => updateCallNotesField('clinicalAssessment', e.target.value)}
+                            placeholder="Enter assessment or diagnosis"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none resize-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                          />
+                        </label>
+                      </div>
+                    </section>
+
+                    <section className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Management Plan :</p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {CALL_NOTES_MANAGEMENT_OPTIONS.map((option) => (
+                          <label
+                            key={option.key}
+                            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(callNotesForm[option.key])}
+                              onChange={(e) => toggleCallNotesField(option.key, e.target.checked)}
+                            />
+                            {option.label}
+                          </label>
+                        ))}
+                      </div>
+                      <label className="mt-3 block space-y-1">
+                        <span className="text-xs font-semibold text-slate-700">Follow-up Instructions</span>
+                        <textarea
+                          rows={3}
+                          value={callNotesForm.followUpInstructions}
+                          onChange={(e) => updateCallNotesField('followUpInstructions', e.target.value)}
+                          placeholder="Enter follow-up instructions"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none resize-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                        />
                       </label>
-                      <textarea
-                        id="clinical-notes"
-                        value={notes}
-                        onChange={e => setNotes(e.target.value)}
-                        placeholder="Enter your clinical observations, diagnosis, and recommendations..."
-                        rows={5}
-                        className="w-full text-sm font-medium px-4 py-3 rounded-2xl outline-none text-slate-900 placeholder-slate-600 resize-none transition-all leading-relaxed"
-                        style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.08)' }}
-                      />
-                    </div>
-
+                    </section>
                   </div>
 
-                  {/* Sign & Complete â€” sticky bottom */}
                   <div className="shrink-0 p-4" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-                    {isPrimaryDoctor ? (
-                      <button type="button"
-                        onClick={requestCompleteConsultation}
-                        className="w-full py-3.5 rounded-2xl font-heading font-black text-slate-900 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
-                        style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
-                      >
-                        <CheckCircle2 className="w-5 h-5" /> Sign & Complete Consultation
-                      </button>
-                    ) : (
-                      <button type="button"
-                        onClick={submitInvitedDoctorNotes}
-                        className="w-full py-3.5 rounded-2xl font-heading font-black text-slate-900 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] transition-all text-sm"
-                        style={{ background: 'linear-gradient(135deg,#059669,#0e7490)', boxShadow: '0 6px 20px rgba(5,150,105,0.35)' }}
-                      >
-                        <CheckCircle2 className="w-5 h-5" /> Submit Notes & Leave
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={saveCallNote}
+                      disabled={savingCallNote}
+                      className="w-full py-3 rounded-xl border border-primary-200 bg-primary-50 text-primary-700 font-black text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingCallNote ? 'Saving...' : 'Save Call Note'}
+                    </button>
                   </div>
+                </div>
+              )}
+              {activeTab === 'notes' && !isDoctor && (
+                <div
+                  className="flex-1 overflow-y-auto p-5"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}
+                >
+                  <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-2.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Call notes</p>
+                    <p className="text-[14px] font-medium leading-6 text-slate-900 whitespace-pre-wrap">
+                      {String(notes || appointment?.consultation?.notes || '').trim() || 'Call notes are not available yet.'}
+                    </p>
+                  </section>
                 </div>
               )}
 
@@ -2279,9 +3594,29 @@ export default function MeetingRoom() {
                       rows={3}
                       className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none"
                     />
-                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                    <button
+                      type="button"
+                      onClick={() => medicalCertificateSignatureInputRef.current?.click()}
+                      disabled={uploadingSignatureFor === 'medicalCertificate'}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                       Upload Signature
                     </button>
+                    <input
+                      ref={medicalCertificateSignatureInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => handleSignatureSelect('medicalCertificate', event)}
+                      hidden
+                    />
+                    {signatureUploads.medicalCertificate ? (
+                      <p className="text-xs font-semibold text-emerald-700">
+                        Signature uploaded: {signatureUploads.medicalCertificate.name}
+                      </p>
+                    ) : null}
+                    {signatureUploadError && uploadingSignatureFor === '' ? (
+                      <p className="text-xs font-semibold text-rose-700">{signatureUploadError}</p>
+                    ) : null}
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
                       <p className="text-lg font-black text-slate-900 mb-2">Medical Certificate</p>
                       <div className="h-px bg-slate-300 mb-3" />
@@ -2318,8 +3653,13 @@ export default function MeetingRoom() {
                     <p className="text-xs font-semibold text-slate-600">
                       Please ensure all details are accurate, patient information is complete, and the certificate is formatted correctly before submitting.
                     </p>
-                    <button type="button" onClick={() => showToast('Medical certificate saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
-                      Save & Send
+                    <button
+                      type="button"
+                      onClick={handleSaveMedicalCertificate}
+                      disabled={savingGeneratedDocumentType === 'MEDICAL_CERTIFICATE' || !signatureUploads.medicalCertificate?.url}
+                      className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingGeneratedDocumentType === 'MEDICAL_CERTIFICATE' ? 'Saving...' : 'Save & Send'}
                     </button>
                   </section>
                 </div>
@@ -2329,16 +3669,55 @@ export default function MeetingRoom() {
                 <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
                   <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                     <h4 className="text-sm font-black text-slate-900">Add Specialist Referral Letter</h4>
-                    <div className="grid grid-cols-1 gap-2">
-                      <input type="text" placeholder="Search Specialist / Referred Doctor Name" value={referralForm.doctorName} onChange={(e) => setReferralForm((c) => ({ ...c, doctorName: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
-                      <input type="email" placeholder="Referred Doctor Email" value={referralForm.doctorEmail} onChange={(e) => setReferralForm((c) => ({ ...c, doctorEmail: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
-                      <input type="text" placeholder="Referred Doctor Address" value={referralForm.doctorAddress} onChange={(e) => setReferralForm((c) => ({ ...c, doctorAddress: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
-                      <input type="text" placeholder="Phone No" value={referralForm.phoneNo} onChange={(e) => setReferralForm((c) => ({ ...c, phoneNo: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
-                      <input type="text" placeholder="Medical condition for referral" value={referralForm.condition} onChange={(e) => setReferralForm((c) => ({ ...c, condition: e.target.value }))} className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        list="specialist-referral-options"
+                        placeholder={loadingReferralSpecialists ? 'Loading specialists...' : 'Search Specialist / Referred Doctor Name'}
+                        value={referralForm.doctorName}
+                        onChange={(e) => handleReferralSpecialistChange(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none"
+                      />
+                      <datalist id="specialist-referral-options">
+                        {referralSpecialists.map((item) => (
+                          <option
+                            key={item.userId}
+                            value={item?.user?.name || ''}
+                          >
+                            {item?.practitionerType || 'Specialist'}
+                          </option>
+                        ))}
+                      </datalist>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1.5">
+                        <p><strong>Email:</strong> {referralForm.doctorEmail || 'Auto-filled after specialist selection'}</p>
+                        <p><strong>Address:</strong> {referralForm.doctorAddress || 'Auto-filled after specialist selection'}</p>
+                        <p><strong>Phone:</strong> {referralForm.phoneNo || 'Auto-filled after specialist selection'}</p>
+                        <p><strong>Medical Condition:</strong> {referralForm.condition || 'Auto-filled from booking details'}</p>
+                      </div>
                     </div>
-                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                    <button
+                      type="button"
+                      onClick={() => specialistReferralSignatureInputRef.current?.click()}
+                      disabled={uploadingSignatureFor === 'specialistReferral'}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                       Upload Signature
                     </button>
+                    <input
+                      ref={specialistReferralSignatureInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => handleSignatureSelect('specialistReferral', event)}
+                      hidden
+                    />
+                    {signatureUploads.specialistReferral ? (
+                      <p className="text-xs font-semibold text-emerald-700">
+                        Signature uploaded: {signatureUploads.specialistReferral.name}
+                      </p>
+                    ) : null}
+                    {signatureUploadError && uploadingSignatureFor === '' ? (
+                      <p className="text-xs font-semibold text-rose-700">{signatureUploadError}</p>
+                    ) : null}
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
                       <p className="text-lg font-black text-slate-900 mb-2">Specialist Referral Letter</p>
                       <div className="h-px bg-slate-300 mb-3" />
@@ -2376,14 +3755,19 @@ export default function MeetingRoom() {
                     <p className="text-xs font-semibold text-slate-600">
                       Please ensure all details are accurate, patient information is complete, and the referral letter is formatted correctly before submitting.
                     </p>
-                    <button type="button" onClick={() => showToast('Specialist referral saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
-                      Save & Send
+                    <button
+                      type="button"
+                      onClick={handleSaveSpecialistReferral}
+                      disabled={savingGeneratedDocumentType === 'SPECIALIST_REFERRAL' || !signatureUploads.specialistReferral?.url}
+                      className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingGeneratedDocumentType === 'SPECIALIST_REFERRAL' ? 'Saving...' : 'Save & Send'}
                     </button>
                   </section>
                 </div>
               )}
 
-              {activeTab === 'medical-history' && isDoctor && (
+              {activeTab === 'medical-history' && (
                 <div className="flex-1 overflow-y-auto p-5 space-y-3" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.08) transparent' }}>
                   <section className="rounded-xl border border-slate-200 bg-white p-3.5">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Medical history snapshot</p>
@@ -2410,8 +3794,36 @@ export default function MeetingRoom() {
                         <p className="text-[12px] font-semibold text-slate-500">GP / medication history</p>
                         <p className="text-[14px] font-medium leading-5 text-slate-900">{String(summary?.gpMedicationHistory || '').trim() || 'Not answered'}</p>
                       </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Requested pathology tests</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">
+                          {requestedPathologyTests.length > 0 ? requestedPathologyTests.join(', ') : 'Not provided'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-slate-500">Requested radiology tests</p>
+                        <p className="text-[14px] font-medium leading-5 text-slate-900">
+                          {requestedRadiologyTests.length > 0 ? requestedRadiologyTests.join(', ') : 'Not provided'}
+                        </p>
+                      </div>
                     </div>
                   </section>
+
+                  {hasQuestionnaireResponses ? (
+                    <section className="rounded-xl border border-slate-200 bg-white p-3.5">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Questionnaire responses</p>
+                      <div className="mt-2.5 space-y-2.5">
+                        {questionnaireRows.map((row) => (
+                          <div key={`history-${row.label}`}>
+                            <p className="text-[12px] font-semibold text-slate-500">{row.label}</p>
+                            <p className="text-[14px] font-medium leading-5 text-slate-900">
+                              {String(row.value || '').trim() || 'Not answered'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
                 </div>
               )}
 
@@ -2422,11 +3834,33 @@ export default function MeetingRoom() {
                       <h4 className="text-sm font-black text-slate-900">Pathology Request</h4>
                       <button type="button" onClick={addPathologyTest} className="rounded-lg bg-primary-800 px-3 py-1.5 text-xs font-black text-white">Add New Test</button>
                     </div>
-                    <p className="text-xs text-slate-600">Please select the test from dropdown/input that needs to be performed in pathology lab.</p>
-                    <input type="text" value={pathologyTestInput} onChange={(e) => setPathologyTestInput(e.target.value)} placeholder="Choose Pathology Test (Max 10)" className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                    <p className="text-xs text-slate-600">Please select the test that needs to be performed in pathology lab. (Optional)</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {PATHOLOGY_TEST_OPTIONS.map((testOption) => {
+                        const checked = pathologyTests.includes(testOption);
+                        return (
+                          <label
+                            key={testOption}
+                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                              checked
+                                ? 'border-primary-300 bg-primary-50 text-primary-800'
+                                : 'border-slate-200 bg-white text-slate-700'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => togglePathologyTest(testOption, event.target.checked)}
+                            />
+                            <span>{testOption}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <input type="text" value={pathologyTestInput} onChange={(e) => setPathologyTestInput(e.target.value)} placeholder="Add custom pathology test" className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
                     {pathologyTests.length === 0 && (
                       <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                        Please select at least one pathology service from the dropdown above to create a letter.
+                        Please select at least one pathology service from the options above to create a letter.
                       </div>
                     )}
                     {pathologyTests.length > 0 && (
@@ -2441,9 +3875,29 @@ export default function MeetingRoom() {
                         ))}
                       </div>
                     )}
-                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                    <button
+                      type="button"
+                      onClick={() => pathologySignatureInputRef.current?.click()}
+                      disabled={uploadingSignatureFor === 'pathologyRequest'}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                       Upload Signature
                     </button>
+                    <input
+                      ref={pathologySignatureInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => handleSignatureSelect('pathologyRequest', event)}
+                      hidden
+                    />
+                    {signatureUploads.pathologyRequest ? (
+                      <p className="text-xs font-semibold text-emerald-700">
+                        Signature uploaded: {signatureUploads.pathologyRequest.name}
+                      </p>
+                    ) : null}
+                    {signatureUploadError && uploadingSignatureFor === '' ? (
+                      <p className="text-xs font-semibold text-rose-700">{signatureUploadError}</p>
+                    ) : null}
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
                       <p className="text-lg font-black text-slate-900 mb-2">Pathology Test Request</p>
                       <div className="h-px bg-slate-300 mb-3" />
@@ -2505,8 +3959,13 @@ export default function MeetingRoom() {
                     <p className="text-xs font-semibold text-slate-600">
                       Please ensure all details are accurate, patient information is complete, and the pathology letter is formatted correctly before submitting.
                     </p>
-                    <button type="button" onClick={() => showToast('Pathology request saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
-                      Save & Send
+                    <button
+                      type="button"
+                      onClick={handleSavePathologyLetter}
+                      disabled={savingGeneratedDocumentType === 'PATHOLOGY_LETTER' || !signatureUploads.pathologyRequest?.url}
+                      className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingGeneratedDocumentType === 'PATHOLOGY_LETTER' ? 'Saving...' : 'Save & Send'}
                     </button>
                   </section>
                 </div>
@@ -2519,11 +3978,33 @@ export default function MeetingRoom() {
                       <h4 className="text-sm font-black text-slate-900">Radiology Request</h4>
                       <button type="button" onClick={addRadiologyTest} className="rounded-lg bg-primary-800 px-3 py-1.5 text-xs font-black text-white">Add New Test</button>
                     </div>
-                    <p className="text-xs text-slate-600">Please select tests required in radiology. For each selected service, a report will be provided.</p>
-                    <input type="text" value={radiologyTestInput} onChange={(e) => setRadiologyTestInput(e.target.value)} placeholder="Choose Radiology Tests (Max 10)" className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
+                    <p className="text-xs text-slate-600">Please select the test from the dropdown that needs to be performed in pathology lab. (Optional)</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {RADIOLOGY_TEST_OPTIONS.map((testOption) => {
+                        const checked = radiologyTests.includes(testOption);
+                        return (
+                          <label
+                            key={testOption}
+                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                              checked
+                                ? 'border-primary-300 bg-primary-50 text-primary-800'
+                                : 'border-slate-200 bg-white text-slate-700'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => toggleRadiologyTest(testOption, event.target.checked)}
+                            />
+                            <span>{testOption}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <input type="text" value={radiologyTestInput} onChange={(e) => setRadiologyTestInput(e.target.value)} placeholder="Add custom radiology test" className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none" />
                     {radiologyTests.length === 0 && (
                       <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                        Please select at least one radiology service from the dropdown above to create a letter.
+                        Please select at least one radiology service from the options above to create a letter.
                       </div>
                     )}
                     {radiologyTests.length > 0 && (
@@ -2538,9 +4019,29 @@ export default function MeetingRoom() {
                         ))}
                       </div>
                     )}
-                    <button type="button" onClick={() => showComingSoon('Signature upload')} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700">
+                    <button
+                      type="button"
+                      onClick={() => radiologySignatureInputRef.current?.click()}
+                      disabled={uploadingSignatureFor === 'radiologyRequest'}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                       Upload Signature
                     </button>
+                    <input
+                      ref={radiologySignatureInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => handleSignatureSelect('radiologyRequest', event)}
+                      hidden
+                    />
+                    {signatureUploads.radiologyRequest ? (
+                      <p className="text-xs font-semibold text-emerald-700">
+                        Signature uploaded: {signatureUploads.radiologyRequest.name}
+                      </p>
+                    ) : null}
+                    {signatureUploadError && uploadingSignatureFor === '' ? (
+                      <p className="text-xs font-semibold text-rose-700">{signatureUploadError}</p>
+                    ) : null}
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
                       <p className="text-lg font-black text-slate-900 mb-2">Radiology Test Request</p>
                       <div className="h-px bg-slate-300 mb-3" />
@@ -2602,8 +4103,13 @@ export default function MeetingRoom() {
                     <p className="text-xs font-semibold text-slate-600">
                       Please ensure all details are accurate, patient information is complete, and the radiology letter is formatted correctly before submitting.
                     </p>
-                    <button type="button" onClick={() => showToast('Radiology request saved.')} className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white">
-                      Save & Send
+                    <button
+                      type="button"
+                      onClick={handleSaveRadiologyLetter}
+                      disabled={savingGeneratedDocumentType === 'RADIOLOGY_LETTER' || !signatureUploads.radiologyRequest?.url}
+                      className="w-full rounded-xl bg-primary-800 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingGeneratedDocumentType === 'RADIOLOGY_LETTER' ? 'Saving...' : 'Save & Send'}
                     </button>
                   </section>
                 </div>
@@ -2617,7 +4123,7 @@ export default function MeetingRoom() {
   );
 }
 
-/* â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Sub-components ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
 
 /* Small round button INSIDE the video overlay */
 function VideoOverlayBtn({ icon, label, onClick, danger }) {
@@ -2665,5 +4171,11 @@ function TabBtn({ icon, label, active, onClick, badge, accent }) {
     </button>
   );
 }
+
+
+
+
+
+
 
 

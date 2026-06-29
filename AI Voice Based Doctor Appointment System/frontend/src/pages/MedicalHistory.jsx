@@ -21,8 +21,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const EMPTY_STATE_IMAGE =
   'https://cdn-icons-png.flaticon.com/512/4076/4076432.png';
 const ITEMS_PER_PAGE = 9;
+const PATIENT_APPOINTMENTS_ROUTE = '/patient/account?tab=medical-history';
 
 function safeDate(value) {
+  if (value === null || value === undefined || value === '') return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -232,7 +234,7 @@ export default function MedicalHistory() {
             <button type="button" onClick={() => navigate('/patient/account?tab=medical-history')}>
               Medical Documents
             </button>
-            <button type="button" onClick={() => navigate('/dashboard')}>
+            <button type="button" onClick={() => navigate(PATIENT_APPOINTMENTS_ROUTE)}>
               Invoice
             </button>
           </div>

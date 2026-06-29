@@ -1,23 +1,14 @@
 const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const path = require('path');
 const { formatDoctorName } = require('../utils/doctorName');
+const { uploadBufferToS3 } = require('./s3UploadService');
 
 exports.generatePrescriptionPDF = async (appointment, consultation) => {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 50 });
-      
+      const chunks = [];
       const fileName = `prescription_${appointment.id}.pdf`;
-      const dirPath = path.join(__dirname, '../../public/prescriptions');
-      
-      if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-      }
-      
-      const filePath = path.join(dirPath, fileName);
-      const writeStream = fs.createWriteStream(filePath);
-      doc.pipe(writeStream);
+      doc.on('data', (chunk) => chunks.push(chunk));
 
       // Header
       doc.fontSize(24).font('Helvetica-Bold').text('CareBridge', { align: 'center' });
@@ -50,8 +41,33 @@ exports.generatePrescriptionPDF = async (appointment, consultation) => {
       doc.font('Helvetica-Bold').text('Prescription:');
       if (consultation.prescription && Array.isArray(consultation.prescription) && consultation.prescription.length > 0) {
         consultation.prescription.forEach((med, index) => {
-          doc.font('Helvetica-Bold').text(`${index + 1}. ${med.name}`);
-          doc.font('Helvetica').text(`   Dosage: ${med.dosage} | Frequency: ${med.frequency} | Duration: ${med.duration}`);
+          const medicineName = String(med?.drugName || med?.name || 'Medicine').trim();
+          const dosageLabel = String(
+            med?.dosage ||
+            `${String(med?.dose || '').trim()}${med?.doseUnit ? ` ${String(med.doseUnit).trim()}` : ''}`.trim()
+          ).trim();
+          const frequencyLabel = String(med?.frequency || '').trim();
+          const durationLabel = String(
+            med?.duration ||
+            `${String(med?.durationValue || '').trim()}${med?.durationUnit ? ` ${String(med.durationUnit).trim()}` : ''}`.trim()
+          ).trim();
+          const routeLabel = String(med?.route || '').trim();
+          const repeatsLabel = String(med?.repeats || '').trim();
+          const directionsLabel = String(med?.directions || '').trim();
+
+          doc.font('Helvetica-Bold').text(`${index + 1}. ${medicineName}`);
+          doc.font('Helvetica').text(
+            `   Dosage: ${dosageLabel || 'N/A'} | Frequency: ${frequencyLabel || 'N/A'} | Duration: ${durationLabel || 'N/A'}`
+          );
+          if (routeLabel) {
+            doc.font('Helvetica').text(`   Route: ${routeLabel}`);
+          }
+          if (repeatsLabel) {
+            doc.font('Helvetica').text(`   Repeats: ${repeatsLabel}`);
+          }
+          if (directionsLabel) {
+            doc.font('Helvetica').text(`   Directions: ${directionsLabel}`);
+          }
           doc.moveDown(0.5);
         });
       } else {
@@ -64,14 +80,26 @@ exports.generatePrescriptionPDF = async (appointment, consultation) => {
 
       doc.end();
 
-      writeStream.on('finish', () => {
-        resolve(`/prescriptions/${fileName}`);
+      doc.on('end', async () => {
+        try {
+          const pdfBuffer = Buffer.concat(chunks);
+          const uploaded = await uploadBufferToS3({
+            file: {
+              buffer: pdfBuffer,
+              size: pdfBuffer.length,
+              mimetype: 'application/pdf',
+              originalname: fileName,
+            },
+            userId: appointment.patientId || appointment.patient?.id || appointment.id,
+            context: 'prescriptions',
+          });
+          resolve(uploaded.url);
+        } catch (uploadError) {
+          reject(uploadError);
+        }
       });
 
-      writeStream.on('error', (err) => {
-        reject(err);
-      });
-
+      doc.on('error', (err) => reject(err));
     } catch (err) {
       reject(err);
     }

@@ -7,11 +7,13 @@ import AppIcon from '../components/branding/AppIcon';
 import { getServiceRate } from '../data/practitionerServiceCatalog';
 import { formatDoctorName } from '../utils/doctorName';
 import { getPractitionerTypeLabel } from '../utils/doctorConsultation';
+import useServiceNavigation from '../hooks/useServiceNavigation';
 import {
   getServiceRateFromMap,
   normalizeStringArray,
   parseDoctorServiceSelections,
 } from '../utils/doctorServices';
+import { uploadFileToS3 } from '../utils/fileUpload';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -76,6 +78,71 @@ const MODE_OPTIONS = [
   { value: 'IN_PERSON', label: 'In-Person Doctor Visit' },
 ];
 
+const PRESCRIPTION_YES_NO_QUESTIONS = [
+  {
+    key: 'chronicConditions',
+    label: '2. Do you have any chronic conditions? (e.g., diabetes, hypertension)',
+  },
+  {
+    key: 'takingMedications',
+    label: '3. Are you currently taking any medications?',
+  },
+  {
+    key: 'recentSurgeriesOrHospitalizations',
+    label: '4. Have you undergone any recent surgeries or hospitalizations?',
+  },
+  {
+    key: 'needsLanguageOrMobilityAssistance',
+    label: '5. Do you need assistance with language or mobility?',
+  },
+  {
+    key: 'seenDoctorForIssueBefore',
+    label: '6. Have you seen a doctor for this issue before?',
+  },
+];
+
+const EMPTY_PRESCRIPTION_QUESTIONNAIRE = {
+  chronicConditions: '',
+  takingMedications: '',
+  recentSurgeriesOrHospitalizations: '',
+  needsLanguageOrMobilityAssistance: '',
+  seenDoctorForIssueBefore: '',
+  symptomDuration: '',
+  symptomSeverity: '',
+  additionalInformation: '',
+};
+
+const BLOOD_TEST_OPTIONS = [
+  'Vitamin D',
+  'Full Blood Count (FBC)',
+  'Liver Function Tests (LFT)',
+  'TSH',
+  'High Density Lipoprotein (HDL)',
+  'Low Density Lipoprotein (LDL)',
+  'Fasting Glucose',
+  'Cholesterol',
+  'Triglycerides',
+  'Calcium, Magnesium, Phosphate',
+  'Blood Test',
+  'Electrolytes And Kidney Function',
+];
+
+const RADIOLOGY_TEST_OPTIONS = [
+  'Head',
+  'Jaw',
+  'Nose',
+  'Back',
+  'Fingers',
+  'Ankle',
+  'Knee',
+  'Head/Brain',
+];
+
+const normalizeYesNo = (value) => {
+  const next = String(value || '').trim().toUpperCase();
+  return next === 'YES' || next === 'NO' ? next : '';
+};
+
 const toIsoDate = (date) => date.toISOString().split('T')[0];
 
 const getDateWithOffset = (offsetDays = 0) => {
@@ -134,6 +201,7 @@ export default function BookingFlowPage() {
   const { doctorId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const navigateToService = useServiceNavigation();
   const token = localStorage.getItem('token');
 
   const doctorPreview = location.state?.doctorPreview || null;
@@ -171,7 +239,29 @@ export default function BookingFlowPage() {
   const [recentConsultationResponse, setRecentConsultationResponse] = useState(
     String(aiSummary?.recentConsultationResponse || '').trim()
   );
-  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploadedFiles, setUploadedFiles] = useState(() => {
+    if (Array.isArray(aiSummary?.attachedFiles) && aiSummary.attachedFiles.length > 0) {
+      return aiSummary.attachedFiles.map((file, index) => ({
+        key: String(file?.key || `existing-file-${index}`),
+        name: String(file?.name || `File ${index + 1}`),
+        url: String(file?.url || ''),
+        contentType: String(file?.contentType || ''),
+        size: Number(file?.size || 0),
+      }));
+    }
+    if (Array.isArray(aiSummary?.attachedFileNames) && aiSummary.attachedFileNames.length > 0) {
+      return aiSummary.attachedFileNames.map((fileName, index) => ({
+        key: `existing-name-${index}`,
+        name: String(fileName || '').trim() || `File ${index + 1}`,
+        url: '',
+        contentType: '',
+        size: 0,
+      }));
+    }
+    return [];
+  });
+  const [isFilesUploading, setIsFilesUploading] = useState(false);
+  const [filesUploadError, setFilesUploadError] = useState('');
 
   const [bookingType, setBookingType] = useState(
     sourceBookingType === 'ON_DEMAND' || sourceBookingType === 'SCHEDULED'
@@ -198,6 +288,29 @@ export default function BookingFlowPage() {
   const [currentGpName, setCurrentGpName] = useState(String(aiSummary?.currentGpName || '').trim());
   const [currentGpEmail, setCurrentGpEmail] = useState(String(aiSummary?.currentGpEmail || '').trim());
   const [medicineName, setMedicineName] = useState(String(aiSummary?.medicineName || '').trim());
+  const [prescriptionQuestionnaire, setPrescriptionQuestionnaire] = useState(() => {
+    const summaryQuestionnaire =
+      aiSummary?.prescriptionQuestionnaire && typeof aiSummary.prescriptionQuestionnaire === 'object'
+        ? aiSummary.prescriptionQuestionnaire
+        : {};
+    return {
+      ...EMPTY_PRESCRIPTION_QUESTIONNAIRE,
+      chronicConditions: normalizeYesNo(summaryQuestionnaire.chronicConditions),
+      takingMedications: normalizeYesNo(summaryQuestionnaire.takingMedications),
+      recentSurgeriesOrHospitalizations: normalizeYesNo(summaryQuestionnaire.recentSurgeriesOrHospitalizations),
+      needsLanguageOrMobilityAssistance: normalizeYesNo(summaryQuestionnaire.needsLanguageOrMobilityAssistance),
+      seenDoctorForIssueBefore: normalizeYesNo(summaryQuestionnaire.seenDoctorForIssueBefore),
+      symptomDuration: String(summaryQuestionnaire.symptomDuration || '').trim(),
+      symptomSeverity: String(summaryQuestionnaire.symptomSeverity || '').trim(),
+      additionalInformation: String(summaryQuestionnaire.additionalInformation || '').trim(),
+    };
+  });
+  const [selectedBloodTests, setSelectedBloodTests] = useState(() =>
+    normalizeStringArray(aiSummary?.selectedBloodTests || aiSummary?.pathologyTests)
+  );
+  const [selectedRadiologyTests, setSelectedRadiologyTests] = useState(() =>
+    normalizeStringArray(aiSummary?.selectedRadiologyTests || aiSummary?.radiologyTests)
+  );
   const [showConditionPicker, setShowConditionPicker] = useState(false);
   const [draftMedicalConditions, setDraftMedicalConditions] = useState([]);
   const [conditionSearchTerm, setConditionSearchTerm] = useState('');
@@ -348,6 +461,49 @@ export default function BookingFlowPage() {
     return offeredServiceOptions[0] || 'General Consultation';
   }, [offeredServiceOptions, selectedServiceName]);
 
+  const isBloodTestService = useMemo(() => {
+    const normalized = String(resolvedServiceName || '').trim().toLowerCase();
+    return normalized.includes('blood test');
+  }, [resolvedServiceName]);
+
+  const isRadiologyService = useMemo(() => {
+    const normalizedService = String(resolvedServiceName || '').trim().toLowerCase();
+    const normalizedType = String(selectedServiceType || sourceServiceType || '').trim().toLowerCase();
+    return (
+      normalizedType.includes('radiology') ||
+      normalizedService.includes('radiology') ||
+      normalizedService.includes('ct scan') ||
+      normalizedService.includes('x-ray') ||
+      normalizedService.includes('xray') ||
+      normalizedService.includes('mri')
+    );
+  }, [resolvedServiceName, selectedServiceType, sourceServiceType]);
+
+  const isDetailedQuestionnaireBooking = useMemo(() => {
+    const normalized = String(resolvedServiceName || '').trim().toLowerCase();
+    return normalized !== 'standard consultation' && !isRadiologyService;
+  }, [isRadiologyService, resolvedServiceName]);
+
+  const toggleBloodTest = (testName, checked) => {
+    const normalized = String(testName || '').trim();
+    if (!normalized) return;
+    setSelectedBloodTests((current) =>
+      checked
+        ? normalizeStringArray([...current, normalized])
+        : current.filter((item) => item !== normalized)
+    );
+  };
+
+  const toggleRadiologyTest = (testName, checked) => {
+    const normalized = String(testName || '').trim();
+    if (!normalized) return;
+    setSelectedRadiologyTests((current) =>
+      checked
+        ? normalizeStringArray([...current, normalized])
+        : current.filter((item) => item !== normalized)
+    );
+  };
+
   const consultationFee = useMemo(() => {
     const mappedRate = Number(getServiceRateFromMap(doctor?.offeredServiceRates, resolvedServiceName));
     if (Number.isFinite(mappedRate) && mappedRate > 0) return Number(mappedRate.toFixed(2));
@@ -370,6 +526,36 @@ export default function BookingFlowPage() {
   const consultationForLabel = selectedPatientId === 'self'
     ? 'Myself'
     : familyMembers.find((member) => String(member.id) === selectedPatientId)?.name || 'Family';
+
+  const handleServiceBreadcrumbClick = () => {
+    if (!resolvedServiceName) {
+      navigate('/booking');
+      return;
+    }
+    navigateToService(resolvedServiceName);
+  };
+
+  const handleDoctorBreadcrumbClick = () => {
+    if (!doctorId) {
+      navigate('/booking');
+      return;
+    }
+    navigate(`/booking/doctor/${doctorId}`, {
+      state: {
+        aiSummary,
+        selectedPatientId,
+        serviceName: resolvedServiceName,
+        serviceType: selectedServiceType,
+        doctorPreview: {
+          id: doctorId,
+          name: doctor?.name || '',
+          practitionerType: doctor?.practitionerType || '',
+          qualification: doctor?.qualification || '',
+          yearsExperience: doctor?.yearsExperience || 0,
+        },
+      },
+    });
+  };
 
   const availableConditionOptions = useMemo(() => {
     const merged = [...CONDITION_LIBRARY, ...selectedMedicalConditions, ...draftMedicalConditions];
@@ -410,6 +596,40 @@ export default function BookingFlowPage() {
       delete next[fieldKey];
       return next;
     });
+  };
+
+  const updatePrescriptionQuestionnaire = (field, value) => {
+    setPrescriptionQuestionnaire((current) => ({ ...current, [field]: value }));
+    clearValidationError(`rx.${field}`);
+  };
+
+  const handleBookingFilesSelect = async (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    setIsFilesUploading(true);
+    setFilesUploadError('');
+    try {
+      const uploads = await Promise.all(
+        selectedFiles.map((file) => uploadFileToS3(file, 'appointment-attachments'))
+      );
+      setUploadedFiles((current) => [
+        ...current,
+        ...uploads.map((uploadedFile, index) => ({
+          key: String(uploadedFile?.key || `uploaded-${Date.now()}-${index}`),
+          name: String(uploadedFile?.name || selectedFiles[index]?.name || 'File'),
+          url: String(uploadedFile?.url || ''),
+          contentType: String(uploadedFile?.contentType || ''),
+          size: Number(uploadedFile?.size || 0),
+        })),
+      ]);
+    } catch (error) {
+      console.error('Failed to upload booking files', error);
+      setFilesUploadError(error?.response?.data?.error || 'Could not upload file(s). Please try again.');
+    } finally {
+      setIsFilesUploading(false);
+      event.target.value = '';
+    }
   };
 
   const openConditionPicker = () => {
@@ -559,6 +779,34 @@ export default function BookingFlowPage() {
       }
     }
 
+    if (currentStep === 2 && isDetailedQuestionnaireBooking) {
+      if (!normalizeYesNo(recentConsultationResponse)) {
+        nextErrors['rx.recentConsultationResponse'] = 'Please select Yes or No.';
+      }
+
+      PRESCRIPTION_YES_NO_QUESTIONS.forEach((question) => {
+        if (!normalizeYesNo(prescriptionQuestionnaire[question.key])) {
+          nextErrors[`rx.${question.key}`] = 'Please select Yes or No.';
+        }
+      });
+
+      if (!String(prescriptionQuestionnaire.symptomDuration || '').trim()) {
+        nextErrors['rx.symptomDuration'] = 'Please enter symptom duration.';
+      }
+
+      const severityRaw = String(prescriptionQuestionnaire.symptomSeverity || '').trim();
+      const severityValue = Number(severityRaw);
+      if (!severityRaw) {
+        nextErrors['rx.symptomSeverity'] = 'Please enter severity between 1 and 10.';
+      } else if (!Number.isFinite(severityValue) || severityValue < 1 || severityValue > 10) {
+        nextErrors['rx.symptomSeverity'] = 'Severity must be a number between 1 and 10.';
+      }
+
+      if (!String(prescriptionQuestionnaire.additionalInformation || '').trim()) {
+        nextErrors['rx.additionalInformation'] = 'Please provide this information.';
+      }
+    }
+
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors((current) => ({ ...current, ...nextErrors }));
       return;
@@ -569,6 +817,15 @@ export default function BookingFlowPage() {
       if (currentStep === 1) {
         delete next.reasonForRequest;
         delete next.selectedPatientId;
+      }
+      if (currentStep === 2) {
+        delete next['rx.recentConsultationResponse'];
+        PRESCRIPTION_YES_NO_QUESTIONS.forEach((question) => {
+          delete next[`rx.${question.key}`];
+        });
+        delete next['rx.symptomDuration'];
+        delete next['rx.symptomSeverity'];
+        delete next['rx.additionalInformation'];
       }
       return next;
     });
@@ -620,6 +877,10 @@ export default function BookingFlowPage() {
       setDoctorError('Doctor information is missing. Please go back and select a doctor again.');
       return;
     }
+    if (isFilesUploading) {
+      setFilesUploadError('Please wait for file uploads to complete.');
+      return;
+    }
 
     clearValidationError('acceptedTerms');
     setProcessingPayment(true);
@@ -647,6 +908,36 @@ export default function BookingFlowPage() {
           : '',
         allergies: allergies.trim(),
         attachedFileNames: uploadedFiles.map((file) => file.name),
+        attachedFiles: uploadedFiles.map((file) => ({
+          key: file.key,
+          name: file.name,
+          url: file.url,
+          contentType: file.contentType,
+          size: file.size,
+        })),
+        selectedBloodTests: isBloodTestService ? selectedBloodTests : [],
+        pathologyTests: isBloodTestService ? selectedBloodTests : [],
+        selectedRadiologyTests: isRadiologyService ? selectedRadiologyTests : [],
+        radiologyTests: isRadiologyService ? selectedRadiologyTests : [],
+        ...(isDetailedQuestionnaireBooking
+          ? {
+            prescriptionQuestionnaire: {
+              consultedWithinLast12Months: normalizeYesNo(recentConsultationResponse),
+              chronicConditions: normalizeYesNo(prescriptionQuestionnaire.chronicConditions),
+              takingMedications: normalizeYesNo(prescriptionQuestionnaire.takingMedications),
+              recentSurgeriesOrHospitalizations: normalizeYesNo(
+                prescriptionQuestionnaire.recentSurgeriesOrHospitalizations
+              ),
+              needsLanguageOrMobilityAssistance: normalizeYesNo(
+                prescriptionQuestionnaire.needsLanguageOrMobilityAssistance
+              ),
+              seenDoctorForIssueBefore: normalizeYesNo(prescriptionQuestionnaire.seenDoctorForIssueBefore),
+              symptomDuration: String(prescriptionQuestionnaire.symptomDuration || '').trim(),
+              symptomSeverity: String(prescriptionQuestionnaire.symptomSeverity || '').trim(),
+              additionalInformation: String(prescriptionQuestionnaire.additionalInformation || '').trim(),
+            },
+          }
+          : {}),
       };
 
       const { data: appointment } = await axios.post(
@@ -903,11 +1194,29 @@ export default function BookingFlowPage() {
 
       <section className="mx-auto w-[min(1080px,calc(100%-48px))] pb-16 pt-[112px] max-md:w-[calc(100%-24px)] max-md:pb-14 max-md:pt-[96px]">
         <div className="mb-[18px] flex items-center gap-2 text-[13px] font-bold text-slate-500">
-          <span>Home</span>
+          <button
+            type="button"
+            className="bg-transparent p-0 text-[13px] font-bold text-inherit hover:text-cyan-800 hover:underline"
+            onClick={() => navigate('/home')}
+          >
+            Home
+          </button>
           <span>/</span>
-          <span>{resolvedServiceName || 'Standard Consultation'}</span>
+          <button
+            type="button"
+            className="bg-transparent p-0 text-[13px] font-bold text-inherit hover:text-cyan-800 hover:underline"
+            onClick={handleServiceBreadcrumbClick}
+          >
+            {resolvedServiceName || 'Standard Consultation'}
+          </button>
           <span>/</span>
-          <strong className="text-cyan-800">{formattedDoctorName}</strong>
+          <button
+            type="button"
+            className="bg-transparent p-0 text-[13px] font-extrabold text-cyan-800 hover:underline"
+            onClick={handleDoctorBreadcrumbClick}
+          >
+            {formattedDoctorName}
+          </button>
         </div>
 
         <article className="mb-3.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(14,116,144,0.08)]">
@@ -1065,14 +1374,22 @@ export default function BookingFlowPage() {
                     <input
                       id="booking-flow-files"
                       type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
                       multiple
-                      onChange={(event) => setUploadedFiles(Array.from(event.target.files || []))}
+                      onChange={handleBookingFilesSelect}
+                      disabled={isFilesUploading}
                       hidden
                     />
+                    {isFilesUploading ? (
+                      <p className="mt-2 text-[13px] font-bold text-cyan-700">Uploading file(s)...</p>
+                    ) : null}
+                    {filesUploadError ? (
+                      <p className="mt-2 text-[13px] font-bold text-red-700">{filesUploadError}</p>
+                    ) : null}
                     {uploadedFiles.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {uploadedFiles.map((file) => (
-                          <span key={`${file.name}-${file.lastModified}`} className="max-w-full truncate rounded-full border border-sky-200 bg-cyan-50 px-2.5 py-1 text-[12px] font-extrabold text-cyan-800">
+                          <span key={file.key} className="max-w-full truncate rounded-full border border-sky-200 bg-cyan-50 px-2.5 py-1 text-[12px] font-extrabold text-cyan-800">
                             {file.name}
                           </span>
                         ))}
@@ -1081,28 +1398,30 @@ export default function BookingFlowPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-sky-50/30 p-3 lg:col-span-2">
-                  <h3 className="mb-2.5 font-heading text-[16px] font-black text-slate-900">Recent consultation history</h3>
-                  <div>
-                    <label className="mb-2 block text-[14px] font-black text-slate-700">Have you consulted any doctor or visited a partner clinic in the last 12 months?</label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className={choiceButtonClass(recentConsultationResponse === 'YES')}
-                        onClick={() => setRecentConsultationResponse('YES')}
-                      >
-                        Yes
-                      </button>
-                      <button
-                        type="button"
-                        className={choiceButtonClass(recentConsultationResponse === 'NO')}
-                        onClick={() => setRecentConsultationResponse('NO')}
-                      >
-                        No
-                      </button>
+                {!isDetailedQuestionnaireBooking ? (
+                  <div className="rounded-xl border border-slate-200 bg-sky-50/30 p-3 lg:col-span-2">
+                    <h3 className="mb-2.5 font-heading text-[16px] font-black text-slate-900">Recent consultation history</h3>
+                    <div>
+                      <label className="mb-2 block text-[14px] font-black text-slate-700">Have you consulted any doctor or visited a partner clinic in the last 12 months?</label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className={choiceButtonClass(recentConsultationResponse === 'YES')}
+                          onClick={() => setRecentConsultationResponse('YES')}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          className={choiceButtonClass(recentConsultationResponse === 'NO')}
+                          onClick={() => setRecentConsultationResponse('NO')}
+                        >
+                          No
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : null}
               </div>
             </section>
           ) : null}
@@ -1120,6 +1439,235 @@ export default function BookingFlowPage() {
                   <h3 className="font-heading text-[18px] font-black text-slate-900">Clinical Background</h3>
                   <p className="mt-1 text-[13px] font-bold text-slate-500">Help your doctor understand your condition before the consultation.</p>
                 </div>
+
+                {isDetailedQuestionnaireBooking ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="mb-3 text-[14px] font-black text-slate-800">
+                      Kindly select Yes or No as your response to the question.
+                    </p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="mb-2 block text-[14px] font-black text-slate-700">
+                          1. Have you consulted with any of our doctors or visited a partner clinic within the last 12 months?
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className={choiceButtonClass(recentConsultationResponse === 'YES')}
+                            onClick={() => {
+                              setRecentConsultationResponse('YES');
+                              clearValidationError('rx.recentConsultationResponse');
+                            }}
+                          >
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            className={choiceButtonClass(recentConsultationResponse === 'NO')}
+                            onClick={() => {
+                              setRecentConsultationResponse('NO');
+                              clearValidationError('rx.recentConsultationResponse');
+                            }}
+                          >
+                            No
+                          </button>
+                        </div>
+                        {validationErrors['rx.recentConsultationResponse'] ? (
+                          <p className="mt-2 text-[13px] font-bold text-red-700">
+                            {validationErrors['rx.recentConsultationResponse']}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      {PRESCRIPTION_YES_NO_QUESTIONS.map((question) => (
+                        <div key={question.key}>
+                          <label className="mb-2 block text-[14px] font-black text-slate-700">{question.label}</label>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className={choiceButtonClass(prescriptionQuestionnaire[question.key] === 'YES')}
+                              onClick={() => updatePrescriptionQuestionnaire(question.key, 'YES')}
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              className={choiceButtonClass(prescriptionQuestionnaire[question.key] === 'NO')}
+                              onClick={() => updatePrescriptionQuestionnaire(question.key, 'NO')}
+                            >
+                              No
+                            </button>
+                          </div>
+                          {validationErrors[`rx.${question.key}`] ? (
+                            <p className="mt-2 text-[13px] font-bold text-red-700">
+                              {validationErrors[`rx.${question.key}`]}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+
+                      <div>
+                        <label htmlFor="booking-flow-rx-duration" className="mb-2 block text-[14px] font-black text-slate-700">
+                          7. How long have you had these symptoms?
+                        </label>
+                        <input
+                          id="booking-flow-rx-duration"
+                          type="text"
+                          className={formControlClass(Boolean(validationErrors['rx.symptomDuration']))}
+                          value={prescriptionQuestionnaire.symptomDuration}
+                          onChange={(event) => updatePrescriptionQuestionnaire('symptomDuration', event.target.value)}
+                          placeholder="Enter Your Answer"
+                        />
+                        {validationErrors['rx.symptomDuration'] ? (
+                          <p className="mt-2 text-[13px] font-bold text-red-700">{validationErrors['rx.symptomDuration']}</p>
+                        ) : null}
+                      </div>
+
+                      <div>
+                        <label htmlFor="booking-flow-rx-severity" className="mb-2 block text-[14px] font-black text-slate-700">
+                          8. On a scale of 1-10, how severe are your symptoms?
+                        </label>
+                        <input
+                          id="booking-flow-rx-severity"
+                          type="number"
+                          min="1"
+                          max="10"
+                          className={formControlClass(Boolean(validationErrors['rx.symptomSeverity']))}
+                          value={prescriptionQuestionnaire.symptomSeverity}
+                          onChange={(event) => updatePrescriptionQuestionnaire('symptomSeverity', event.target.value)}
+                          placeholder="Enter Your Answer"
+                        />
+                        {validationErrors['rx.symptomSeverity'] ? (
+                          <p className="mt-2 text-[13px] font-bold text-red-700">{validationErrors['rx.symptomSeverity']}</p>
+                        ) : null}
+                      </div>
+
+                      <div>
+                        <label htmlFor="booking-flow-rx-info" className="mb-2 block text-[14px] font-black text-slate-700">
+                          9. Is there any other information your doctor should know before the consultation?
+                        </label>
+                        <textarea
+                          id="booking-flow-rx-info"
+                          className={formControlClass(Boolean(validationErrors['rx.additionalInformation']))}
+                          value={prescriptionQuestionnaire.additionalInformation}
+                          onChange={(event) => updatePrescriptionQuestionnaire('additionalInformation', event.target.value)}
+                          rows={3}
+                          placeholder="Enter Your Answer"
+                        />
+                        {validationErrors['rx.additionalInformation'] ? (
+                          <p className="mt-2 text-[13px] font-bold text-red-700">{validationErrors['rx.additionalInformation']}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {isBloodTestService ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="mb-3 text-[14px] font-black text-slate-800">
+                      Please select the test that needs to be performed in pathology lab. (Optional)
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {BLOOD_TEST_OPTIONS.map((testOption) => {
+                        const checked = selectedBloodTests.includes(testOption);
+                        return (
+                          <label
+                            key={testOption}
+                            className="grid cursor-pointer grid-cols-[16px_minmax(0,1fr)] items-center gap-x-2.5 rounded-[10px] border border-slate-200 bg-white px-3 py-2.5"
+                          >
+                            <input
+                              className="m-0 h-4 w-4 shrink-0 self-center accent-cyan-700"
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => toggleBloodTest(testOption, event.target.checked)}
+                            />
+                            <span className="m-0 self-center text-[13px] font-extrabold leading-5 text-slate-700">
+                              {testOption}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {selectedBloodTests.length > 0 ? (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {selectedBloodTests.map((testName) => (
+                          <span
+                            key={testName}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-cyan-50 px-2.5 py-1 text-[12px] font-extrabold text-cyan-800"
+                          >
+                            {testName}
+                            <button
+                              type="button"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full text-cyan-800 hover:bg-cyan-100"
+                              onClick={() =>
+                                setSelectedBloodTests((current) =>
+                                  current.filter((item) => item !== testName)
+                                )
+                              }
+                              aria-label={`Remove ${testName}`}
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {isRadiologyService ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="mb-3 text-[14px] font-black text-slate-800">
+                      Please select the test from the dropdown that needs to be performed in pathology lab. (Optional)
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {RADIOLOGY_TEST_OPTIONS.map((testOption) => {
+                        const checked = selectedRadiologyTests.includes(testOption);
+                        return (
+                          <label
+                            key={testOption}
+                            className="grid cursor-pointer grid-cols-[16px_minmax(0,1fr)] items-center gap-x-2.5 rounded-[10px] border border-slate-200 bg-white px-3 py-2.5"
+                          >
+                            <input
+                              className="m-0 h-4 w-4 shrink-0 self-center accent-cyan-700"
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => toggleRadiologyTest(testOption, event.target.checked)}
+                            />
+                            <span className="m-0 self-center text-[13px] font-extrabold leading-5 text-slate-700">
+                              {testOption}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {selectedRadiologyTests.length > 0 ? (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {selectedRadiologyTests.map((testName) => (
+                          <span
+                            key={testName}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-cyan-50 px-2.5 py-1 text-[12px] font-extrabold text-cyan-800"
+                          >
+                            {testName}
+                            <button
+                              type="button"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full text-cyan-800 hover:bg-cyan-100"
+                              onClick={() =>
+                                setSelectedRadiologyTests((current) =>
+                                  current.filter((item) => item !== testName)
+                                )
+                              }
+                              aria-label={`Remove ${testName}`}
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div>
                   <label className="mb-2 block text-[14px] font-black text-slate-700">Medical Conditions (Optional)</label>

@@ -7,6 +7,7 @@ const {
   getUserAppointments,
   inviteDoctor,
   submitDoctorNote,
+  saveGeneratedDocument,
   getAppointmentById,
   moveToGeneralQueue,
 } = require('../controllers/appointmentController');
@@ -23,5 +24,6 @@ router.put('/:id/status', authenticate, updateStatus);
 router.post('/:id/move-to-general', authenticate, moveToGeneralQueue);
 router.post('/:id/invite', authenticate, inviteDoctor);
 router.post('/:id/notes', authenticate, submitDoctorNote);
+router.post('/:id/documents', authenticate, saveGeneratedDocument);
 
 module.exports = router;

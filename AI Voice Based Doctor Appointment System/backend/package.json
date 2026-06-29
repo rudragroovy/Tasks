@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
+    "migrate:prescriptions:s3:dry": "node src/scripts/migratePrescriptionUrlsToS3.js",
+    "migrate:prescriptions:s3": "node src/scripts/migratePrescriptionUrlsToS3.js --apply",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@prisma/client": "^6.19.3",
     "agora-access-token": "^2.0.4",
     "axios": "^1.18.0",

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import {
   BrowserRouter as Router,
   Navigate,
@@ -8,6 +8,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
+import axios from 'axios';
 import { useAuth } from './context/AuthContext';
 import AuthModal from './components/auth/AuthModal';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -37,6 +38,7 @@ const PatientDoctorReviews = lazy(() => import('./pages/PatientDoctorReviews'));
 const PatientAccount = lazy(() => import('./pages/PatientAccount'));
 const ServiceTypePage = lazy(() => import('./pages/ServiceTypePage'));
 const BookingFlowPage = lazy(() => import('./pages/BookingFlowPage'));
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function getDefaultPostAuthPath(user) {
   if (user?.role === 'ADMIN') return '/admin';
@@ -83,6 +85,111 @@ function ProtectedRoute({ children }) {
     return <RequireAuthRedirect redirectTo={`${location.pathname}${location.search}`} />;
   }
   return children;
+}
+
+function getJoinRouteForAppointment(appointment, role) {
+  if (!appointment?.id) return '/dashboard';
+  const mode = String(appointment.consultationMode || '').toUpperCase();
+  if (mode === 'IN_PERSON') {
+    if (role === 'DOCTOR') return `/doctor/in-person/${appointment.id}`;
+    return `/patient/in-person/${appointment.id}`;
+  }
+  return `/room/${appointment.id}`;
+}
+
+function isOngoingAppointment(appointment) {
+  if (!appointment || String(appointment.status || '').toUpperCase() !== 'ACCEPTED') return false;
+
+  if (!appointment.scheduledFor) {
+    return true; // on-demand accepted appointments are considered live until completed/cancelled.
+  }
+
+  const start = new Date(appointment.scheduledFor);
+  if (Number.isNaN(start.getTime())) return false;
+
+  const scheduledUntil = appointment.scheduledUntil ? new Date(appointment.scheduledUntil) : null;
+  const fallbackEnd = new Date(start.getTime() + 90 * 60 * 1000);
+  const end = scheduledUntil && !Number.isNaN(scheduledUntil.getTime()) ? scheduledUntil : fallbackEnd;
+
+  const now = Date.now();
+  const startsSoonMs = 15 * 60 * 1000;
+  const staleWindowMs = 8 * 60 * 60 * 1000;
+  return now >= (start.getTime() - startsSoonMs) && now <= (end.getTime() + staleWindowMs);
+}
+
+function OngoingMeetingOverlay() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [ongoingAppointment, setOngoingAppointment] = useState(null);
+
+  const pathname = location.pathname || '';
+  const isMeetingPath =
+    pathname.startsWith('/room/') ||
+    pathname.startsWith('/doctor/in-person/') ||
+    pathname.startsWith('/patient/in-person/');
+
+  useEffect(() => {
+    if (!user || user.role === 'ADMIN' || isMeetingPath) {
+      setOngoingAppointment(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const fetchAppointments = async () => {
+      try {
+        const { data } = await axios.get(`${API_URL}/api/appointments`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (cancelled) return;
+
+        const rows = Array.isArray(data) ? data : [];
+        const live = rows
+          .filter(isOngoingAppointment)
+          .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+
+        setOngoingAppointment(live[0] || null);
+      } catch {
+        if (!cancelled) setOngoingAppointment(null);
+      }
+    };
+
+    fetchAppointments();
+    const interval = setInterval(fetchAppointments, 15000);
+    const onFocus = () => { fetchAppointments(); };
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [isMeetingPath, user]);
+
+  if (!ongoingAppointment || !user || user.role === 'ADMIN' || isMeetingPath) return null;
+
+  const joinRoute = getJoinRouteForAppointment(ongoingAppointment, user.role);
+  if (pathname === joinRoute) return null;
+
+  const counterpartName = user.role === 'DOCTOR'
+    ? (ongoingAppointment.familyMember?.name || ongoingAppointment.patient?.name || 'Patient')
+    : (ongoingAppointment.doctor?.name || 'Doctor');
+
+  return (
+    <div className="fixed bottom-5 right-5 z-[1500] w-[min(92vw,360px)] rounded-xl border border-emerald-200 bg-white p-4 shadow-2xl">
+      <p className="text-xs font-black uppercase tracking-wide text-emerald-700">Ongoing Meeting</p>
+      <p className="mt-1 text-sm font-semibold text-slate-800">
+        Your meeting with {counterpartName} is still active.
+      </p>
+      <button
+        type="button"
+        onClick={() => navigate(joinRoute)}
+        className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+      >
+        Join Meeting
+      </button>
+    </div>
+  );
 }
 
 function AppRoutes() {
@@ -132,6 +239,7 @@ function AppRoutes() {
           <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         </Routes>
       </Suspense>
+      <OngoingMeetingOverlay />
       <AuthModal />
     </div>
   );

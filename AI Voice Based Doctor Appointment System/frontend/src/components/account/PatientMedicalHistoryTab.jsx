@@ -8,6 +8,7 @@ const EMPTY_STATE_IMAGE = 'https://cdn-icons-png.flaticon.com/512/4076/4076432.p
 const ITEMS_PER_PAGE = 9;
 
 function safeDate(value) {
+  if (value === null || value === undefined || value === '') return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

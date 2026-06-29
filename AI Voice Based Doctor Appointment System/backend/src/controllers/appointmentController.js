@@ -57,7 +57,13 @@ function withQueueType(aiSummary, queueType) {
 }
 
 function parseAiSummary(aiSummary) {
-  return typeof aiSummary === 'object' ? aiSummary : JSON.parse(aiSummary || '{}');
+  if (!aiSummary) return {};
+  if (typeof aiSummary === 'object') return aiSummary;
+  try {
+    return JSON.parse(aiSummary);
+  } catch {
+    return {};
+  }
 }
 
 function intervalsOverlap(startA, endA, startB, endB) {
@@ -132,6 +138,13 @@ function emitAppointmentToParticipants(io, eventName, appointment) {
   }
 }
 
+const GENERATED_DOCUMENT_FIELD_BY_TYPE = {
+  MEDICAL_CERTIFICATE: 'medicalCertificateUrl',
+  SPECIALIST_REFERRAL: 'specialistReferralUrl',
+  PATHOLOGY_LETTER: 'pathologyLetterUrl',
+  RADIOLOGY_LETTER: 'radiologyLetterUrl',
+};
+
 exports.getDoctors = async (req, res) => {
   try {
     const practitionerTypeParam = typeof req.query?.practitionerType === 'string' ? req.query.practitionerType.trim() : '';
@@ -180,6 +193,9 @@ exports.getDoctors = async (req, res) => {
         experienceRange: true,
         practitionerType: true,
         services: true,
+        phoneCode: true,
+        phone: true,
+        address: true,
         averageRating: true,
         reviewCount: true,
         slotDurationMinutesVideo: true,
@@ -619,7 +635,21 @@ exports.updateStatus = async (req, res) => {
 
       const formatRx = (rx) => {
         if (!rx || !Array.isArray(rx) || rx.length === 0) return 'None';
-        return rx.map(m => `${m.name} (${m.dosage}, ${m.frequency}, ${m.duration})`).join('; ');
+        return rx
+          .map((m) => {
+            const medicineName = String(m?.drugName || m?.name || 'Medicine').trim();
+            const dosage = String(
+              m?.dosage ||
+              `${String(m?.dose || '').trim()}${m?.doseUnit ? ` ${String(m.doseUnit).trim()}` : ''}`.trim()
+            ).trim() || 'N/A';
+            const frequency = String(m?.frequency || '').trim() || 'N/A';
+            const duration = String(
+              m?.duration ||
+              `${String(m?.durationValue || '').trim()}${m?.durationUnit ? ` ${String(m.durationUnit).trim()}` : ''}`.trim()
+            ).trim() || 'N/A';
+            return `${medicineName} (${dosage}, ${frequency}, ${duration})`;
+          })
+          .join('; ');
       };
 
       let primaryNotes = notes;
@@ -790,6 +820,11 @@ exports.getUserAppointments = async (req, res) => {
                 services: true,
                 qualification: true,
                 providerNumber: true,
+                prescriberNumber: true,
+                ahpraNumber: true,
+                hpiIndividualNumber: true,
+                hpioNumber: true,
+                prescriptionEntityId: true,
                 phoneCode: true,
                 phone: true,
                 address: true,
@@ -804,6 +839,12 @@ exports.getUserAppointments = async (req, res) => {
             email: true,
             patientProfile: {
               select: {
+                profilePictureUrl: true,
+                givenName: true,
+                secondaryName: true,
+                familyName: true,
+                noFamilyName: true,
+                relation: true,
                 medicareIrn: true,
                 medicareCardNumber: true,
                 healthIdentifierType: true,
@@ -811,7 +852,19 @@ exports.getUserAppointments = async (req, res) => {
                 gender: true,
                 phoneCode: true,
                 phone: true,
+                email: true,
                 address: true,
+                ctgIslandOrigin: true,
+                allergies: true,
+                dvaCardNumber: true,
+                dvaCardColor: true,
+                currentGpName: true,
+                currentGpEmail: true,
+                partnerCode: true,
+                noCurrentGpDetails: true,
+                saveHealthIdentifier: true,
+                onBehalfOfFamilyMember: true,
+                patientConsentGiven: true,
               },
             },
           },
@@ -823,6 +876,19 @@ exports.getUserAppointments = async (req, res) => {
                 id: true,
                 name: true,
                 email: true,
+                patientProfile: {
+                  select: {
+                    gender: true,
+                    dateOfBirth: true,
+                    phoneCode: true,
+                    phone: true,
+                    address: true,
+                    allergies: true,
+                    medicareCardNumber: true,
+                    medicareIrn: true,
+                    healthIdentifierType: true,
+                  },
+                },
               },
             },
           },
@@ -975,6 +1041,93 @@ exports.submitDoctorNote = async (req, res) => {
   }
 };
 
+exports.saveGeneratedDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doctorId = req.user.id;
+    const userRole = req.user.role;
+    const documentType = String(req.body?.documentType || '').trim().toUpperCase();
+    const documentUrl = String(req.body?.documentUrl || '').trim();
+    const signatureUrl = String(req.body?.signatureUrl || '').trim();
+
+    if (userRole !== 'DOCTOR') {
+      return res.status(403).json({ error: 'Only doctors can save generated documents.' });
+    }
+    if (!documentType || !GENERATED_DOCUMENT_FIELD_BY_TYPE[documentType]) {
+      return res.status(400).json({ error: 'Invalid document type.' });
+    }
+    if (!documentUrl) {
+      return res.status(400).json({ error: 'documentUrl is required.' });
+    }
+    if (!signatureUrl) {
+      return res.status(400).json({ error: 'signatureUrl is required.' });
+    }
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        invitedDoctors: true,
+        familyMember: {
+          select: {
+            id: true,
+            linkedUserId: true,
+          },
+        },
+      },
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const isPrimaryDoctor = appointment.doctorId === doctorId;
+    const isInvitedDoctor = appointment.invitedDoctors.some((invite) => invite.doctorId === doctorId);
+    if (!isPrimaryDoctor && !isInvitedDoctor) {
+      return res.status(403).json({ error: 'Not authorized to save generated documents for this appointment.' });
+    }
+
+    const targetField = GENERATED_DOCUMENT_FIELD_BY_TYPE[documentType];
+    const currentSummary = parseAiSummary(appointment.aiSummary);
+    const nextSummary = {
+      ...currentSummary,
+      [targetField]: documentUrl,
+      documentsUpdatedAt: new Date().toISOString(),
+    };
+
+    const signatureField = targetField.replace('Url', 'SignatureUrl');
+    nextSummary[signatureField] = signatureUrl;
+
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id },
+      data: { aiSummary: nextSummary },
+      include: {
+        familyMember: {
+          select: {
+            id: true,
+            linkedUserId: true,
+          },
+        },
+      },
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      emitAppointmentToParticipants(io, 'appointment:updated', updatedAppointment);
+    }
+
+    return res.json({
+      ok: true,
+      documentType,
+      field: targetField,
+      documentUrl,
+      signatureUrl: signatureUrl || null,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to save generated document.' });
+  }
+};
+
 exports.moveToGeneralQueue = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1061,6 +1214,11 @@ exports.getAppointmentById = async (req, res) => {
                 services: true,
                 qualification: true,
                 providerNumber: true,
+                prescriberNumber: true,
+                ahpraNumber: true,
+                hpiIndividualNumber: true,
+                hpioNumber: true,
+                prescriptionEntityId: true,
                 phoneCode: true,
                 phone: true,
                 address: true,
@@ -1075,6 +1233,12 @@ exports.getAppointmentById = async (req, res) => {
             email: true,
             patientProfile: {
               select: {
+                profilePictureUrl: true,
+                givenName: true,
+                secondaryName: true,
+                familyName: true,
+                noFamilyName: true,
+                relation: true,
                 medicareIrn: true,
                 medicareCardNumber: true,
                 healthIdentifierType: true,
@@ -1082,7 +1246,19 @@ exports.getAppointmentById = async (req, res) => {
                 gender: true,
                 phoneCode: true,
                 phone: true,
+                email: true,
                 address: true,
+                ctgIslandOrigin: true,
+                allergies: true,
+                dvaCardNumber: true,
+                dvaCardColor: true,
+                currentGpName: true,
+                currentGpEmail: true,
+                partnerCode: true,
+                noCurrentGpDetails: true,
+                saveHealthIdentifier: true,
+                onBehalfOfFamilyMember: true,
+                patientConsentGiven: true,
               },
             },
           },
