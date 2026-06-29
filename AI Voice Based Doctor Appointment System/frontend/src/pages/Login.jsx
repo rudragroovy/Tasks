@@ -22,8 +22,10 @@ export default function Login({ embedded = false, onOpenRegister = null, onAuthS
         onAuthSuccess(loggedInUser);
       } else if (loggedInUser.role === 'ADMIN') {
         navigate('/admin');
-      } else {
+      } else if (loggedInUser.role === 'DOCTOR') {
         navigate('/dashboard');
+      } else {
+        navigate('/');
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to login');

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Button, Card, Col, Layout, Row, Space, Tag, Typography } from 'antd';
 import {
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import AppIcon from '../components/branding/AppIcon';
 import LandingNavbar from '../components/LandingNavbar';
+import { useAuth } from '../context/AuthContext';
 import './landing-page.css';
 
 const { Content, Footer } = Layout;
@@ -540,6 +541,8 @@ function getInitialByDirection(direction) {
 }
 
 export default function LandingPage() {
+  const navigate = useNavigate();
+  const { user, openAuthModal } = useAuth();
   const [activeHeroSlide, setActiveHeroSlide] = useState(0);
   const reduceMotion = useReducedMotion();
   const [typedHeroText, setTypedHeroText] = useState(() => (reduceMotion ? heroTypedPhrase : ''));
@@ -609,6 +612,14 @@ export default function LandingPage() {
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const handleBookAppointment = () => {
+    if (user) {
+      navigate('/booking');
+      return;
+    }
+    openAuthModal({ mode: 'login', redirectTo: '/booking' });
+  };
+
   const activeReview = testimonials[activeTestimonial];
 
   return (
@@ -617,7 +628,7 @@ export default function LandingPage() {
         <div className="landing-hero-v2__media" aria-hidden="true">
           {heroSlides.map((slide, index) => (
             <div
-              key={slide}
+              key={`${slide}-${index}`}
               className={`landing-hero-v2__media-slide${index === activeHeroSlide ? ' is-active' : ''}`}
               style={{ backgroundImage: `url(${slide})` }}
             />
@@ -629,8 +640,8 @@ export default function LandingPage() {
 
         <div className="landing-hero-v2__content">
           <motion.div className="landing-hero-v2__left" {...revealProps('left', 0.04)}>
-            <Space direction="vertical" size={12} className="landing-hero-v2__copy">
-              <Tag className="landing-chip" bordered={false}>
+            <Space orientation="vertical" size={12} className="landing-hero-v2__copy">
+              <Tag className="landing-chip" variant="filled">
                 <ShieldCheck size={14} /> AHPRA Verified Doctors
               </Tag>
               <Title level={1}>
@@ -657,9 +668,9 @@ export default function LandingPage() {
                 </li>
               </ul>
               <Space className="landing-hero-v2__actions" wrap>
-                <Link to="/login" className="landing-btn landing-btn--primary">
+                <button type="button" className="landing-btn landing-btn--primary" onClick={handleBookAppointment}>
                   Book an Appointment <ArrowRight size={16} />
-                </Link>
+                </button>
                 <Button className="landing-btn landing-btn--outline" onClick={() => scrollToSection('steps')}>
                   How It Works
                 </Button>
@@ -679,7 +690,7 @@ export default function LandingPage() {
               {heroCards.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <Card key={card.label} className="hero-mode-card" bordered={false}>
+                  <Card key={card.label} className="hero-mode-card" variant="borderless">
                     <span className={`hero-mode-card__icon hero-mode-card__icon--${card.tone}`}>
                       <Icon size={18} />
                     </span>
@@ -687,7 +698,7 @@ export default function LandingPage() {
                   </Card>
                 );
               })}
-              <Card className="hero-mode-card hero-mode-card--wide" bordered={false}>
+              <Card className="hero-mode-card hero-mode-card--wide" variant="borderless">
                 <span className="hero-mode-card__icon hero-mode-card__icon--pink">
                   <House size={18} />
                 </span>
@@ -702,7 +713,7 @@ export default function LandingPage() {
         </div>
 
         <motion.div {...revealProps('up', 0.12)}>
-          <Card className="landing-hero-v2__banner" bordered={false}>
+          <Card className="landing-hero-v2__banner" variant="borderless">
             <ShieldCheck size={18} />
             <p>
               CareBridge is Australia&apos;s first truly digital GP clinic, combining personalised care, smart technology,
@@ -823,9 +834,9 @@ export default function LandingPage() {
             ))}
           </div>
           <motion.div {...revealProps('up', 0.08)}>
-            <Link to="/login" className="landing-btn landing-btn--primary landing-steps-v2__cta">
+            <button type="button" className="landing-btn landing-btn--primary landing-steps-v2__cta" onClick={handleBookAppointment}>
               <CalendarClock size={16} /> Book Standard Consultation now <ArrowRight size={16} />
-            </Link>
+            </button>
           </motion.div>
         </section>
 
@@ -994,9 +1005,9 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                <Link to="/login" className="landing-btn landing-btn--primary consult-panel__cta">
+                <button type="button" className="landing-btn landing-btn--primary consult-panel__cta" onClick={handleBookAppointment}>
                   <CalendarClock size={16} /> Book Appointment Now <ArrowRight size={16} />
-                </Link>
+                </button>
               </div>
             </motion.div>
           </div>
@@ -1105,9 +1116,9 @@ export default function LandingPage() {
               })}
             </div>
             <motion.div className="plus-cta-wrap" {...revealProps('up', 0.08)}>
-              <Link to="/login" className="landing-btn landing-btn--primary plus-cta">
+              <button type="button" className="landing-btn landing-btn--primary plus-cta" onClick={handleBookAppointment}>
                 Join CareBridge Plus <ArrowRight size={16} />
-              </Link>
+              </button>
             </motion.div>
           </div>
         </section>
@@ -1242,9 +1253,9 @@ export default function LandingPage() {
                           </strong>
                           <em>{card.note}</em>
                         </div>
-                        <Link to="/login" className="top-rated-card__cta">
+                        <button type="button" className="top-rated-card__cta" onClick={handleBookAppointment}>
                           Book now
-                        </Link>
+                        </button>
                       </div>
                     </div>
                   </motion.article>
@@ -1461,9 +1472,9 @@ export default function LandingPage() {
                   <ShieldCheck size={13} /> AHPRA verified doctors
                 </span>
               </div>
-              <Link to="/login" className="landing-btn landing-btn--primary">
+              <button type="button" className="landing-btn landing-btn--primary" onClick={handleBookAppointment}>
                 Book Telehealth Appointment <ArrowRight size={16} />
-              </Link>
+              </button>
             </motion.div>
           </div>
         </section>

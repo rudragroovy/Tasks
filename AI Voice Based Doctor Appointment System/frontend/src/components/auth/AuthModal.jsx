@@ -5,14 +5,21 @@ import { useAuth } from '../../context/AuthContext';
 import Login from '../../pages/Login';
 import Register from '../../pages/Register';
 
+function getDefaultPostAuthPath(user) {
+  if (user?.role === 'ADMIN') return '/admin';
+  if (user?.role === 'DOCTOR') return '/dashboard';
+  return '/';
+}
+
 function resolvePostAuthPath(user, redirectTo) {
   const isInvalidRedirect =
     !redirectTo ||
     redirectTo === '/login' ||
-    redirectTo === '/register';
+    redirectTo === '/register' ||
+    (user?.role === 'PATIENT' && redirectTo === '/dashboard');
 
   if (!isInvalidRedirect) return redirectTo;
-  return user?.role === 'ADMIN' ? '/admin' : '/dashboard';
+  return getDefaultPostAuthPath(user);
 }
 
 export default function AuthModal() {

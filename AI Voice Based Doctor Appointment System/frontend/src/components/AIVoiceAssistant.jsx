@@ -262,10 +262,10 @@ function AIVoiceAssistantInner({ onComplete, onClose }) {
           <div className="absolute bottom-[7.75rem] left-1/2 z-10 w-[min(92vw,430px)] -translate-x-1/2 rounded-2xl border border-white/20 bg-white/14 px-4 py-3 backdrop-blur-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/35 bg-white/90 text-sm font-black text-indigo-700">OA</div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/35 bg-white/90 text-sm font-black text-indigo-700">CA</div>
                 <div className="text-left">
                   <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-200">Your AI Agent</p>
-                  <p className="text-[1.35rem] font-black leading-none tracking-tight">OLA AI</p>
+                  <p className="text-[1.35rem] font-black leading-none tracking-tight">CareBridge AI</p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">

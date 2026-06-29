@@ -60,8 +60,34 @@ function getTimestampValue(rawDate) {
   return date.getTime();
 }
 
+function isFamilyAppointment(appointment) {
+  return Boolean(appointment?.familyMemberId || appointment?.familyMember?.id);
+}
+
+function buildGroupTitle(doctorName, patientName, familyName) {
+  const parts = [doctorName, patientName, familyName]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts)).join(' • ');
+}
+
+function getDoctorFirstName(doctorName) {
+  const raw = String(doctorName || '').trim();
+  if (!raw) return 'Doctor';
+  const withoutPrefix = raw.replace(/^dr\.?\s+/i, '').trim();
+  const first = withoutPrefix.split(/\s+/)[0];
+  return first || 'Doctor';
+}
+
+function getFirstName(name, fallback = 'User') {
+  const raw = String(name || '').trim();
+  if (!raw) return fallback;
+  const first = raw.split(/\s+/)[0];
+  return first || fallback;
+}
+
 function getMessageSenderLabel(message, doctorId, patientName, doctorName) {
-  if (message?.senderRole === 'PATIENT') return patientName;
+  if (message?.senderRole === 'PATIENT') return message?.senderName || patientName;
   if (message?.senderRole === 'DOCTOR') {
     return message?.senderId === doctorId ? 'You' : doctorName;
   }
@@ -170,16 +196,38 @@ export default function DoctorChat() {
     const groupedByPatient = new Map();
 
     appointments.forEach((appointment) => {
+      const isGroupConversation = isFamilyAppointment(appointment);
       const patientId = appointment?.patient?.id || appointment?.patientId;
-      const fallbackPatientName = appointment?.patient?.name || appointment?.familyMember?.name || 'Unknown Patient';
-      const key = patientId || `name:${fallbackPatientName.toLowerCase()}`;
+      const basePatientName = appointment?.patient?.name || 'Unknown Patient';
+      const familyMemberId = appointment?.familyMember?.id || appointment?.familyMemberId || null;
+      const familyMemberName = appointment?.familyMember?.name || '';
+      const linkedFamilyUserName = appointment?.familyMember?.linkedUser?.name || '';
+      const resolvedFamilyName = linkedFamilyUserName || familyMemberName;
+      const appointmentDoctorName = formatDoctorName(appointment?.doctor?.name, appointment?.doctor?.name || 'Doctor');
+      const displayPatientName = isGroupConversation && familyMemberName
+        ? `${basePatientName} + ${familyMemberName}`
+        : basePatientName;
+      const keyBase = patientId || `name:${basePatientName.toLowerCase()}`;
+      const key = isGroupConversation
+        ? `group:${keyBase}:${familyMemberId || familyMemberName.toLowerCase()}`
+        : `chat:${keyBase}`;
 
       if (!groupedByPatient.has(key)) {
         groupedByPatient.set(key, {
           id: key,
-          patientName: appointment?.patient?.name || fallbackPatientName,
+          scope: isGroupConversation ? 'group' : 'chat',
+          patientName: displayPatientName,
+          doctorName: appointmentDoctorName,
+          familyMemberName: isGroupConversation ? resolvedFamilyName : '',
+          groupTitle: isGroupConversation
+            ? buildGroupTitle(
+              getDoctorFirstName(appointmentDoctorName),
+              getFirstName(basePatientName, 'Patient'),
+              getFirstName(resolvedFamilyName, 'User')
+            )
+            : '',
           patientEmail: appointment?.patient?.email || '',
-          avatarSeed: appointment?.patient?.name || fallbackPatientName,
+          avatarSeed: displayPatientName,
           messages: [],
           latestConsultedAppointmentId: null,
           latestConsultedAt: null,
@@ -192,6 +240,8 @@ export default function DoctorChat() {
       const messages = Array.isArray(appointment?.messages) ? appointment.messages : [];
       const appointmentActivityAt = appointment?.updatedAt || appointment?.createdAt || null;
       const appointmentActivityTs = getTimestampValue(appointmentActivityAt);
+      const primaryPatientName = appointment?.patient?.name || '';
+      const linkedFamilyUserId = appointment?.familyMember?.linkedUser?.id || null;
 
       if (appointment?.id && appointmentActivityTs >= getTimestampValue(group.latestAppointmentAt)) {
         group.latestAppointmentId = appointment.id;
@@ -205,8 +255,24 @@ export default function DoctorChat() {
       }
 
       messages.forEach((message) => {
+        let resolvedSenderName = String(message?.senderName || '').trim();
+        if (!resolvedSenderName) {
+          if (message?.senderRole === 'PATIENT') {
+            if (message?.senderId === appointment?.patientId) {
+              resolvedSenderName = primaryPatientName;
+            } else if (linkedFamilyUserId && message?.senderId === linkedFamilyUserId) {
+              resolvedSenderName = familyMemberName;
+            } else {
+              resolvedSenderName = familyMemberName || primaryPatientName || displayPatientName;
+            }
+          } else if (message?.senderRole === 'DOCTOR') {
+            resolvedSenderName = appointmentDoctorName;
+          }
+        }
+
         group.messages.push({
           ...message,
+          senderName: resolvedSenderName || message?.senderName || '',
           appointmentId: message?.appointmentId || appointment?.id,
         });
       });
@@ -236,32 +302,43 @@ export default function DoctorChat() {
       .sort((a, b) => getTimestampValue(b.lastActivity) - getTimestampValue(a.lastActivity));
   }, [appointments]);
 
+  const scopedConversations = useMemo(
+    () => conversations.filter((conversation) => conversation.scope === chatScope),
+    [conversations, chatScope]
+  );
+
   const filteredConversations = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    if (!q) return conversations;
-    return conversations.filter((conversation) => {
+    if (!q) return scopedConversations;
+    return scopedConversations.filter((conversation) => {
       return (
+        conversation.groupTitle.toLowerCase().includes(q) ||
+        conversation.doctorName.toLowerCase().includes(q) ||
         conversation.patientName.toLowerCase().includes(q) ||
+        conversation.familyMemberName.toLowerCase().includes(q) ||
         conversation.patientEmail.toLowerCase().includes(q) ||
         conversation.lastMessageText.toLowerCase().includes(q)
       );
     });
-  }, [conversations, searchText]);
+  }, [scopedConversations, searchText]);
 
   const selectedConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === selectedConversationId) || null,
-    [conversations, selectedConversationId]
+    () => scopedConversations.find((conversation) => conversation.id === selectedConversationId) || null,
+    [scopedConversations, selectedConversationId]
   );
 
   useEffect(() => {
-    if (!conversations.length) {
+    if (!scopedConversations.length) {
       if (selectedConversationId !== null) setSelectedConversationId(null);
       return;
     }
-    if (!selectedConversationId || !conversations.some((conversation) => conversation.id === selectedConversationId)) {
-      setSelectedConversationId(conversations[0].id);
+    if (
+      !selectedConversationId ||
+      !scopedConversations.some((conversation) => conversation.id === selectedConversationId)
+    ) {
+      setSelectedConversationId(scopedConversations[0].id);
     }
-  }, [conversations, selectedConversationId]);
+  }, [scopedConversations, selectedConversationId]);
 
   useEffect(() => {
     setNewMessage('');
@@ -352,13 +429,9 @@ export default function DoctorChat() {
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-                  {chatScope === 'group' ? (
+                  {filteredConversations.length === 0 && !loading ? (
                     <div className="flex h-full min-h-[240px] items-center justify-center px-3">
-                      <Empty description="No groups yet" />
-                    </div>
-                  ) : filteredConversations.length === 0 && !loading ? (
-                    <div className="flex h-full min-h-[240px] items-center justify-center px-3">
-                      <Empty description="No patient chat history yet" />
+                      <Empty description={chatScope === 'group' ? 'No groups yet' : 'No patient chat history yet'} />
                     </div>
                   ) : (
                     <List
@@ -383,7 +456,7 @@ export default function DoctorChat() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
                                   <Text strong className="!truncate !text-base !text-primary-900">
-                                    {conversation.patientName}
+                                    {conversation.scope === 'group' ? conversation.groupTitle : conversation.patientName}
                                   </Text>
                                   <Text className="!whitespace-nowrap !text-xs !font-bold !text-slate-700">
                                     {conversation.timeLabel}
@@ -392,6 +465,11 @@ export default function DoctorChat() {
                                 <Text className="!block !truncate !text-sm !text-slate-600">
                                   {conversation.lastMessageText}
                                 </Text>
+                                {conversation.scope === 'group' ? (
+                                  <Text className="!block !truncate !text-xs !text-slate-500">
+                                    Family booking group
+                                  </Text>
+                                ) : null}
                               </div>
                             </div>
                           </List.Item>
@@ -422,10 +500,12 @@ export default function DoctorChat() {
                           />
                           <div className="min-w-0">
                             <Text strong className="!block !truncate !text-base">
-                              {selectedConversation.patientName}
+                              {selectedConversation.scope === 'group'
+                                ? selectedConversation.groupTitle
+                                : selectedConversation.patientName}
                             </Text>
                             <Text className="!text-xs !text-slate-500">
-                              Combined conversation history
+                              {selectedConversation.scope === 'group' ? 'Family booking group' : 'Combined conversation history'}
                             </Text>
                           </div>
                         </div>

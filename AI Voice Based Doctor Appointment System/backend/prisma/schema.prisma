@@ -41,6 +41,7 @@ model User {
   patientAppointments Appointment[]   @relation("PatientAppointments")
   doctorAppointments  Appointment[]   @relation("DoctorAppointments")
   patientReviews      Review[]        @relation("PatientReviews")
+  linkedFamilyProfiles FamilyMember[] @relation("LinkedFamilyProfile")
   invitedAppointments InvitedDoctor[] @relation("InvitedDoctor")
   doctorNotes         DoctorNote[]    @relation("DoctorNote")
   workingHours        DoctorWorkingHour[] @relation("DoctorWorkingHours")
@@ -86,6 +87,8 @@ model FamilyMember {
   id        String   @id @default(uuid())
   patientId String
   patient   User     @relation(fields: [patientId], references: [id])
+  linkedUserId String?
+  linkedUser   User? @relation("LinkedFamilyProfile", fields: [linkedUserId], references: [id], onDelete: SetNull)
   name      String
   relation  String
   age       Int
@@ -93,6 +96,8 @@ model FamilyMember {
   createdAt DateTime @default(now())
 
   appointments Appointment[]
+
+  @@index([linkedUserId])
 }
 
 model Doctor {

@@ -17,6 +17,9 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
   const isMedicalHistoryTabActive =
     (location.pathname === '/patient/account' || location.pathname === '/account') &&
     new URLSearchParams(location.search).get('tab') === 'medical-history';
+  const isFamilyTabActive =
+    (location.pathname === '/patient/account' || location.pathname === '/account') &&
+    new URLSearchParams(location.search).get('tab') === 'family';
 
   // Triage state
   const [triageStep, setTriageStep] = useState('select_patient');
@@ -301,8 +304,8 @@ export function TopHeader({ activeAppointmentsCount = 0 }) {
                   </button>
                 ) : null}
                 <button type="button"
-                  onClick={() => { setIsSidebarOpen(false); navigate('/family-members'); }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${location.pathname === '/family-members' ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                  onClick={() => { setIsSidebarOpen(false); navigate('/patient/account?tab=family'); }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors w-full text-left cursor-pointer ${isFamilyTabActive ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
                 >
                   <Users className="w-5 h-5" /> Family Members
                 </button>

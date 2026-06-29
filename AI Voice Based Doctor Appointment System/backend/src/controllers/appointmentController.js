@@ -118,6 +118,20 @@ async function releaseBookedSlot(tx, appointmentId) {
   });
 }
 
+function getLinkedFamilyUserId(appointment) {
+  const linkedUserId = appointment?.familyMember?.linkedUserId;
+  return typeof linkedUserId === 'string' && linkedUserId.trim() ? linkedUserId.trim() : null;
+}
+
+function emitAppointmentToParticipants(io, eventName, appointment) {
+  if (!io || !appointment) return;
+  io.to(`user:${appointment.patientId}`).to(`user:${appointment.doctorId}`).emit(eventName, appointment);
+  const linkedFamilyUserId = getLinkedFamilyUserId(appointment);
+  if (linkedFamilyUserId) {
+    io.to(`user:${linkedFamilyUserId}`).emit(eventName, appointment);
+  }
+}
+
 exports.getDoctors = async (req, res) => {
   try {
     const practitionerTypeParam = typeof req.query?.practitionerType === 'string' ? req.query.practitionerType.trim() : '';
@@ -350,6 +364,17 @@ exports.createAppointment = async (req, res) => {
       }
     }
 
+    let familyMemberRecord = null;
+    if (familyMemberId) {
+      familyMemberRecord = await prisma.familyMember.findUnique({
+        where: { id: familyMemberId },
+        select: { id: true, patientId: true },
+      });
+      if (!familyMemberRecord || familyMemberRecord.patientId !== patientId) {
+        return res.status(400).json({ error: 'Invalid family member selected for this booking' });
+      }
+    }
+
     let appointment;
 
     if (normalizedType === SCHEDULED_APPOINTMENT_TYPE) {
@@ -425,7 +450,7 @@ exports.createAppointment = async (req, res) => {
           data: {
             patientId,
             doctorId,
-            familyMemberId: familyMemberId || null,
+            familyMemberId: familyMemberRecord?.id || null,
             aiSummary: normalizedAiSummary,
             status: 'PENDING',
             type: normalizedType,
@@ -441,7 +466,7 @@ exports.createAppointment = async (req, res) => {
         data: {
           patientId,
           doctorId,
-          familyMemberId: familyMemberId || null,
+          familyMemberId: familyMemberRecord?.id || null,
           aiSummary: normalizedAiSummary,
           status: 'PENDING',
           type: normalizedType,
@@ -472,7 +497,15 @@ exports.updateStatus = async (req, res) => {
     const { status, notes, prescription, declineReason } = req.body;
     
     const appointmentCheck = await prisma.appointment.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        familyMember: {
+          select: {
+            id: true,
+            linkedUserId: true,
+          },
+        },
+      },
     });
 
     if (!appointmentCheck) {
@@ -647,9 +680,21 @@ exports.updateStatus = async (req, res) => {
       return updatedAppointment;
     });
 
+    const appointmentWithFamily = await prisma.appointment.findUnique({
+      where: { id: appointment.id },
+      include: {
+        familyMember: {
+          select: {
+            id: true,
+            linkedUserId: true,
+          },
+        },
+      },
+    });
+
     const io = req.app.get('io');
     if (io) {
-      io.to(`user:${appointment.patientId}`).to(`user:${appointment.doctorId}`).emit('appointment:updated', appointment);
+      emitAppointmentToParticipants(io, 'appointment:updated', appointmentWithFamily || appointment);
       if (status === 'ACCEPTED') {
         // ponytail: emit call popup from the shared ACCEPTED path so all doctor-accept flows behave the same.
         const doctorUser = await prisma.user.findUnique({
@@ -660,6 +705,13 @@ exports.updateStatus = async (req, res) => {
           appointmentId: id,
           doctorName: formatDoctorName(doctorUser?.name, doctorUser?.name || 'Doctor'),
         });
+        const linkedFamilyUserId = getLinkedFamilyUserId(appointmentWithFamily);
+        if (linkedFamilyUserId) {
+          io.to(`user:${linkedFamilyUserId}`).emit('call:incoming', {
+            appointmentId: id,
+            doctorName: formatDoctorName(doctorUser?.name, doctorUser?.name || 'Doctor'),
+          });
+        }
       }
     }
 
@@ -716,7 +768,12 @@ exports.getUserAppointments = async (req, res) => {
         ]
       };
     } else {
-      whereClause.patientId = userId;
+      whereClause = {
+        OR: [
+          { patientId: userId },
+          { familyMember: { is: { linkedUserId: userId } } },
+        ],
+      };
     }
 
     const appointments = await prisma.appointment.findMany({
@@ -759,7 +816,17 @@ exports.getUserAppointments = async (req, res) => {
             },
           },
         },
-        familyMember: true,
+        familyMember: {
+          include: {
+            linkedUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
         consultation: true,
         review: true,
         invitedDoctors: true,
@@ -914,6 +981,14 @@ exports.moveToGeneralQueue = async (req, res) => {
 
     const appointment = await prisma.appointment.findUnique({
       where: { id },
+      include: {
+        familyMember: {
+          select: {
+            id: true,
+            linkedUserId: true,
+          },
+        },
+      },
     });
 
     if (!appointment) {
@@ -944,10 +1019,22 @@ exports.moveToGeneralQueue = async (req, res) => {
       },
     });
 
+    const updatedWithFamily = await prisma.appointment.findUnique({
+      where: { id: updated.id },
+      include: {
+        familyMember: {
+          select: {
+            id: true,
+            linkedUserId: true,
+          },
+        },
+      },
+    });
+
     const io = req.app.get('io');
     if (io) {
-      io.to(`user:${updated.patientId}`).to(`user:${updated.doctorId}`).emit('appointment:updated', updated);
-      io.emit('appointment:updated', updated);
+      emitAppointmentToParticipants(io, 'appointment:updated', updatedWithFamily || updated);
+      io.emit('appointment:updated', updatedWithFamily || updated);
     }
 
     res.json(updated);
@@ -1000,7 +1087,17 @@ exports.getAppointmentById = async (req, res) => {
             },
           },
         },
-        familyMember: true,
+        familyMember: {
+          include: {
+            linkedUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
         consultation: true,
         review: true,
         invitedDoctors: true,

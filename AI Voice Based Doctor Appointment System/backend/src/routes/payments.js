@@ -180,7 +180,18 @@ router.post('/confirm', authenticate, async (req, res) => {
 
     const existingAppointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      select: { id: true, doctorId: true, type: true, aiSummary: true }
+      select: {
+        id: true,
+        doctorId: true,
+        patientId: true,
+        type: true,
+        aiSummary: true,
+        familyMember: {
+          select: {
+            linkedUserId: true,
+          },
+        },
+      },
     });
 
     if (!existingAppointment) {
@@ -208,6 +219,11 @@ router.post('/confirm', authenticate, async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.to(`user:${appointment.doctorId}`).emit('appointment:new', appointment);
+      io.to(`user:${appointment.patientId}`).emit('appointment:new', appointment);
+      const linkedUserId = existingAppointment.familyMember?.linkedUserId;
+      if (linkedUserId) {
+        io.to(`user:${linkedUserId}`).emit('appointment:new', appointment);
+      }
     }
 
     res.json(appointment);

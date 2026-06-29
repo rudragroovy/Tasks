@@ -15,7 +15,9 @@ import {
   Save,
   ShieldCheck,
   Stethoscope,
+  Trash2,
   UserCircle2,
+  Plus,
   UserPlus2,
   Users,
   Wallet,
@@ -25,6 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import PatientMedicalHistoryTab from '../components/account/PatientMedicalHistoryTab';
 import PatientMedicalDocumentsTab from '../components/account/PatientMedicalDocumentsTab';
 import PatientPastDoctorsTab from '../components/account/PatientPastDoctorsTab';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import './patient-account.css';
 
 const accountTabs = [
@@ -67,6 +70,11 @@ const emptyProfileForm = {
   patientConsentGiven: false,
 };
 
+const emptyFamilyForm = {
+  ...emptyProfileForm,
+  onBehalfOfFamilyMember: true,
+};
+
 function resolveActiveTab(searchParams) {
   const requested = searchParams.get('tab');
   return accountTabs.some((tab) => tab.key === requested) ? requested : 'profile';
@@ -75,6 +83,13 @@ function resolveActiveTab(searchParams) {
 function asString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
   return String(value);
+}
+
+function formatTableDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString();
 }
 
 function mapProfileFromApi(data, fallbackEmail) {
@@ -117,6 +132,12 @@ export default function PatientAccount() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [familyMembers, setFamilyMembers] = useState([]);
   const [isFamilyLoading, setIsFamilyLoading] = useState(false);
+  const [isFamilyFormOpen, setIsFamilyFormOpen] = useState(false);
+  const [familyForm, setFamilyForm] = useState(emptyFamilyForm);
+  const [isFamilySaving, setIsFamilySaving] = useState(false);
+  const [isFamilyDeleting, setIsFamilyDeleting] = useState(false);
+  const [familySaveMessage, setFamilySaveMessage] = useState('');
+  const [pendingDeleteFamilyMemberId, setPendingDeleteFamilyMemberId] = useState(null);
   const [profileForm, setProfileForm] = useState(emptyProfileForm);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
@@ -151,23 +172,7 @@ export default function PatientAccount() {
 
   useEffect(() => {
     if (activeTab !== 'family') return;
-
-    const fetchFamilyMembers = async () => {
-      setIsFamilyLoading(true);
-      try {
-        const { data } = await axios.get(familyApiUrl, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        setFamilyMembers(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Failed to fetch family members for account tab', error);
-        setFamilyMembers([]);
-      } finally {
-        setIsFamilyLoading(false);
-      }
-    };
-
-    fetchFamilyMembers();
+    refreshFamilyMembers();
   }, [activeTab, familyApiUrl]);
 
   useEffect(() => {
@@ -209,6 +214,83 @@ export default function PatientAccount() {
 
   const updateCheckbox = (field, checked) => {
     setProfileForm((previous) => ({ ...previous, [field]: Boolean(checked) }));
+  };
+
+  const updateFamilyField = (field, value) => {
+    setFamilyForm((previous) => ({ ...previous, [field]: value }));
+  };
+
+  const updateFamilyCheckbox = (field, checked) => {
+    setFamilyForm((previous) => ({ ...previous, [field]: Boolean(checked) }));
+  };
+
+  const handleFamilyPhotoSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        updateFamilyField('profilePictureUrl', reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const refreshFamilyMembers = async () => {
+    setIsFamilyLoading(true);
+    try {
+      const { data } = await axios.get(familyApiUrl, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setFamilyMembers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to refresh family members', error);
+      setFamilyMembers([]);
+    } finally {
+      setIsFamilyLoading(false);
+    }
+  };
+
+  const handleFamilyMemberSave = async (event) => {
+    event.preventDefault();
+    setIsFamilySaving(true);
+    setFamilySaveMessage('');
+    try {
+      await axios.post(familyApiUrl, familyForm, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setFamilySaveMessage('Family member saved successfully.');
+      setFamilyForm(emptyFamilyForm);
+      setIsFamilyFormOpen(false);
+      await refreshFamilyMembers();
+    } catch (error) {
+      console.error('Failed to save family member', error);
+      setFamilySaveMessage(error?.response?.data?.error || 'Could not save family member.');
+    } finally {
+      setIsFamilySaving(false);
+    }
+  };
+
+  const openFamilyMemberDeleteDialog = (memberId) => {
+    setFamilySaveMessage('');
+    setPendingDeleteFamilyMemberId(memberId);
+  };
+
+  const handleFamilyMemberDelete = async () => {
+    if (!pendingDeleteFamilyMemberId || isFamilyDeleting) return;
+    setIsFamilyDeleting(true);
+    try {
+      await axios.delete(`${familyApiUrl}/${pendingDeleteFamilyMemberId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      await refreshFamilyMembers();
+      setPendingDeleteFamilyMemberId(null);
+    } catch (error) {
+      console.error('Failed to delete family member', error);
+      setFamilySaveMessage(error?.response?.data?.error || 'Could not delete family member.');
+    } finally {
+      setIsFamilyDeleting(false);
+    }
   };
 
   const handlePhotoSelect = (event) => {
@@ -447,17 +529,15 @@ export default function PatientAccount() {
                       />
                     </label>
 
-                    <label>
+                    <label className="patient-account-field-tight">
                       Eligible for CTG (Closing the Gap)
                       <select
                         value={profileForm.ctgIslandOrigin}
                         onChange={(event) => updateField('ctgIslandOrigin', event.target.value)}
                       >
-                        <option value="">Please select island origin</option>
-                        <option value="Aboriginal">Aboriginal</option>
-                        <option value="Torres Strait Islander">Torres Strait Islander</option>
-                        <option value="Both">Both</option>
-                        <option value="Not Eligible">Not Eligible</option>
+                        <option value="">Please select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
                       </select>
                     </label>
 
@@ -708,80 +788,379 @@ export default function PatientAccount() {
             <>
               <header className="patient-account-main__header">
                 <h2>My Family</h2>
-                <p>Manage family members and quickly book consultations on their behalf.</p>
+                <p>Manage detailed family profiles from your account.</p>
               </header>
 
               <article className="patient-account-card">
-                <h3>
-                  <Users size={16} /> Family Members
-                </h3>
-                {isFamilyLoading ? (
-                  <div className="patient-account-family-grid">
-                    {[1, 2, 3].map((item) => (
-                      <article
-                        key={item}
-                        className="patient-account-family-card patient-account-family-card--loading"
-                      >
-                        <div className="patient-account-family-skeleton patient-account-family-skeleton--title" />
-                        <div className="patient-account-family-skeleton patient-account-family-skeleton--meta" />
-                      </article>
-                    ))}
-                  </div>
-                ) : familyMembers.length === 0 ? (
-                  <div className="patient-account-family-empty">
-                    <p>No family members added yet.</p>
-                    <button type="button" onClick={() => navigate('/family-members')}>
-                      Add Family Member
-                    </button>
-                  </div>
-                ) : (
-                  <div className="patient-account-family-grid">
-                    {familyMembers.map((member) => (
-                      <article key={member.id} className="patient-account-family-card">
-                        <div>
-                          <strong>{member.name}</strong>
-                          <span>{`${member.relation || 'Family'} - ${member.age || '-'} years`}</span>
-                        </div>
-                        <button type="button" onClick={() => navigate('/family-members')}>
-                          Manage
-                        </button>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </article>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3>
+                    <Users size={16} /> Family Information
+                  </h3>
+                  <button
+                    type="button"
+                    className="patient-account-primary-btn"
+                    onClick={() => {
+                      setIsFamilyFormOpen((previous) => !previous);
+                      setFamilySaveMessage('');
+                    }}
+                  >
+                    <Plus size={15} /> {isFamilyFormOpen ? 'Close Form' : 'Add Family Member'}
+                  </button>
+                </div>
 
-              <article className="patient-account-card">
-                <h3>
-                  <CalendarClock size={16} /> Family Booking Shortcuts
-                </h3>
-                <ul className="patient-account-list">
-                  {(familyMembers.length ? familyMembers : [{ name: 'Family Member' }])
-                    .slice(0, 3)
-                    .map((member, index) => (
-                      <li key={`${member.name}-${index}`}>
-                        <span>{`Book consultation for ${member.name}`}</span>
-                        <button
-                          type="button"
-                          className="patient-account-link-btn"
-                          onClick={() => navigate('/booking')}
+                <div className="patient-account-family-table-wrap">
+                  <table className="patient-account-family-table">
+                    <thead>
+                      <tr>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Name</th>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Email</th>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Date of Birth</th>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Phone Number</th>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Relation</th>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Status</th>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Medicare ID</th>
+                        <th className="border-b border-slate-200 px-4 py-3 font-extrabold text-slate-700">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isFamilyLoading ? (
+                        <tr>
+                          <td className="px-4 py-8 text-center font-bold text-slate-500" colSpan={8}>
+                            Loading...
+                          </td>
+                        </tr>
+                      ) : familyMembers.length === 0 ? (
+                        <tr>
+                          <td className="px-4 py-10 text-center font-bold text-slate-500" colSpan={8}>
+                            No Data
+                          </td>
+                        </tr>
+                      ) : (
+                        familyMembers.map((member) => (
+                          <tr key={member.id} className="patient-account-family-table__row">
+                            <td>{member.name || '-'}</td>
+                            <td>{member.email || '-'}</td>
+                            <td>{formatTableDate(member.dateOfBirth)}</td>
+                            <td>{member.phone || '-'}</td>
+                            <td>{member.relation || '-'}</td>
+                            <td>{member.status || 'Active'}</td>
+                            <td>{member.medicareId || '-'}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="patient-account-family-delete-btn"
+                                onClick={() => openFamilyMemberDeleteDialog(member.id)}
+                                aria-label={`Delete ${member.name || 'family member'}`}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {isFamilyFormOpen ? (
+                  <form onSubmit={handleFamilyMemberSave} className="patient-account-family-form">
+                    <div className="patient-account-family-form-grid patient-account-family-form-grid--three">
+                      <label>
+                        <span className="is-required">Given Name</span>
+                        <input
+                          type="text"
+                          required
+                          value={familyForm.givenName}
+                          onChange={(event) => updateFamilyField('givenName', event.target.value)}
+                          placeholder="Please Enter Given Name"
+                        />
+                      </label>
+
+                      <label>
+                        Secondary Name (Optional)
+                        <input
+                          type="text"
+                          value={familyForm.secondaryName}
+                          onChange={(event) => updateFamilyField('secondaryName', event.target.value)}
+                          placeholder="Please Enter Secondary Name"
+                        />
+                      </label>
+
+                      <label>
+                        <span className="is-required">Family Name</span>
+                        <input
+                          type="text"
+                          required={!familyForm.noFamilyName}
+                          disabled={familyForm.noFamilyName}
+                          value={familyForm.familyName}
+                          onChange={(event) => updateFamilyField('familyName', event.target.value)}
+                          placeholder="Please Enter Family Name"
+                        />
+                      </label>
+                    </div>
+
+                    <label className="patient-account-checkbox-inline">
+                      <input
+                        type="checkbox"
+                        checked={familyForm.noFamilyName}
+                        onChange={(event) => updateFamilyCheckbox('noFamilyName', event.target.checked)}
+                      />
+                      I don&apos;t have family name
+                    </label>
+
+                    <div className="patient-account-family-form-grid patient-account-family-form-grid--three">
+                      <label>
+                        <span className="is-required">Relation</span>
+                        <select
+                          value={familyForm.relation}
+                          onChange={(event) => updateFamilyField('relation', event.target.value)}
                         >
-                          Open
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              </article>
+                          <option value="">Please select Relation</option>
+                          <option value="Spouse">Spouse</option>
+                          <option value="Parent">Parent</option>
+                          <option value="Child">Child</option>
+                          <option value="Sibling">Sibling</option>
+                          <option value="Guardian">Guardian</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </label>
 
-              <div className="patient-account-actions">
-                <button
-                  type="button"
-                  className="patient-account-primary-btn"
-                  onClick={() => navigate('/family-members')}
-                >
-                  <UserPlus2 size={15} /> Add Family Member
-                </button>
-              </div>
+                      <label>
+                        <span className="is-required">Gender</span>
+                        <select
+                          value={familyForm.gender}
+                          onChange={(event) => updateFamilyField('gender', event.target.value)}
+                        >
+                          <option value="">Please select gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </label>
+
+                      <label>
+                        Date of Birth
+                        <input
+                          type="date"
+                          value={familyForm.dateOfBirth}
+                          onChange={(event) => updateFamilyField('dateOfBirth', event.target.value)}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="patient-account-family-form-grid patient-account-family-form-grid--three">
+                      <label>
+                        Phone Number
+                        <div className="patient-account-inline-inputs">
+                          <input
+                            type="text"
+                            value={familyForm.phoneCode}
+                            onChange={(event) => updateFamilyField('phoneCode', event.target.value)}
+                            placeholder="+61"
+                          />
+                          <input
+                            type="text"
+                            value={familyForm.phone}
+                            onChange={(event) => updateFamilyField('phone', event.target.value)}
+                            placeholder="Please Enter Phone Number"
+                          />
+                        </div>
+                      </label>
+
+                      <label>
+                        <span className="is-required">Email</span>
+                        <input
+                          type="email"
+                          required
+                          value={familyForm.email}
+                          onChange={(event) => updateFamilyField('email', event.target.value)}
+                          placeholder="Please Enter Email"
+                        />
+                      </label>
+
+                      <label>
+                        Address
+                        <input
+                          type="text"
+                          value={familyForm.address}
+                          onChange={(event) => updateFamilyField('address', event.target.value)}
+                          placeholder="Address"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="patient-account-family-form-grid patient-account-family-form-grid--two">
+                      <label className="patient-account-field-tight">
+                        Eligible for CTG (Closing the Gap)
+                        <select
+                          value={familyForm.ctgIslandOrigin}
+                          onChange={(event) => updateFamilyField('ctgIslandOrigin', event.target.value)}
+                        >
+                          <option value="">Please select</option>
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </select>
+                      </label>
+
+                      <label>
+                        Allergies / Adverse Drug Reactions
+                        <textarea
+                          rows={3}
+                          value={familyForm.allergies}
+                          onChange={(event) => updateFamilyField('allergies', event.target.value)}
+                          placeholder="Please add allergies"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="patient-account-family-form-grid patient-account-family-form-grid--three">
+                      <label>
+                        Medicare Card Number
+                        <input
+                          type="text"
+                          value={familyForm.medicareCardNumber}
+                          onChange={(event) => updateFamilyField('medicareCardNumber', event.target.value)}
+                          placeholder="Please Enter Medicare Number"
+                        />
+                      </label>
+                      <label>
+                        Medicare IRN
+                        <input
+                          type="text"
+                          value={familyForm.medicareIrn}
+                          onChange={(event) => updateFamilyField('medicareIrn', event.target.value)}
+                          placeholder="Please Enter Medicare IRN"
+                        />
+                      </label>
+                      <label>
+                        DVA Card Number
+                        <input
+                          type="text"
+                          value={familyForm.dvaCardNumber}
+                          onChange={(event) => updateFamilyField('dvaCardNumber', event.target.value)}
+                          placeholder="Please Enter DVA Card Number"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="patient-account-family-form-grid patient-account-family-form-grid--three">
+                      <label>
+                        DVA Card Color
+                        <select
+                          value={familyForm.dvaCardColor}
+                          onChange={(event) => updateFamilyField('dvaCardColor', event.target.value)}
+                        >
+                          <option value="">Please select Card Color</option>
+                          <option value="Gold">Gold</option>
+                          <option value="White">White</option>
+                          <option value="Orange">Orange</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="patient-account-family-subsection">
+                      <div className="patient-account-family-subsection__head">
+                        <h4>General Practitioner (GP) Details</h4>
+                        <label className="patient-account-checkbox-inline">
+                          <input
+                            type="checkbox"
+                            checked={familyForm.noCurrentGpDetails}
+                            onChange={(event) => updateFamilyCheckbox('noCurrentGpDetails', event.target.checked)}
+                          />
+                          I don&apos;t have Current GP Details
+                        </label>
+                      </div>
+                      <div className="patient-account-family-form-grid patient-account-family-form-grid--three">
+                        <label>
+                          Current GP Name
+                          <input
+                            type="text"
+                            disabled={familyForm.noCurrentGpDetails}
+                            value={familyForm.currentGpName}
+                            onChange={(event) => updateFamilyField('currentGpName', event.target.value)}
+                            placeholder="Please Enter GP Name"
+                          />
+                        </label>
+                        <label>
+                          Current GP Email
+                          <input
+                            type="email"
+                            disabled={familyForm.noCurrentGpDetails}
+                            value={familyForm.currentGpEmail}
+                            onChange={(event) => updateFamilyField('currentGpEmail', event.target.value)}
+                            placeholder="Please Enter GP Email"
+                          />
+                        </label>
+                        <label>
+                          Partner Code
+                          <input
+                            type="text"
+                            disabled={familyForm.noCurrentGpDetails}
+                            value={familyForm.partnerCode}
+                            onChange={(event) => updateFamilyField('partnerCode', event.target.value)}
+                          placeholder="Enter Partner Code"
+                        />
+                      </label>
+                      </div>
+                    </div>
+
+                    <div className="patient-account-family-form-grid patient-account-family-form-grid--three">
+                      <label>
+                        Health Identifier
+                        <select
+                          value={familyForm.healthIdentifierType}
+                          onChange={(event) => updateFamilyField('healthIdentifierType', event.target.value)}
+                        >
+                          <option value="Medicare Number">Medicare Number</option>
+                          <option value="DVA Number">DVA Number</option>
+                          <option value="IHI Number">IHI Number</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="patient-account-checkbox-stack">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={familyForm.saveHealthIdentifier}
+                          onChange={(event) => updateFamilyCheckbox('saveHealthIdentifier', event.target.checked)}
+                        />
+                        Save my HI (Health Identifier) number for prescription
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          required
+                          checked={familyForm.onBehalfOfFamilyMember}
+                          onChange={(event) => updateFamilyCheckbox('onBehalfOfFamilyMember', event.target.checked)}
+                        />
+                        On behalf of family member, I am approving the appointment and creating the account.
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={familyForm.patientConsentGiven}
+                          onChange={(event) => updateFamilyCheckbox('patientConsentGiven', event.target.checked)}
+                        />
+                        The patient has given consent for the carer to act on their behalf.
+                      </label>
+                    </div>
+
+                    <label>
+                      Profile Picture (Optional)
+                      <input type="file" accept="image/*" onChange={handleFamilyPhotoSelect} />
+                    </label>
+
+                    <div className="patient-account-actions">
+                      <button type="submit" className="patient-account-primary-btn" disabled={isFamilySaving}>
+                        {isFamilySaving ? 'Saving...' : 'Submit Form'}
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {familySaveMessage ? <p className="patient-account-save-message">{familySaveMessage}</p> : null}
+              </article>
             </>
           ) : null}
 
@@ -912,6 +1291,20 @@ export default function PatientAccount() {
           ) : null}
         </section>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteFamilyMemberId)}
+        title="Remove family member?"
+        message="This will remove this family member from your account."
+        confirmText="Yes, remove"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        isLoading={isFamilyDeleting}
+        onConfirm={handleFamilyMemberDelete}
+        onCancel={() => {
+          if (!isFamilyDeleting) setPendingDeleteFamilyMemberId(null);
+        }}
+      />
     </main>
   );
 }

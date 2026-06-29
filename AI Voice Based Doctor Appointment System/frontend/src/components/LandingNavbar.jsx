@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Layout, Space } from 'antd';
 import {
   Activity,
@@ -26,6 +26,7 @@ import AppIcon from './branding/AppIcon';
 import '../pages/landing-page.css';
 
 const { Header } = Layout;
+const AIVoiceAssistant = lazy(() => import('./AIVoiceAssistant'));
 
 const basePrimaryNav = [
   { key: 'patient', label: 'Patient', opensPanel: 'patient' },
@@ -237,7 +238,9 @@ const serviceTypeRouteMap = {
 };
 
 function resolvePostAuthPath(user) {
-  return user?.role === 'ADMIN' ? '/admin' : '/dashboard';
+  if (user?.role === 'ADMIN') return '/admin';
+  if (user?.role === 'DOCTOR') return '/dashboard';
+  return '/';
 }
 
 function getUserDisplayName(user) {
@@ -260,6 +263,7 @@ export default function LandingNavbar({ activeKey = null }) {
   const [isPatientMenuOpen, setIsPatientMenuOpen] = useState(false);
   const [isDoctorMenuOpen, setIsDoctorMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isAIVoiceAssistantOpen, setIsAIVoiceAssistantOpen] = useState(false);
   const [activeDoctorMenuItem, setActiveDoctorMenuItem] = useState(doctorsMenuItems[0].key);
   const [activePatientServiceType, setActivePatientServiceType] = useState(patientMenuServiceTypes[0].key);
   const [activePatientCategory, setActivePatientCategory] = useState(patientMenuServiceTypes[0].categories[0].key);
@@ -335,6 +339,19 @@ export default function LandingNavbar({ activeKey = null }) {
       return;
     }
     openAuthModal({ mode: 'login', redirectTo: '/dashboard' });
+  };
+
+  const openAIVoiceAssistant = () => {
+    setIsPatientMenuOpen(false);
+    setIsDoctorMenuOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsAIVoiceAssistantOpen(true);
+  };
+
+  const handleAIVoiceComplete = (data) => {
+    setIsAIVoiceAssistantOpen(false);
+    const practitionerType = data?.suggested_practitioner_type || 'General Practitioner (GP)';
+    navigate(`/booking?practitionerType=${encodeURIComponent(practitionerType)}`, { state: { aiSummary: data } });
   };
 
   const handlePrimaryAction = () => {
@@ -485,8 +502,8 @@ export default function LandingNavbar({ activeKey = null }) {
           </Space>
 
           <div className="landing-nav-v2__right">
-            <Button className="landing-nav-v2__ai" icon={<Mic size={14} />} onClick={openLogin}>
-              <span className="label-full">OLA AI</span>
+            <Button className="landing-nav-v2__ai" icon={<Mic size={14} />} onClick={openAIVoiceAssistant}>
+              <span className="label-full">CareBridge AI</span>
               <span className="label-short">AI</span>
             </Button>
             {!isAuthenticated ? (
@@ -726,6 +743,17 @@ export default function LandingNavbar({ activeKey = null }) {
             </div>
           </div>
         </section>
+      ) : null}
+
+      {isAIVoiceAssistantOpen ? (
+        <div className="fixed inset-0 z-[1300] bg-slate-900/60 backdrop-blur-sm">
+          <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white">Loading AI triage...</div>}>
+            <AIVoiceAssistant
+              onComplete={handleAIVoiceComplete}
+              onClose={() => setIsAIVoiceAssistantOpen(false)}
+            />
+          </Suspense>
+        </div>
       ) : null}
     </div>
   );

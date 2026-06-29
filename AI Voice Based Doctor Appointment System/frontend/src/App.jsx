@@ -31,7 +31,6 @@ const DoctorProfile = lazy(() => import('./pages/DoctorProfile'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const MockCheckout = lazy(() => import('./pages/MockCheckout'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const FamilyMembers = lazy(() => import('./pages/FamilyMembers'));
 const CategoryPage = lazy(() => import('./pages/CategoryPage'));
 const ServiceDetailPage = lazy(() => import('./pages/ServiceDetailPage'));
 const PatientDoctorReviews = lazy(() => import('./pages/PatientDoctorReviews'));
@@ -40,7 +39,9 @@ const ServiceTypePage = lazy(() => import('./pages/ServiceTypePage'));
 const BookingFlowPage = lazy(() => import('./pages/BookingFlowPage'));
 
 function getDefaultPostAuthPath(user) {
-  return user?.role === 'ADMIN' ? '/admin' : '/dashboard';
+  if (user?.role === 'ADMIN') return '/admin';
+  if (user?.role === 'DOCTOR') return '/dashboard';
+  return '/';
 }
 
 function AuthRouteRedirect({ mode }) {
@@ -127,7 +128,7 @@ function AppRoutes() {
           <Route path="/waiting-room" element={<ProtectedRoute><PatientWaitingRoom /></ProtectedRoute>} />
           <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
           <Route path="/mock-checkout" element={<ProtectedRoute><MockCheckout /></ProtectedRoute>} />
-          <Route path="/family-members" element={<ProtectedRoute><FamilyMembers /></ProtectedRoute>} />
+          <Route path="/family-members" element={<Navigate to="/patient/account?tab=family" replace />} />
           <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         </Routes>
       </Suspense>
